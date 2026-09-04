@@ -253,16 +253,36 @@ class CurriculumVectorStore:
         with self._lock:
             self.collection.delete(where={"source": source})
 
-    def query(self, query: str, top_k: int) -> list[CurriculumVectorHit]:
+    def query(
+        self,
+        query: str,
+        top_k: int,
+        allowed_sources: list[str] | None = None,
+    ) -> list[CurriculumVectorHit]:
         if not self.available:
             raise CurriculumVectorUnavailable(self.error or "向量检索不可用")
         query_vectors = self.embed_texts([query])
         if not query_vectors:
             return []
+        where = None
+        if allowed_sources is not None:
+            normalized_sources = list(dict.fromkeys(allowed_sources))
+            if not normalized_sources:
+                return []
+            where = (
+                {"source": normalized_sources[0]}
+                if len(normalized_sources) == 1
+                else {"source": {"$in": normalized_sources}}
+            )
+        query_args = {
+            "query_embeddings": query_vectors,
+            "n_results": max(1, top_k),
+            "include": ["metadatas", "distances"],
+        }
+        if where is not None:
+            query_args["where"] = where
         result = self.collection.query(
-            query_embeddings=query_vectors,
-            n_results=max(1, top_k),
-            include=["metadatas", "distances"],
+            **query_args,
         )
         metadatas = (result.get("metadatas") or [[]])[0]
         distances = (result.get("distances") or [[]])[0]

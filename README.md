@@ -19,7 +19,7 @@ Windows 一键启动（已有依赖时）：
 .\start.bat -Install
 ```
 
-默认启动后端 `http://127.0.0.1:8010` 和前端 `http://127.0.0.1:5173`。脚本会复用已经健康运行的服务；端口被其他程序占用时会报错，不会直接结束对方进程。确需重启本项目时可运行 `.\start.bat -Restart`，日志保存在 `.logs/`。
+默认启动后端 `http://127.0.0.1:8010` 和前端 `http://127.0.0.1:5173`，成功后自动打开浏览器。脚本会复用已经健康运行的服务；端口被其他程序占用时会报错并暂停窗口，不会直接结束对方进程。确需重启本项目时可运行 `.\start.bat -Restart`；不希望自动打开页面时可增加 `-NoBrowser`，日志保存在 `.logs/`。
 
 手动启动方式：
 
@@ -37,9 +37,9 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --reload
 
 当前 HTTP 部署地址：`http://152.136.39.252:5173/`。
 
-## 主导师模型
+## 主导师与领域专家
 
-主教学导师通过 OpenRouter 的 OpenAI 兼容接口调用：
+教学流程始终由 `main_tutor` 主导师推进。教师也可以在每次提问前临时选择一位领域专家；专家只回答当前这一轮，完成后自动回到主导师。第一版包含昆虫、自然生态、数学数据、安全伦理和物理探究五位专家，均通过独立角色提示词划分能力边界，共用现有 OpenAI 兼容模型配置：
 
 ```text
 LLM_API_BASE=https://openrouter.ai/api/v1
@@ -76,8 +76,10 @@ POST /api/auth/logout
 GET  /api/auth/me
 GET  /health
 GET  /api/flows
+GET  /api/experts
 GET  /api/curriculum/files
 POST /api/curriculum/files
+PUT  /api/curriculum/files/permissions
 DELETE /api/curriculum/files?source={source}
 GET  /api/curriculum/status
 POST /api/curriculum/vector/rebuild
@@ -94,25 +96,24 @@ POST /api/sessions/{session_id}/select_flow
 POST /api/sessions/{session_id}/chat
 POST /api/sessions/{session_id}/chat/{request_id}/cancel
 POST /api/sessions/{session_id}/rollback
-GET  /api/sessions/{session_id}/dify_agents
 PUT  /api/sessions/{session_id}/stages/{stage_id}/draft
 GET  /api/sessions/{session_id}/export
 ```
 
-会话参考资料支持 `PDF`、`DOCX`、`TXT` 和 `MD`。上传成功后，系统会提取全文并自动加入当前会话后续的主导师、阶段专家和草案 Agent 上下文。默认限制为单文件 20 MB、每个会话 10 个文件、可用正文总计 50,000 字符；扫描版 PDF 暂不支持 OCR。
+会话参考资料支持 `PDF`、`DOCX`、`TXT` 和 `MD`。上传成功后，系统会提取全文并加入当前会话后续的主导师、领域专家和草案上下文。默认限制为单文件 20 MB、每个会话 10 个文件、可用正文总计 50,000 字符；扫描版 PDF 暂不支持 OCR。
 
 ## 本地课标混合 RAG
 
 将权威课标文件放入 `data/curriculum/`，支持 `MD`、`TXT`、`PDF` 和 `DOCX`。扫描版 PDF 暂不支持 OCR。执行以下命令导入：
 
-管理员也可以在工作台聊天输入框下方点击“课标知识库”按钮，直接上传、替换或删除课标；普通用户可以在同一入口查看当前课标。网页上传完成后立即生效，不需要执行命令。命令行方式保留用于批量导入：
+管理员可以在工作台上传、替换或删除课标，并在文件解析、切片和向量化完成后单独配置哪些专家可以查询该文件。新文件默认未授权；一个文件可以授权给多位专家，权限变更在下一轮咨询中立即生效。普通用户只能查看文件与授权结果。命令行方式保留用于批量导入：
 
 ```powershell
 cd E:\InquiryTeachingPythonService
 .\.venv\Scripts\python.exe scripts\ingest_curriculum.py data\curriculum
 ```
 
-导入命令会递归读取目录、切分正文并写入本地 `curriculum_chunks` 表。同一路径的文件重复导入时会替换旧片段。系统同时使用 BM25 关键词召回和本地 BGE Embedding 语义召回，再按学段、明确学科和融合分数重排。命中内容作为年龄特点、技术水平、任务难度、安全边界和评价方式的参考，回答末尾只简要显示来源，完整片段和各路分数保存在 `rag_records` 中。
+导入命令会递归读取目录、切分正文并写入本地 `curriculum_chunks` 表。同一路径的文件重复导入时会替换旧片段。只有教师显式选择的专家会查询课程知识库：系统先读取 `curriculum_source_agent_permissions`，然后在获权文件范围内执行 BM25 和本地 BGE Embedding 召回。主导师、草案能力和未被选择的专家不会查询课程库。完整命中、专家 ID、授权来源及各路分数保存在 `rag_records` 中。
 
 首次部署或模型缺失时执行一次初始化脚本。脚本会下载或验证模型，并根据 `curriculum_chunks` 重建 Chroma 索引：
 
@@ -165,7 +166,7 @@ curl -X POST http://localhost:8010/api/sessions/{session_id}/select_flow ^
   -d "{\"flow_name\":\"three_step_inquiry\",\"clear_messages\":true}"
 ```
 
-主导师与当前阶段专家协同对话：
+主导师对话：
 
 ```bash
 curl -N -X POST http://localhost:8010/api/sessions/{session_id}/chat ^
@@ -179,7 +180,13 @@ curl -N -X POST http://localhost:8010/api/sessions/{session_id}/chat ^
 curl -X POST http://localhost:8010/api/sessions/{session_id}/chat/chat_demo_001/cancel
 ```
 
-后端会自动调用当前阶段绑定的 Dify 专家，再由 `main_agent` 整合为主导师回复，无需前端手动选择专家。
+临时咨询物理专家时，在同一请求中传入 `expert_id`。本轮只返回专家建议，不修改草案，下一轮不传时自动由主导师继续：
+
+```bash
+curl -N -X POST http://localhost:8010/api/sessions/{session_id}/chat ^
+  -H "Content-Type: application/json" ^
+  -d "{\"type\":\"chat\",\"message\":\"怎样控制实验变量？\",\"expert_id\":\"physics_teacher_agent\"}"
+```
 
 推进阶段：
 
@@ -197,24 +204,18 @@ curl -X POST http://localhost:8010/api/sessions/{session_id}/rollback ^
   -d "{\"steps\":1,\"stage_back\":false}"
 ```
 
-## 七阶段 Dify Agent 配置
+## Agent 配置
 
-默认使用 `mock` 模式暴露七个阶段专家，方便离线联调。接真实 Dify 时把模式改为 `live`，并配置 `.env` 或环境变量：
+Agent 采用 YAML 注册表和独立 Markdown 角色提示词：
 
 ```text
-DIFY_STAGE_AGENT_MODE=live
-DIFY_STAGE_AGENTS_JSON=[
-  {
-    "id": "stage_observation_start",
-    "stage_id": "observation_start",
-    "name": "情境探寻专家",
-    "description": "设计观察起点",
-    "api_url": "http://49.233.10.4/v1/chat-messages",
-    "api_key": "app-xxx",
-    "flow_names": ["inquiry_7_stage", "three_step_inquiry"]
-  }
-]
+app/agents/config/agents.yaml
+app/agents/prompts/main_tutor.md
+app/agents/prompts/experts/*.md
+AGENT_CONFIG_PATH=./app/agents/config/agents.yaml
 ```
+
+配置会校验唯一 ID、`main`/`expert` 角色、可选择状态和提示词文件。知识文件权限不写入 YAML，而由数据库中的文件级授权关系管理。
 
 ## 前端事件约定
 
@@ -222,14 +223,12 @@ DIFY_STAGE_AGENTS_JSON=[
 
 ```text
 event: stage
-event: agent    # 当前阶段专家
-event: delta    # 阶段专家回复
-event: warning  # 专家不可用时可选
-event: agent    # main_agent
-event: delta    # 主导师整合回复
-event: draft    # 仅由主导师更新草稿
+event: agent    # 本轮主导师或显式选择的领域专家
+event: delta    # main_tutor 或 expert_advice 回复
+event: status   # 主导师引导或草案状态
+event: draft    # 主导师内部草案能力的流式内容
 event: interrupted  # 本轮被前端或后端中断，不会落库
 event: done
 ```
 
-每轮正常对话会保存教师、阶段专家、主导师三条消息。Dify 不可用时会发送 `warning`，主导师继续完成本轮回答并在 `done` 中返回 `degraded=true`。
+新增回复统一保存为 `main_tutor` 或 `expert_advice`；历史 `stage_expert` 消息仍可读取。未配置 LLM 密钥时继续使用本地 Mock 回复。

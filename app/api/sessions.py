@@ -4,10 +4,10 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.agents.registry import get_agent_registry
 from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.db.models import (
-    AgentConversationModel,
     ChatTurnModel,
     DraftProposalModel,
     MessageModel,
@@ -25,7 +25,6 @@ from app.schemas import (
     SelectFlowRequest,
     SessionCreate,
 )
-from app.services.dify_agent_service import DifyAgentService
 from app.services.draft_proposal_service import DraftProposalService
 from app.services.session_access_service import get_owned_session
 from app.services.session_file_service import SessionFileService
@@ -192,16 +191,19 @@ def delete_session(
     user: UserModel = Depends(get_current_user),
 ):
     sess = get_owned_session(db, session_id, user.id)
-    
+
     # Cascade delete all related data to keep DB clean
-    db.query(StageOutputModel).filter(StageOutputModel.session_id == session_id).delete()
-    db.query(AgentConversationModel).filter(AgentConversationModel.session_id == session_id).delete()
+    db.query(StageOutputModel).filter(
+        StageOutputModel.session_id == session_id
+    ).delete()
     db.query(MessageModel).filter(MessageModel.session_id == session_id).delete()
     db.query(ChatTurnModel).filter(ChatTurnModel.session_id == session_id).delete()
-    db.query(DraftProposalModel).filter(DraftProposalModel.session_id == session_id).delete()
+    db.query(DraftProposalModel).filter(
+        DraftProposalModel.session_id == session_id
+    ).delete()
     db.query(RagRecordModel).filter(RagRecordModel.session_id == session_id).delete()
     SessionFileService.delete_session_files(db, session_id)
-    
+
     db.delete(sess)
     db.commit()
     return {"code": 0, "message": "session deleted successfully"}
@@ -220,6 +222,7 @@ def get_messages(
         .order_by(MessageModel.created_at.asc())
         .all()
     )
+    registry = get_agent_registry()
     return {
         "code": 0,
         "message": "success",
@@ -230,6 +233,16 @@ def get_messages(
                 "role": item.role,
                 "content": item.content,
                 "agent_id": item.agent_id,
+                "agent_name": (
+                    registry.get(item.agent_id).name
+                    if item.agent_id and registry.get(item.agent_id)
+                    else None
+                ),
+                "agent_role": (
+                    registry.get(item.agent_id).role
+                    if item.agent_id and registry.get(item.agent_id)
+                    else None
+                ),
                 "message_type": item.message_type,
                 "created_at": item.created_at,
             }
@@ -267,7 +280,10 @@ def confirm_stage(
     stage = flow["stages"][sess.current_stage_index]
     output = (
         db.query(StageOutputModel)
-        .filter(StageOutputModel.session_id == session_id, StageOutputModel.stage_id == stage["id"])
+        .filter(
+            StageOutputModel.session_id == session_id,
+            StageOutputModel.stage_id == stage["id"],
+        )
         .first()
     )
     if output:
@@ -275,7 +291,9 @@ def confirm_stage(
         output.confirmed = 1
         output.updated_at = now_iso()
 
-    DraftProposalService.reject_pending_proposals(db, session_id=session_id, stage_id=stage["id"])
+    DraftProposalService.reject_pending_proposals(
+        db, session_id=session_id, stage_id=stage["id"]
+    )
 
     sess.current_stage_index += 1
     if sess.current_stage_index >= len(flow["stages"]):
@@ -283,7 +301,11 @@ def confirm_stage(
     sess.updated_at = now_iso()
     db.commit()
     db.refresh(sess)
-    return {"code": 0, "message": "stage confirmed", "data": serialize_session(sess, db)}
+    return {
+        "code": 0,
+        "message": "stage confirmed",
+        "data": serialize_session(sess, db),
+    }
 
 
 @router.put("/{session_id}/draft-mode")
@@ -311,7 +333,11 @@ def get_draft_proposal(
 ):
     get_owned_session(db, session_id, user.id)
     proposal = DraftProposalService.get_active_proposal(db, session_id, stage_id)
-    return {"code": 0, "message": "success", "data": DraftProposalService.serialize(proposal)}
+    return {
+        "code": 0,
+        "message": "success",
+        "data": DraftProposalService.serialize(proposal),
+    }
 
 
 @router.post("/{session_id}/draft-proposals/{proposal_id}/actions")
@@ -323,10 +349,14 @@ def apply_draft_proposal_actions(
     user: UserModel = Depends(get_current_user),
 ):
     get_owned_session(db, session_id, user.id)
-    proposal = db.query(DraftProposalModel).filter(
-        DraftProposalModel.id == proposal_id,
-        DraftProposalModel.session_id == session_id,
-    ).first()
+    proposal = (
+        db.query(DraftProposalModel)
+        .filter(
+            DraftProposalModel.id == proposal_id,
+            DraftProposalModel.session_id == session_id,
+        )
+        .first()
+    )
     if not proposal:
         raise HTTPException(status_code=404, detail="Draft proposal not found")
 
@@ -341,7 +371,10 @@ def apply_draft_proposal_actions(
     updated = DraftProposalService.finalize_actions(
         db,
         proposal_id=proposal_id,
-        actions=[item.model_dump() if hasattr(item, "model_dump") else item.dict() for item in payload.actions],
+        actions=[
+            item.model_dump() if hasattr(item, "model_dump") else item.dict()
+            for item in payload.actions
+        ],
         stage_output=stage_output,
     )
     if not updated:
@@ -365,7 +398,10 @@ def rollback(
         stage = get_stage(sess.flow_name, sess.current_stage_index)
         output = (
             db.query(StageOutputModel)
-            .filter(StageOutputModel.session_id == session_id, StageOutputModel.stage_id == stage["id"])
+            .filter(
+                StageOutputModel.session_id == session_id,
+                StageOutputModel.stage_id == stage["id"],
+            )
             .first()
         )
         if output:
@@ -393,11 +429,15 @@ def rollback(
                     turn.expert_message_id,
                     turn.assistant_message_id,
                 ]
-                turn_message_ids = [message_id for message_id in turn_message_ids if message_id]
+                turn_message_ids = [
+                    message_id for message_id in turn_message_ids if message_id
+                ]
                 deleted_ids.extend(turn_message_ids)
                 oldest_turn_by_stage[turn.stage_id] = turn
                 if turn.rag_record_id:
-                    db.query(RagRecordModel).filter(RagRecordModel.id == turn.rag_record_id).delete()
+                    db.query(RagRecordModel).filter(
+                        RagRecordModel.id == turn.rag_record_id
+                    ).delete()
                 db.query(MessageModel).filter(
                     MessageModel.id.in_(turn_message_ids)
                 ).delete(synchronize_session=False)
@@ -454,45 +494,22 @@ def update_stage_draft(
     get_owned_session(db, session_id, user.id)
     output = (
         db.query(StageOutputModel)
-        .filter(StageOutputModel.session_id == session_id, StageOutputModel.stage_id == stage_id)
+        .filter(
+            StageOutputModel.session_id == session_id,
+            StageOutputModel.stage_id == stage_id,
+        )
         .first()
     )
     if not output:
         raise HTTPException(status_code=404, detail="Stage output not found")
     output.draft_content = payload.draft_content
     output.updated_at = now_iso()
-    DraftProposalService.reject_pending_proposals(db, session_id=session_id, stage_id=stage_id)
+    DraftProposalService.reject_pending_proposals(
+        db, session_id=session_id, stage_id=stage_id
+    )
     db.commit()
     return {
         "code": 0,
         "message": "draft saved",
         "data": {"stage_id": stage_id, "draft_content": output.draft_content},
-    }
-
-
-@router.get("/{session_id}/dify_agents")
-def get_dify_agents(
-    session_id: str,
-    db: Session = Depends(get_db),
-    user: UserModel = Depends(get_current_user),
-):
-    sess = get_owned_session(db, session_id, user.id)
-
-    agents = DifyAgentService.list_agents(sess.flow_name)
-    return {
-        "code": 0,
-        "message": "success",
-        "data": [
-            {
-                "id": agent.id,
-                "stage_id": agent.stage_id,
-                "command": agent.command,
-                "name": agent.name,
-                "description": agent.description,
-                "flow_names": list(agent.flow_names),
-                "configured": True,
-                "mode": "prompt",
-            }
-            for agent in agents
-        ],
     }

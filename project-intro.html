@@ -484,7 +484,7 @@
       <div>
         <p class="eyebrow">InquiryTeachingPythonService · 新建独立项目</p>
         <h1>AI 探究式教学助手</h1>
-        <p class="lead">项目的核心设计，是把“生成一份教案”改成“沿着七个探究阶段逐步打磨教案”。教师保留判断权，模型提供阶段专家意见，系统负责流程、草稿和回滚。</p>
+        <p class="lead">项目的核心设计，是把“生成一份教案”改成“沿着探究阶段逐步打磨教案”。教师保留判断权，主导师持续推进流程，教师可按需临时咨询领域专家。</p>
         <div class="meta">
           <span class="pill">FastAPI + SQLite</span>
           <span class="pill">Vue 3 工作台</span>
@@ -573,8 +573,8 @@
         </article>
         <div class="arrow" aria-hidden="true"></div>
         <article class="module agent">
-          <h3>阶段专家 + 主导师</h3>
-          <p>阶段专家给出专业意见，主教学导师贯穿全链路，整合历史、草稿和专家输出。</p>
+          <h3>统一主导师 + 可选领域专家</h3>
+          <p>主导师贯穿全链路并吸收阶段能力；昆虫、生态、数学、安全和物理专家按教师单次选择提供建议。</p>
         </article>
       </div>
     </section>
@@ -607,11 +607,11 @@
         </article>
         <article class="status">
           <h3>已接入</h3>
-          <p>主导师通过 OpenRouter 调用 DeepSeek；七阶段 Dify 专家接口已预留并支持 Mock 降级。</p>
+          <p>主导师与五位领域专家均由本地服务通过 OpenAI 兼容接口调用模型，并支持 Mock 降级。</p>
         </article>
         <article class="status next">
           <h3>下一步</h3>
-          <p>配置真实 Dify Chatflow 与阶段知识库，补齐端到端验收和教师试用反馈。</p>
+          <p>持续补齐领域专家、文件级知识权限的端到端验收和教师试用反馈。</p>
         </article>
       </div>
     </section>

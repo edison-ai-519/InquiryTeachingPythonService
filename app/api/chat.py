@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.agents.registry import get_agent_registry
+from app.agents.service import ExpertAgentService
 from app.core.auth import get_current_user
 from app.core.sse import format_sse
 from app.db.database import SessionLocal, get_db
 from app.db.models import (
-    AgentConversationModel,
     ChatTurnModel,
     MessageModel,
     RagRecordModel,
@@ -20,9 +21,8 @@ from app.db.models import (
 )
 from app.schemas import ChatRequest
 from app.services.context_service import ContextService
-from app.services.app_settings_service import SUBAGENT_MODE, get_user_chat_mode
 from app.services.chat_interrupt_service import ChatInterrupted, chat_interruptions
-from app.services.dify_agent_service import DifyAgentError, DifyAgentService
+from app.services.curriculum_permission_service import CurriculumPermissionService
 from app.services.draft_edit_service import DraftEditService
 from app.services.draft_generate_service import DraftGenerateService
 from app.services.draft_service import DraftService
@@ -69,52 +69,6 @@ def get_current_context(
     return sess, flow, stage, stage_output
 
 
-def get_agent_conversation_id(db: Session, session_id: str, agent_id: str) -> str:
-    row = (
-        db.query(AgentConversationModel)
-        .filter(
-            AgentConversationModel.session_id == session_id,
-            AgentConversationModel.agent_id == agent_id,
-        )
-        .first()
-    )
-    return row.conversation_id if row else ""
-
-
-def upsert_agent_conversation_id(session_id: str, agent_id: str, conversation_id: str) -> None:
-    if not conversation_id:
-        return
-
-    db = SessionLocal()
-    try:
-        row = (
-            db.query(AgentConversationModel)
-            .filter(
-                AgentConversationModel.session_id == session_id,
-                AgentConversationModel.agent_id == agent_id,
-            )
-            .first()
-        )
-        timestamp = now_iso()
-        if row:
-            row.conversation_id = conversation_id
-            row.updated_at = timestamp
-        else:
-            db.add(
-                AgentConversationModel(
-                    id=new_id("aconv"),
-                    session_id=session_id,
-                    agent_id=agent_id,
-                    conversation_id=conversation_id,
-                    created_at=timestamp,
-                    updated_at=timestamp,
-                )
-            )
-        db.commit()
-    finally:
-        db.close()
-
-
 def save_chat_result(
     *,
     session_id: str,
@@ -124,7 +78,6 @@ def save_chat_result(
     expert_agent_id: str,
     main_message: str = "",
     draft_message: str = "",
-    draft_agent_id: str = "draft_agent",
     draft_content: str = "",
     update_stage_output: bool = False,
     rag_record: dict | None = None,
@@ -159,13 +112,13 @@ def save_chat_result(
                     role="assistant",
                     content=expert_message,
                     agent_id=expert_agent_id,
-                    message_type="stage_expert",
+                    message_type="expert_advice",
                     created_at=now_iso(),
                 )
             )
 
         assistant_message_id = expert_msg_id
-        assistant_message_type = "stage_expert"
+        assistant_message_type = "expert_advice"
         assistant_message_agent_id = expert_agent_id
         main_timestamp = now_iso()
         draft_msg_id = None
@@ -173,7 +126,7 @@ def save_chat_result(
             main_msg_id = new_id("msg")
             assistant_message_id = main_msg_id
             assistant_message_type = "main_tutor"
-            assistant_message_agent_id = "main_agent"
+            assistant_message_agent_id = "main_tutor"
             db.add(
                 MessageModel(
                     id=main_msg_id,
@@ -181,7 +134,7 @@ def save_chat_result(
                     stage_id=stage_id,
                     role="assistant",
                     content=DraftService.strip_draft_markers(main_message),
-                    agent_id="main_agent",
+                    agent_id="main_tutor",
                     message_type="main_tutor",
                     created_at=main_timestamp,
                 )
@@ -190,8 +143,8 @@ def save_chat_result(
         if draft_message:
             draft_msg_id = new_id("msg")
             assistant_message_id = draft_msg_id
-            assistant_message_type = "draft_tutor"
-            assistant_message_agent_id = draft_agent_id
+            assistant_message_type = "main_tutor"
+            assistant_message_agent_id = "main_tutor"
             db.add(
                 MessageModel(
                     id=draft_msg_id,
@@ -199,8 +152,8 @@ def save_chat_result(
                     stage_id=stage_id,
                     role="assistant",
                     content=DraftService.strip_draft_markers(draft_message),
-                    agent_id=draft_agent_id,
-                    message_type="draft_tutor",
+                    agent_id="main_tutor",
+                    message_type="main_tutor",
                     created_at=main_timestamp,
                 )
             )
@@ -362,8 +315,9 @@ async def chat(
                         "delta",
                         {
                             "text": text,
-                            "agent_id": "main_agent",
-                            "agent_name": "主教学导师",
+                            "agent_id": "main_tutor",
+                            "agent_name": "主导师 Agent",
+                            "agent_role": "探究教学主导师",
                             "message_type": "main_tutor",
                         },
                     )
@@ -373,11 +327,24 @@ async def chat(
                         "message_id": None,
                         "completed": action_result["completed"],
                         "degraded": False,
+                        "agent_id": "main_tutor",
+                        "agent_name": "主导师 Agent",
+                        "agent_role": "探究教学主导师",
+                        "message_type": "main_tutor",
                         "request_id": request_id,
                     },
                 )
             except ChatInterrupted:
-                yield format_sse("interrupted", {"request_id": request_id})
+                yield format_sse(
+                    "interrupted",
+                    {
+                        "request_id": request_id,
+                        "agent_id": "main_tutor",
+                        "agent_name": "主导师 Agent",
+                        "agent_role": "探究教学主导师",
+                        "message_type": "main_tutor",
+                    },
+                )
             except asyncio.CancelledError:
                 raise
             finally:
@@ -388,23 +355,34 @@ async def chat(
     if not payload.message.strip():
         raise HTTPException(status_code=400, detail="message is required")
 
+    registry = get_agent_registry()
+    selected_expert = None
+    if payload.expert_id:
+        selected_expert = registry.selectable_expert(payload.expert_id)
+        if selected_expert is None:
+            raise HTTPException(status_code=400, detail="未知或不可选择的专家 Agent")
+
     all_messages = ContextService.load_messages(db, session_id)
     dialog_history = ContextService.format_dialog_history(all_messages)
     llm_history = ContextService.to_llm_history(all_messages)
     current_draft = stage_output.draft_content if stage_output else ""
     base_doc_input = ContextService.build_doc_input(db, session_id, stage["id"])
-    curriculum_context, curriculum_source = RagService.retrieve_curriculum_context(
-        db,
-        topic=sess.topic,
-        stage=stage,
-        user_message=payload.message,
-    )
+    curriculum_context = ""
+    curriculum_source: dict = {}
+    allowed_sources: list[str] = []
+    if selected_expert is not None:
+        allowed_sources = CurriculumPermissionService.allowed_sources(db, selected_expert.id)
+        if allowed_sources:
+            curriculum_context, curriculum_source = RagService.retrieve_curriculum_context(
+                db,
+                topic=sess.topic,
+                stage=stage,
+                user_message=payload.message,
+                expert_id=selected_expert.id,
+                allowed_sources=allowed_sources,
+            )
     doc_input = RagService.merge_context(base_doc_input, curriculum_context)
     curriculum_sources = RagService.curriculum_sources(curriculum_source)
-    stage_agent_id = stage["agent_id"]
-    stage_agent = DifyAgentService.find_agent(stage_agent_id, sess.flow_name)
-    conversation_id = get_agent_conversation_id(db, session_id, stage_agent_id)
-    chat_mode = get_user_chat_mode(user)
 
     session_snapshot = {
         "session_id": sess.id,
@@ -421,8 +399,9 @@ async def chat(
             "query": curriculum_source.get("query", ""),
             "context": curriculum_context,
             "source": curriculum_source,
-        },
+        } if curriculum_source else None,
         "rag_sources": curriculum_sources,
+        "allowed_sources": allowed_sources,
         "selection_text": get_selection_text(payload),
     }
 
@@ -439,7 +418,6 @@ async def chat(
         expert_text = ""
         main_text = ""
         draft_text = ""
-        next_conversation_id = conversation_id
         final_draft = current_draft
         draft_updated = False
         draft_failed = False
@@ -450,32 +428,77 @@ async def chat(
         draft_request_kind = payload.draft_request_kind or (
             "generate" if not session_snapshot["current_draft"].strip() else "edit"
         )
+        agent_identity = {
+            "agent_id": selected_expert.id if selected_expert else "main_tutor",
+            "agent_name": selected_expert.name if selected_expert else "主导师 Agent",
+            "agent_role": selected_expert.role if selected_expert else "探究教学主导师",
+            "message_type": "expert_advice" if selected_expert else "main_tutor",
+        }
 
         await ensure_chat_active()
         yield format_sse(
             "stage",
             {
+                **agent_identity,
                 "stage": session_snapshot["stage"],
                 "flow_name": session_snapshot["flow_name"],
                 "flow_display_name": session_snapshot["flow_display_name"],
-                "chat_mode": chat_mode,
                 "draft_mode_enabled": session_snapshot["draft_mode_enabled"],
             },
         )
-        if session_snapshot["draft_mode_enabled"]:
+        if selected_expert is not None:
+            yield format_sse(
+                "agent",
+                {
+                    "agent_id": selected_expert.id,
+                    "agent_name": selected_expert.name,
+                    "agent_role": selected_expert.role,
+                    "message_type": "expert_advice",
+                },
+            )
+            expert_prompt = ExpertAgentService.build_prompt(
+                agent=selected_expert,
+                topic=session_snapshot["topic"],
+                flow_display_name=session_snapshot["flow_display_name"],
+                stage=session_snapshot["stage"],
+                dialog_history=session_snapshot["dialog_history"],
+                doc_input=session_snapshot["doc_input"],
+                current_draft=session_snapshot["current_draft"],
+                user_message=payload.message,
+                selection_text=session_snapshot["selection_text"],
+            )
+            async for text in ExpertAgentService.chat_stream(
+                agent=selected_expert,
+                system_prompt=expert_prompt,
+                message=payload.message,
+            ):
+                await ensure_chat_active()
+                expert_text += text
+                yield format_sse(
+                    "delta",
+                    {
+                        "text": text,
+                        "agent_id": selected_expert.id,
+                        "agent_name": selected_expert.name,
+                        "agent_role": selected_expert.role,
+                        "message_type": "expert_advice",
+                    },
+                )
+        elif session_snapshot["draft_mode_enabled"]:
             draft_status_text = "我先根据您的想法整理右侧草案，您稍等一下。"
             yield format_sse(
                 "agent",
                 {
-                    "mode": "main",
-                    "agent_id": "main_agent",
-                    "agent_name": "流程引导Agent",
+                    "agent_id": "main_tutor",
+                    "agent_name": "主导师 Agent",
+                    "agent_role": "探究教学主导师",
                     "message_type": "main_tutor",
                 },
             )
             yield format_sse(
                 "status",
                 {
+                    **agent_identity,
                     "phase": "draft",
                     "state": "start",
                     "text": draft_status_text,
@@ -504,11 +527,13 @@ async def chat(
                         yield format_sse(
                             "draft",
                             {
+                                **agent_identity,
                                 "text": chunk,
                                 "content": draft_text,
-                                "agent_id": "draft_agent",
-                                "agent_name": "草案转写Agent",
-                                "message_type": "draft_tutor",
+                                "agent_id": "main_tutor",
+                                "agent_name": "主导师 Agent",
+                                "agent_role": "探究教学主导师",
+                                "message_type": "main_tutor",
                             },
                         )
                     if draft_text and draft_text != session_snapshot["current_draft"]:
@@ -557,6 +582,7 @@ async def chat(
                         yield format_sse(
                             "status",
                             {
+                                **agent_identity,
                                 "phase": "draft",
                                 "state": "error",
                                 "text": draft_status_text,
@@ -565,8 +591,10 @@ async def chat(
                         yield format_sse(
                             "warning",
                             {
-                                "agent_id": "draft_agent",
-                                "agent_name": "草案编辑Agent",
+                                **agent_identity,
+                                "agent_id": "main_tutor",
+                                "agent_name": "主导师 Agent",
+                                "agent_role": "探究教学主导师",
                                 "message": draft_status_text,
                             },
                         )
@@ -590,6 +618,7 @@ async def chat(
                         yield format_sse(
                             "status",
                             {
+                                **agent_identity,
                                 "phase": "draft",
                                 "state": "start",
                                 "text": draft_status_text,
@@ -611,11 +640,13 @@ async def chat(
                             yield format_sse(
                                 "draft",
                                 {
+                                    **agent_identity,
                                     "text": chunk,
                                     "content": draft_text,
-                                    "agent_id": "draft_agent",
-                                    "agent_name": "草案编辑Agent",
-                                    "message_type": "draft_tutor",
+                                    "agent_id": "main_tutor",
+                                    "agent_name": "主导师 Agent",
+                                    "agent_role": "探究教学主导师",
+                                    "message_type": "main_tutor",
                                 },
                             )
                         await ensure_chat_active()
@@ -653,6 +684,7 @@ async def chat(
             yield format_sse(
                 "status",
                 {
+                    **agent_identity,
                     "phase": "draft",
                     "state": "done" if not draft_failed else "error",
                     "text": draft_status_text,
@@ -666,62 +698,20 @@ async def chat(
                     final_draft = session_snapshot["current_draft"]
                 elif not draft_updated:
                     final_draft = session_snapshot["current_draft"]
-        elif chat_mode == SUBAGENT_MODE:
-            yield format_sse(
-                "agent",
-                {
-                    "mode": "subagent",
-                    "agent_id": stage_agent_id,
-                    "agent_name": stage["expert"],
-                    "message_type": "stage_expert",
-                },
-            )
-
-            if not stage_agent:
-                raise DifyAgentError(f"当前流程未配置阶段专家 {stage_agent_id}")
-            async for item in DifyAgentService.chat_stream(
-                agent=stage_agent,
-                session_id=session_id,
-                conversation_id=conversation_id,
-                flow_display_name=session_snapshot["flow_display_name"],
-                topic=session_snapshot["topic"],
-                stage=session_snapshot["stage"],
-                message=payload.message,
-                dialog_history=session_snapshot["dialog_history"],
-                doc_input=session_snapshot["doc_input"],
-                current_draft=session_snapshot["current_draft"],
-                selection_text=session_snapshot["selection_text"],
-            ):
-                await ensure_chat_active()
-                text = item.get("text", "")
-                next_conversation_id = item.get("conversation_id") or next_conversation_id
-                if not text:
-                    continue
-                expert_text += text
-                yield format_sse(
-                    "delta",
-                    {
-                        "text": text,
-                        "agent_id": stage_agent.id,
-                        "agent_name": stage_agent.name,
-                        "message_type": "stage_expert",
-                    },
-                )
-            await ensure_chat_active()
-            upsert_agent_conversation_id(session_id, stage_agent.id, next_conversation_id)
         else:
             yield format_sse(
                 "agent",
                 {
-                    "mode": "main",
-                    "agent_id": "main_agent",
-                    "agent_name": "流程引导Agent",
+                    "agent_id": "main_tutor",
+                    "agent_name": "主导师 Agent",
+                    "agent_role": "探究教学主导师",
                     "message_type": "main_tutor",
                 },
             )
             yield format_sse(
                 "status",
                 {
+                    **agent_identity,
                     "phase": "guide",
                     "state": "start",
                     "text": "正在生成流程引导...",
@@ -749,14 +739,16 @@ async def chat(
                     "delta",
                     {
                         "text": text,
-                        "agent_id": "main_agent",
-                        "agent_name": "流程引导Agent",
+                        "agent_id": "main_tutor",
+                        "agent_name": "主导师 Agent",
+                        "agent_role": "探究教学主导师",
                         "message_type": "main_tutor",
                     },
                 )
             yield format_sse(
                 "status",
                 {
+                    **agent_identity,
                     "phase": "guide",
                     "state": "done",
                     "text": "流程引导完成",
@@ -765,30 +757,18 @@ async def chat(
 
         await ensure_chat_active()
         source_note = RagService.source_note(session_snapshot["rag_sources"])
-        if source_note:
-            if chat_mode == SUBAGENT_MODE:
-                expert_text += source_note
-                yield format_sse(
-                    "delta",
-                    {
-                        "text": source_note,
-                        "agent_id": stage_agent_id,
-                        "agent_name": stage["expert"],
-                        "message_type": "stage_expert",
-                    },
-                )
-            else:
-                main_text += source_note
-                if not session_snapshot["draft_mode_enabled"]:
-                    yield format_sse(
-                        "delta",
-                        {
-                            "text": source_note,
-                            "agent_id": "main_agent",
-                            "agent_name": "流程引导Agent",
-                            "message_type": "main_tutor",
-                        },
-                    )
+        if source_note and selected_expert is not None:
+            expert_text += source_note
+            yield format_sse(
+                "delta",
+                {
+                    "text": source_note,
+                    "agent_id": selected_expert.id,
+                    "agent_name": selected_expert.name,
+                    "agent_role": selected_expert.role,
+                    "message_type": "expert_advice",
+                },
+            )
 
         await ensure_chat_active()
         message_ids = save_chat_result(
@@ -796,11 +776,14 @@ async def chat(
             stage_id=stage["id"],
             user_message=payload.message,
             expert_message=expert_text,
-            expert_agent_id=stage_agent_id,
+            expert_agent_id=selected_expert.id if selected_expert else "",
             main_message=main_text,
             draft_message="",
-            draft_agent_id="draft_agent",
-            draft_content=final_draft if session_snapshot["draft_mode_enabled"] else "",
+            draft_content=(
+                final_draft
+                if selected_expert is None and session_snapshot["draft_mode_enabled"]
+                else ""
+            ),
             update_stage_output=persist_draft_directly,
             rag_record=session_snapshot["rag_record"],
         )
@@ -815,13 +798,14 @@ async def chat(
                 "draft_status_text": draft_status_text,
                 "draft_request_kind": draft_request_kind,
                 "proposal_kind": proposal_kind,
-                "conversation_id": next_conversation_id if expert_text else None,
                 "degraded": False,
-                "failed_agent_id": None,
                 "warning": None,
-                "chat_mode": chat_mode,
                 "draft_mode_enabled": session_snapshot["draft_mode_enabled"],
                 "rag_sources": session_snapshot["rag_sources"],
+                "agent_id": selected_expert.id if selected_expert else "main_tutor",
+                "agent_name": selected_expert.name if selected_expert else "主导师 Agent",
+                "agent_role": selected_expert.role if selected_expert else "探究教学主导师",
+                "message_type": "expert_advice" if selected_expert else "main_tutor",
                 "request_id": request_id,
             },
         )
@@ -832,7 +816,17 @@ async def chat(
             async for event in chat_body():
                 yield event
         except ChatInterrupted:
-            yield format_sse("interrupted", {"request_id": request_id})
+            interrupted_agent = selected_expert or get_agent_registry().main_tutor()
+            yield format_sse(
+                "interrupted",
+                {
+                    "request_id": request_id,
+                    "agent_id": interrupted_agent.id,
+                    "agent_name": interrupted_agent.name,
+                    "agent_role": interrupted_agent.role,
+                    "message_type": "expert_advice" if selected_expert else "main_tutor",
+                },
+            )
         except asyncio.CancelledError:
             raise
         finally:

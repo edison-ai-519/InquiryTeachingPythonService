@@ -9,13 +9,10 @@ from fastapi import Response
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.db.models import AppSettingModel, AuthSessionModel, SessionModel, UserModel
+from app.db.models import AuthSessionModel, SessionModel, UserModel
 
 
 AUTH_COOKIE_NAME = "inquiry_auth"
-MAIN_MODE = "main"
-SUBAGENT_MODE = "subagent"
-VALID_CHAT_MODES = {MAIN_MODE, SUBAGENT_MODE}
 
 
 def now_utc() -> dt.datetime:
@@ -44,7 +41,10 @@ def hash_password(password: str) -> str:
         p=1,
         dklen=64,
     )
-    encode = lambda value: base64.urlsafe_b64encode(value).decode("ascii")
+
+    def encode(value: bytes) -> str:
+        return base64.urlsafe_b64encode(value).decode("ascii")
+
     return f"scrypt$16384$8$1${encode(salt)}${encode(digest)}"
 
 
@@ -72,7 +72,6 @@ def serialize_user(user: UserModel) -> dict:
     return {
         "id": user.id,
         "username": user.username,
-        "chat_mode": user.chat_mode if user.chat_mode in VALID_CHAT_MODES else MAIN_MODE,
         "is_admin": bool(user.is_admin),
     }
 
@@ -109,21 +108,10 @@ def register_user(
         raise ValueError("用户名已存在")
 
     is_first_user = db.query(UserModel).count() == 0
-    initial_chat_mode = MAIN_MODE
-    if is_first_user:
-        legacy_setting = (
-            db.query(AppSettingModel)
-            .filter(AppSettingModel.key == "global_chat_mode")
-            .first()
-        )
-        if legacy_setting and legacy_setting.value in VALID_CHAT_MODES:
-            initial_chat_mode = legacy_setting.value
-
     user = UserModel(
         id=new_id("user"),
         username=normalized_username,
         password_hash=hash_password(password),
-        chat_mode=initial_chat_mode,
         is_admin=1 if is_admin else 0,
         created_at=now_iso(),
     )

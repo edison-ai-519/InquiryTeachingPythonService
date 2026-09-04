@@ -8,7 +8,7 @@
 2. `day2.md`：流程模型、会话状态、流程切换、阶段状态机
 3. `day3.md`：SSE 主对话、消息落库、草稿同步、回滚（已完成）
 4. `day4.md`：RAG 适配、Prompt 组装、离线 Mock 降级
-5. `day5.md`：七阶段 Dify Agent 路由、conversation_id、主导师整合与 fallback（已完成）
+5. `day5.md`：Agent 路由演进、统一主导师与可选领域专家（已完成）
 6. `day6.md`：Vue 3 前端工作台、会话切换、草稿编辑、导出
 7. `day7.md`：联调、导出验收、回归测试、打包说明
 

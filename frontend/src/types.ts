@@ -1,18 +1,22 @@
 export type FlowStage = {
   id: string;
   name: string;
-  expert: string;
-  agent_id: string;
   direction: string;
+  display_direction?: string;
 };
-
-export type ChatMode = "main" | "subagent";
 
 export type AuthUser = {
   id: string;
   username: string;
-  chat_mode: ChatMode;
   is_admin: boolean;
+};
+
+export type ExpertAgentItem = {
+  id: string;
+  name: string;
+  role: string;
+  description: string;
+  capabilities: string[];
 };
 
 export type CurriculumFileItem = {
@@ -24,6 +28,7 @@ export type CurriculumFileItem = {
   embedding_model: string;
   last_error: string;
   updated_at: string;
+  allowed_expert_ids: string[];
 };
 
 export type CurriculumVectorStatus = {
@@ -66,6 +71,9 @@ export type CurriculumRetrievalRecord = {
   stage_id: string;
   query: string;
   mode: string;
+  expert_id: string;
+  allowed_sources: string[];
+  hit_sources: string[];
   vector_error: string;
   records: CurriculumRetrievalHit[];
   created_at: string;
@@ -165,17 +173,8 @@ export type MessageItem = {
   content: string;
   agent_id?: string | null;
   agent_name?: string | null;
+  agent_role?: string | null;
   message_type?: string;
   interrupted?: boolean;
   created_at?: string;
-};
-
-export type DifyAgentItem = {
-  id: string;
-  stage_id: string;
-  command: string;
-  name: string;
-  description: string;
-  flow_names: string[];
-  configured: boolean;
 };

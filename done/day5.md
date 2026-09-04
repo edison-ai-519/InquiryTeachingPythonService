@@ -1,36 +1,16 @@
-# Day 5 - Dify 专家路由
+# Day 5 - Agent 路由演进记录
 
 ## 当前状态
 
-已完成七阶段专家接口、自动路由、独立上下文和主导师整合链路；真实 Dify 凭证待部署时配置。
+早期版本曾实现“固定阶段专家 + 主导师”的双层路由，并为阶段专家保存独立 conversation ID。该方案现已由统一主导师与可选领域专家架构取代，不再作为现行运行方式。
 
-## 分工
+当前实现：
 
-- 专家目录：Dify Agent 配置、流程可见性、专家列表接口
-- 对话隔离：每个专家独立 conversation_id
-- 降级兜底：真实 Dify 与 Mock 双模式
+- `main_tutor` 负责全部流程阶段、草案和阶段推进。
+- 教师可在单次请求中选择昆虫、自然生态、数学、安全伦理或物理专家。
+- 专家只产生一条 `expert_advice`，结束后自动回到主导师。
+- Agent 使用 `app/agents/config/agents.yaml` 注册，并从独立 Markdown 文件加载角色提示词。
+- 课程知识文件由管理员上传后另行配置专家查询权限。
+- 旧 `stage_expert` 消息可继续读取，旧聊天模式和 Agent conversation 状态停止使用。
 
-## 目标
-
-把七个阶段专家做成自动路由，独立维护 conversation_id，并由贯穿全程的主导师统一整合回复。
-
-## 开发任务
-
-- 定义七阶段 Dify Agent 配置结构。
-- 根据当前阶段自动选择专家，不允许前端跨阶段手动切换。
-- 维护每个 `(session_id, agent_id)` 的独立 conversation_id。
-- 向专家传递全局对话历史、前序定稿和当前草稿。
-- 专家回复完成后，由 Python 主导师生成第二条整合回复和草稿。
-- Dify 异常时发送 `warning`，主导师继续完成回答。
-
-## 产物
-
-- `app/services/dify_agent_service.py`
-- `app/api/sessions.py` 中的 `dify_agents` 接口
-
-## 验收标准
-
-- 选择不同专家时不会互相污染上下文。
-- 配置缺失或外部服务失败时仍能继续对话。
-- 前端能分别看到阶段专家和主导师两条回复。
-- 回滚一轮时同时撤销教师、专家和主导师消息。
+现行实现与验收说明见 `docs/new_agent_architecture_guide.md`。

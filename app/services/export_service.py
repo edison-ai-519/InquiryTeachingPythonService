@@ -31,7 +31,7 @@ class MarkdownExportService:
                 [
                     f"### {stage['name']}",
                     "",
-                    f"**导师角色**：{stage['expert']}",
+                    "**导师角色**：主导师 Agent",
                     "",
                     f"**阶段目标**：{stage['direction']}",
                     "",

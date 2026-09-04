@@ -317,16 +317,26 @@ class CurriculumKnowledgeService:
         )
         return vector_status
 
-    def retrieve(self, query: str, top_k: int | None = None) -> list[CurriculumSearchResult]:
+    def retrieve(
+        self,
+        query: str,
+        top_k: int | None = None,
+        allowed_sources: list[str] | None = None,
+    ) -> list[CurriculumSearchResult]:
         query = query.strip()
         if not query:
             return []
 
-        chunks = (
-            self.db.query(CurriculumChunkModel)
-            .order_by(CurriculumChunkModel.source, CurriculumChunkModel.source_index)
-            .all()
-        )
+        chunk_query = self.db.query(CurriculumChunkModel)
+        if allowed_sources is not None:
+            normalized_sources = list(dict.fromkeys(allowed_sources))
+            if not normalized_sources:
+                return []
+            chunk_query = chunk_query.filter(CurriculumChunkModel.source.in_(normalized_sources))
+        chunks = chunk_query.order_by(
+            CurriculumChunkModel.source,
+            CurriculumChunkModel.source_index,
+        ).all()
         if not chunks:
             return []
 
@@ -340,10 +350,17 @@ class CurriculumKnowledgeService:
         vector_used = False
         if self.settings.curriculum_vector_enabled and self.vector_store.available:
             try:
-                vector_hits = self.vector_store.query(
-                    query,
-                    self.settings.curriculum_candidate_k,
-                )
+                if allowed_sources is None:
+                    vector_hits = self.vector_store.query(
+                        query,
+                        self.settings.curriculum_candidate_k,
+                    )
+                else:
+                    vector_hits = self.vector_store.query(
+                        query,
+                        self.settings.curriculum_candidate_k,
+                        allowed_sources,
+                    )
                 valid_ids = {chunk.id for chunk in chunks}
                 vector_raw = {
                     hit.chunk_id: hit.score

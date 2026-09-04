@@ -24,8 +24,10 @@ class ContextService:
         for item in messages:
             if item.role == "user":
                 speaker = "教师"
+            elif item.message_type == "expert_advice":
+                speaker = f"领域专家-{item.agent_id or 'unknown'}"
             elif item.message_type == "stage_expert":
-                speaker = f"阶段专家-{item.agent_id or 'unknown'}"
+                speaker = f"历史阶段专家-{item.agent_id or 'unknown'}"
             elif item.message_type == "draft_tutor":
                 speaker = "草案修订Agent"
             else:
@@ -50,6 +52,9 @@ class ContextService:
             if item.role == "user":
                 content = item.content
                 role = "user"
+            elif item.message_type == "expert_advice":
+                content = f"【领域专家建议-{item.agent_id or 'unknown'}】{item.content}"
+                role = "assistant"
             elif item.message_type == "stage_expert":
                 content = f"【阶段专家意见】{item.content}"
                 role = "assistant"

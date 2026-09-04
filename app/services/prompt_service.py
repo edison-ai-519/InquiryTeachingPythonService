@@ -1,51 +1,13 @@
+from app.agents.prompt_loader import load_agent_prompt
+from app.agents.registry import get_agent_registry
+
+
 class PromptService:
     @staticmethod
     def _selection_block(selection_text: str = "") -> str:
         if selection_text.strip():
             return selection_text.strip()
         return "本轮无选区。"
-
-    @staticmethod
-    def build_stage_agent_prompt(
-        *,
-        topic: str,
-        flow_display_name: str,
-        stage: dict,
-        dialog_history: str,
-        doc_input: str,
-        current_draft: str = "",
-        user_message: str = "",
-        selection_text: str = "",
-    ) -> str:
-        return f"""你是{stage["expert"]}，你的专业能力是{stage["direction"]}，专门负责给教师提供本阶段的专业意见。
-
-【课题】{topic}
-【教学流】{flow_display_name}
-【当前阶段】{stage["name"]}
-【当前阶段专家】{stage["expert"]}
-
-【跨阶段对话历史】
-{dialog_history or "暂无历史对话。"}
-
-【阶段文档上下文】
-{doc_input or "暂无阶段文档。"}
-
-【右侧现有草案】
-{current_draft or "暂无草案。"}
-
-【教师当前选中的草案内容】
-{PromptService._selection_block(selection_text)}
-
-【本轮教师输入】
-{user_message or "请结合当前阶段给出建议。"}
-
-【输出要求】
-1. 只输出本阶段专家意见，不要冒充主教学导师。
-2. 保持简短、具体、可执行，优先给出 2 到 3 个关键建议和 1 到 2 个追问。
- 3. 如果本轮有选区，默认只围绕选中的这段内容做专业点评，不要泛泛点评整篇草案。
-4. 不要输出完整教案，不要输出草案标记块。
-5. 不要编造来自外部系统的结论，只根据当前上下文给建议。
-"""
 
     @staticmethod
     def build_guide_agent_prompt(
@@ -59,12 +21,12 @@ class PromptService:
         user_message: str = "",
         selection_text: str = "",
     ) -> str:
-        return f"""你是贯穿完整教学设计流程的流程引导Agent，负责引导一线教师逐步打磨探究式教案。
+        main_prompt = load_agent_prompt(get_agent_registry().main_tutor())
+        return f"""{main_prompt}
 
 【课题】{topic}
 【教学流】{flow_display_name}
 【当前阶段】{stage["name"]}
-【当前阶段专家】{stage["expert"]}
 【阶段目标】{stage["direction"]}
 
 【跨阶段对话历史】
@@ -83,7 +45,7 @@ class PromptService:
 {user_message or "请结合当前阶段给出引导建议。"}
 
 【工作方式】
-1. 你是流程引导Agent，不要冒充阶段专家，也不要输出完整草案。
+1. 你是主导师 Agent，负责吸收当前阶段的完整能力要求并持续推进流程，但不要在普通引导回复中输出完整草案。
 2. 采用 Human-in-the-loop 方式，不要一次性包办整份教案。
  3. 如果本轮有选区，默认先围绕这段内容给出引导，指出它与当前阶段目标的关系、问题和下一步建议。
 4. 语言要连贯、友好、具体，尽量把教师的想法推进到下一步。
@@ -102,12 +64,11 @@ class PromptService:
         current_draft: str = "",
         user_message: str = "",
     ) -> str:
-        return f"""你是草案撰写Agent，只负责把当前阶段的教学设计整理成可直接保存的 Markdown 草案。
+        return f"""你是主导师 Agent，当前正在执行内部草案撰写能力，把当前阶段的教学设计整理成可直接保存的 Markdown 草案。
 
 【课题】{topic}
 【教学流】{flow_display_name}
 【当前阶段】{stage["name"]}
-【当前阶段专家】{stage["expert"]}
 【阶段目标】{stage["direction"]}
 
 【流程引导回复】
@@ -146,12 +107,11 @@ class PromptService:
         current_draft: str = "",
         user_message: str = "",
     ) -> str:
-        return f"""你是草案转写Agent。你的任务是根据教师当前输入和阶段上下文，整理出一份可直接审阅的 Markdown 草案。
+        return f"""你是主导师 Agent，当前正在执行内部草案生成能力。请根据教师输入和阶段上下文，整理出一份可直接审阅的 Markdown 草案。
 
 【课题】{topic}
 【教学流】{flow_display_name}
 【当前阶段】{stage["name"]}
-【当前阶段专家】{stage["expert"]}
 【阶段目标】{stage["direction"]}
 
 【跨阶段对话历史】
@@ -187,12 +147,11 @@ class PromptService:
         target_summary: str = "",
         target_text: str = "",
     ) -> str:
-        return f"""你是草案编辑Agent。你的任务不是重写整份草案，而是只修改指定片段，并输出该片段修改后的完整正文。
+        return f"""你是主导师 Agent，当前正在执行内部草案编辑能力。不要重写整份草案，只修改指定片段，并输出该片段修改后的完整正文。
 
 【课题】{topic}
 【教学流】{flow_display_name}
 【当前阶段】{stage["name"]}
-【当前阶段专家】{stage["expert"]}
 【阶段目标】{stage["direction"]}
 
 【跨阶段对话历史】
@@ -229,7 +188,7 @@ class PromptService:
         current_draft: str = "",
         user_message: str = "",
     ) -> str:
-        return f"""你是草案定位助手。你的任务是根据教师输入，从当前草案中猜测最可能需要修改的一段。
+        return f"""你是主导师 Agent，当前正在执行内部草案定位能力。请根据教师输入，从当前草案中判断最可能需要修改的一段。
 
 【课题】{topic}
 【教学流】{flow_display_name}
@@ -254,8 +213,7 @@ class PromptService:
     @staticmethod
     def opening_message(topic: str, flow_display_name: str, stage: dict) -> str:
         return (
-            f"【流程引导Agent】已进入当前阶段：{stage['name']}，"
-            f"本阶段将围绕{stage['expert']}的专业方向推进。\n\n"
+            f"【主导师 Agent】已进入当前阶段：{stage['name']}。\n\n"
             f"我们正在为《{topic}》设计「{flow_display_name}」。"
             f"这一阶段的重点是：{stage['direction']}\n\n"
             "老师可以先描述你的课堂设想，我会边追问边推动草案逐步成形。"

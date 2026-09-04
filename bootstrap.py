@@ -43,6 +43,7 @@ def init_database() -> None:
             flow_name TEXT NOT NULL DEFAULT 'inquiry_7_stage',
             current_stage_index INTEGER DEFAULT 0,
             status TEXT DEFAULT 'active',
+            draft_mode_enabled INTEGER DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
@@ -52,7 +53,6 @@ def init_database() -> None:
             id TEXT PRIMARY KEY,
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
-            chat_mode TEXT NOT NULL DEFAULT 'main',
             is_admin INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         )
@@ -147,15 +147,17 @@ def init_database() -> None:
         )
         """,
         """
-        CREATE TABLE IF NOT EXISTS agent_conversations (
-            id TEXT PRIMARY KEY,
-            session_id TEXT NOT NULL,
+        CREATE TABLE IF NOT EXISTS curriculum_source_agent_permissions (
+            source TEXT NOT NULL,
             agent_id TEXT NOT NULL,
-            conversation_id TEXT DEFAULT '',
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE(session_id, agent_id)
+            PRIMARY KEY (source, agent_id),
+            FOREIGN KEY(source) REFERENCES curriculum_sources(source) ON DELETE CASCADE
         )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS ix_curriculum_permissions_agent_id
+        ON curriculum_source_agent_permissions (agent_id)
         """,
     ]
 

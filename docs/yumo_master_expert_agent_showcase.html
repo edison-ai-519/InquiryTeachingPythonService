@@ -501,7 +501,7 @@ textarea{min-height:80px;resize:vertical}
   <!-- 中间对话区 -->
   <main class="panel main center-main">
     <div class="topbar">
-      <div><b id="stageTitle">参数采集</b><div class="hint">与主流程 Agent 对话，通过 @领域专家 获取墨子思想、考工记工艺、第一性原理和实验安全等专业反馈。</div></div>
+      <div><b id="stageTitle">参数采集</b><div class="hint">与主导师 Agent 对话，通过 @领域专家 获取墨子思想、考工记工艺、第一性原理和实验安全等专业反馈。</div></div>
       <div class="badge">session: <span id="sessionId"></span></div>
     </div>
     <div class="chat" id="chat">
@@ -901,7 +901,7 @@ function sendMainMessage(){
     return;
   }
 
-  // 2. 走普通主流程对话，更新当前阶段并解锁下一步
+  // 2. 由主导师继续对话，更新当前阶段并解锁下一步
   addMsg('user',v); 
   const [stageKey,stageName]=stages[current]; 
   const patch=fakePatch(stageKey); 

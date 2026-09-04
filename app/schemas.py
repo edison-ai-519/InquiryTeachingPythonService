@@ -23,10 +23,6 @@ class SelectFlowRequest(BaseModel):
     clear_messages: bool = True
 
 
-class ChatModeRequest(BaseModel):
-    chat_mode: Literal["main", "subagent"]
-
-
 class DraftModeRequest(BaseModel):
     enabled: bool
 
@@ -45,6 +41,7 @@ class ChatRequest(BaseModel):
     message: str = ""
     action: Literal["next_stage", "prev_stage", "intro", "confirm_stage"] | None = None
     final_content: str | None = None
+    expert_id: str | None = Field(default=None, min_length=1, max_length=128)
     draft_request_kind: Literal["generate", "edit"] | None = None
     selection: DraftSelection | None = None
 

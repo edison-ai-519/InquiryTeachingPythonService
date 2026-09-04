@@ -10,7 +10,8 @@ param(
 
     [switch]$Install,
     [switch]$Restart,
-    [switch]$NoReload
+    [switch]$NoReload,
+    [switch]$NoBrowser
 )
 
 Set-StrictMode -Version Latest
@@ -336,6 +337,10 @@ try {
     if ($null -ne $frontendLaunch) {
         Write-Host "前端日志： $($frontendLaunch.Stdout)"
         Write-Host "前端错误： $($frontendLaunch.Stderr)"
+    }
+    if (-not $NoBrowser) {
+        Write-Step "打开浏览器"
+        Start-Process "http://127.0.0.1:$FrontendPort"
     }
 } catch {
     foreach ($process in $script:StartedProcesses) {

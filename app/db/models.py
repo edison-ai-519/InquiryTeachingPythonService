@@ -1,4 +1,12 @@
-from sqlalchemy import Column, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 
 from app.db.database import Base
 
@@ -18,21 +26,12 @@ class SessionModel(Base):
     updated_at = Column(String, nullable=False)
 
 
-class AppSettingModel(Base):
-    __tablename__ = "app_settings"
-
-    key = Column(String, primary_key=True)
-    value = Column(Text, nullable=False, default="")
-    updated_at = Column(String, nullable=False)
-
-
 class UserModel(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True)
     username = Column(String, nullable=False, unique=True, index=True)
     password_hash = Column(Text, nullable=False)
-    chat_mode = Column(String, nullable=False, default="main")
     is_admin = Column(Integer, nullable=False, default=0)
     created_at = Column(String, nullable=False)
 
@@ -108,7 +107,9 @@ class StageOutputModel(Base):
     created_at = Column(String, nullable=False)
     updated_at = Column(String, nullable=False)
 
-    __table_args__ = (UniqueConstraint("session_id", "stage_id", name="uq_session_stage"),)
+    __table_args__ = (
+        UniqueConstraint("session_id", "stage_id", name="uq_session_stage"),
+    )
 
 
 class DraftProposalModel(Base):
@@ -164,14 +165,15 @@ class CurriculumSourceModel(Base):
     updated_at = Column(String, nullable=False)
 
 
-class AgentConversationModel(Base):
-    __tablename__ = "agent_conversations"
+class CurriculumSourceAgentPermissionModel(Base):
+    __tablename__ = "curriculum_source_agent_permissions"
 
-    id = Column(String, primary_key=True)
-    session_id = Column(String, nullable=False, index=True)
-    agent_id = Column(String, nullable=False, index=True)
-    conversation_id = Column(String, default="")
+    source = Column(
+        String,
+        ForeignKey("curriculum_sources.source", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    agent_id = Column(String, primary_key=True)
     created_at = Column(String, nullable=False)
-    updated_at = Column(String, nullable=False)
 
-    __table_args__ = (UniqueConstraint("session_id", "agent_id", name="uq_session_agent"),)
+    __table_args__ = (Index("ix_curriculum_permissions_agent_id", "agent_id"),)

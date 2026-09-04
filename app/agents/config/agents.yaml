@@ -1,0 +1,80 @@
+agents:
+  - id: main_tutor
+    kind: main
+    name: 主导师 Agent
+    role: 探究教学主导师
+    description: 负责完整教学流程引导、阶段推进、草案生成与编辑。
+    capabilities:
+      - stage_guidance
+      - inquiry_coaching
+      - draft_generation
+      - draft_editing
+      - stage_summary
+    prompt_file: prompts/main_tutor.md
+    selectable: false
+
+  - id: insect_agent
+    kind: expert
+    name: 昆虫 Agent
+    role: 昆虫观察专家
+    description: 昆虫识别思路、习性解释、观察记录和非侵扰提醒。
+    capabilities:
+      - insect_observation
+      - identification_reasoning
+      - behavior_explanation
+      - non_intrusive_guidance
+    prompt_file: prompts/experts/insect.md
+    selectable: true
+
+  - id: nature_agent
+    kind: expert
+    name: 自然 Agent
+    role: 自然生态专家
+    description: 生态关系、季节变化以及植物、土壤和水文关系。
+    capabilities:
+      - ecosystem_relationships
+      - seasonal_change
+      - plant_soil_water_analysis
+    prompt_file: prompts/experts/nature_ecology.md
+    selectable: true
+
+  - id: mathematics_teacher_agent
+    kind: expert
+    name: 数学课老师 Agent
+    role: 数据分析专家
+    description: 测量、计数、抽样、统计、误差、图表和数据解释。
+    capabilities:
+      - measurement
+      - sampling
+      - statistics
+      - chart_design
+      - data_interpretation
+    prompt_file: prompts/experts/mathematics.md
+    selectable: true
+
+  - id: safety_agent
+    kind: expert
+    name: 安全 Agent
+    role: 安全与伦理专家
+    description: 户外风险、材料工具安全、生物伦理和活动边界。
+    capabilities:
+      - risk_assessment
+      - outdoor_safety
+      - tool_safety
+      - biological_ethics
+    prompt_file: prompts/experts/safety_ethics.md
+    selectable: true
+
+  - id: physics_teacher_agent
+    kind: expert
+    name: 物理课老师 Agent
+    role: 科学探究专家
+    description: 探究问题、变量控制、实验设计、测量误差和物理解释。
+    capabilities:
+      - inquiry_question
+      - variable_control
+      - experiment_design
+      - measurement_error
+      - physics_explanation
+    prompt_file: prompts/experts/physics.md
+    selectable: true

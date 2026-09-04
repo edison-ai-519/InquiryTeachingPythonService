@@ -7,7 +7,7 @@ import httpx
 from app.core.config import get_settings
 
 
-LLMResponseKind = Literal["guide", "draft_generate", "draft_edit", "draft_target"]
+LLMResponseKind = Literal["guide", "expert", "draft_generate", "draft_edit", "draft_target"]
 
 
 class LLMService:
@@ -90,6 +90,10 @@ class LLMService:
 
     @staticmethod
     async def _mock_chat_stream(system_prompt: str, new_message: str, *, response_kind: LLMResponseKind = "guide"):
+        if response_kind == "expert":
+            async for chunk in LLMService._mock_expert_stream(system_prompt, new_message):
+                yield chunk
+            return
         if response_kind == "draft_generate":
             async for chunk in LLMService._mock_draft_generate_stream(system_prompt, new_message):
                 yield chunk
@@ -107,6 +111,18 @@ class LLMService:
             yield chunk
 
     @staticmethod
+    async def _mock_expert_stream(system_prompt: str, new_message: str):
+        identity = LLMService._between(system_prompt, "【你的身份】", "\n") or "领域专家"
+        full_reply = (
+            f"【{identity}】针对“{new_message}”，建议先列出已经观察到的事实或已有数据，"
+            "再区分合理推断与仍需验证的结论。接下来可以把问题收紧为一个可操作的专业判断，"
+            "并明确需要补充的证据；超出本领域的部分应改请相应专家。"
+        )
+        for index in range(0, len(full_reply), 12):
+            await asyncio.sleep(0.01)
+            yield full_reply[index : index + 12]
+
+    @staticmethod
     async def _mock_guide_stream(system_prompt: str, new_message: str):
         stage_name = LLMService._between(system_prompt, "【当前阶段】", "\n") or "当前阶段"
         stage_goal = LLMService._between(system_prompt, "【阶段目标】", "\n\n") or "阶段目标"
@@ -114,7 +130,7 @@ class LLMService:
         if selection_text and selection_text != "本轮无选区。":
             guide_hint = "我会先围绕你选中的这段内容来推进，重点看它和当前阶段目标是否对齐、还缺少哪些证据或追问。"
             full_reply = (
-                f"【流程引导Agent】：老师，我收到你的想法：“{new_message}”。\n\n"
+                f"【主导师 Agent】：老师，我收到你的想法：“{new_message}”。\n\n"
                 f"你刚刚选中的这段内容很关键。站在“{stage_name}”这一阶段，我们要先把它和{stage_goal}更紧地扣在一起。\n\n"
                 f"{guide_hint}\n\n"
                 "你可以继续补充这段想解决的课堂问题、学生反应或你最担心的地方，我会继续围绕这段帮你收紧。"
@@ -122,7 +138,7 @@ class LLMService:
         else:
             guide_hint = "你可以先补充一个更具体的课堂情境，或者说明希望学生优先观察什么现象。"
             full_reply = (
-                f"【流程引导Agent】：老师，我收到你的想法：“{new_message}”。\n\n"
+                f"【主导师 Agent】：老师，我收到你的想法：“{new_message}”。\n\n"
                 f"站在“{stage_name}”这一阶段，我们要先把{stage_goal}落到可观察、可追问、可推进的课堂动作上。\n\n"
                 f"{guide_hint}\n\n"
                 "你可以继续补充课堂材料、学生已有基础或预期现象，我会继续帮你把方向收紧。"

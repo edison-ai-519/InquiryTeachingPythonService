@@ -1,6 +1,6 @@
 -- InquiryTeachingPythonService - SQLite schema
 -- Covers sessions, seven-stage outputs, messages, rollback turns,
--- RAG records, and per-agent Dify conversation state.
+-- RAG records, and file-level expert permissions.
 
 PRAGMA foreign_keys = ON;
 
@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     flow_name           TEXT NOT NULL DEFAULT 'inquiry_7_stage',
     current_stage_index INTEGER NOT NULL DEFAULT 0,
     status              TEXT NOT NULL DEFAULT 'active',
+    draft_mode_enabled  INTEGER NOT NULL DEFAULT 0,
     created_at          TEXT NOT NULL,
     updated_at          TEXT NOT NULL
 );
@@ -36,7 +37,7 @@ CREATE TABLE IF NOT EXISTS stage_outputs (
         FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
 );
 
--- Teacher, stage-expert, and main-tutor messages.
+-- Teacher, optional domain-expert, main-tutor, and legacy messages.
 CREATE TABLE IF NOT EXISTS messages (
     id           TEXT PRIMARY KEY,
     session_id   TEXT NOT NULL,
@@ -94,17 +95,26 @@ CREATE TABLE IF NOT EXISTS curriculum_chunks (
 CREATE INDEX IF NOT EXISTS ix_curriculum_chunks_source
     ON curriculum_chunks (source);
 
--- Independent Dify conversation state for each session and stage agent.
-CREATE TABLE IF NOT EXISTS agent_conversations (
-    id              TEXT PRIMARY KEY,
-    session_id      TEXT NOT NULL,
-    agent_id         TEXT NOT NULL,
-    conversation_id TEXT NOT NULL DEFAULT '',
-    created_at      TEXT NOT NULL,
-    updated_at      TEXT NOT NULL,
-    CONSTRAINT uq_session_agent UNIQUE (session_id, agent_id),
-    CONSTRAINT fk_agent_conversations_session
-        FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
+-- Per-file ingestion and vector-index status.
+CREATE TABLE IF NOT EXISTS curriculum_sources (
+    source             TEXT PRIMARY KEY,
+    checksum           TEXT NOT NULL DEFAULT '',
+    chunk_count        INTEGER NOT NULL DEFAULT 0,
+    vector_chunk_count INTEGER NOT NULL DEFAULT 0,
+    vector_status      TEXT NOT NULL DEFAULT 'pending',
+    embedding_model    TEXT NOT NULL DEFAULT '',
+    last_error         TEXT NOT NULL DEFAULT '',
+    updated_at         TEXT NOT NULL
+);
+
+-- Explicit file-level RAG access for selectable expert agents.
+CREATE TABLE IF NOT EXISTS curriculum_source_agent_permissions (
+    source     TEXT NOT NULL,
+    agent_id   TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (source, agent_id),
+    CONSTRAINT fk_curriculum_permission_source
+        FOREIGN KEY (source) REFERENCES curriculum_sources (source) ON DELETE CASCADE
 );
 
 -- One rollback unit per chat round. Message IDs are application-managed
@@ -151,10 +161,8 @@ CREATE INDEX IF NOT EXISTS ix_rag_records_session_id
 CREATE INDEX IF NOT EXISTS ix_rag_records_session_stage
     ON rag_records (session_id, stage_id);
 
-CREATE INDEX IF NOT EXISTS ix_agent_conversations_session_id
-    ON agent_conversations (session_id);
-CREATE INDEX IF NOT EXISTS ix_agent_conversations_agent_id
-    ON agent_conversations (agent_id);
+CREATE INDEX IF NOT EXISTS ix_curriculum_permissions_agent_id
+    ON curriculum_source_agent_permissions (agent_id);
 
 CREATE UNIQUE INDEX IF NOT EXISTS ix_chat_turns_turn_id
     ON chat_turns (turn_id);

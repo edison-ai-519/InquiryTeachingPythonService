@@ -61,7 +61,7 @@
           </div>
           <div class="stage-summary-title">{{ currentStage.name }}</div>
           <div class="stage-summary-meta">
-            <span>负责专家：{{ currentStage.expert }}</span>
+            <span>阶段目标：{{ currentStage.display_direction || currentStage.direction }}</span>
             <span>流程：{{ currentSession.flow_display_name }}</span>
           </div>
         </div>
@@ -91,7 +91,7 @@
               </span>
             </div>
             <div class="doc-meta">
-              智能体: {{ stage.expert }}
+              主导师推进：{{ stage.display_direction || stage.direction }}
             </div>
             <div
               v-if="activeStageOutput(stage.id)?.draft_content || activeStageOutput(stage.id)?.final_content"
@@ -153,7 +153,7 @@
                 :style="{ left: activeStages.length > 1 ? (idx / (activeStages.length - 1)) * 100 + '%' : '50%' }"
               >
                 <span class="step-num">{{ idx + 1 }}</span>
-                <span class="step-tooltip">{{ stage.name }} ({{ stage.expert }})</span>
+                <span class="step-tooltip">{{ stage.name }} · {{ stage.display_direction || stage.direction }}</span>
               </div>
             </div>
           </div>
@@ -164,16 +164,6 @@
         <div class="panel-head">
           <h2>主对话</h2>
           <div class="toolbar">
-            <button
-              class="stage-agent-pill mode-toggle"
-              :class="{ active: chatMode === 'subagent' }"
-              v-if="currentStage"
-              @click="toggleChatMode"
-              :disabled="isStreaming"
-              :title="chatMode === 'subagent' ? '当前为Agent模式，点击切回主流程' : '当前为主流程模式，点击切到Agent'"
-            >
-              {{ chatMode === 'subagent' ? 'Agent对话' : '主流程对话' }}
-            </button>
             <button class="ghost-button compact" @click="rollbackRecent" :disabled="!currentSession" title="撤销最近一轮对话">
               ↺ 回滚
             </button>
@@ -195,7 +185,7 @@
               <div class="message-meta-main">
                 <span>{{ messageRoleLabel(message) }}</span>
                 <small>{{ stageNameMap[message.stage_id] || message.stage_id }}</small>
-                <small v-if="message.agent_id">{{ message.agent_id }}</small>
+                <small v-if="message.agent_role || message.agent_id">{{ message.agent_role || message.agent_id }}</small>
               </div>
               <div v-if="showWorkflowBadgeForMessage(message)" class="message-meta-status">
                 <span v-if="workflowPhase === 'guide'" class="workflow-status-badge guide active">流程引导中</span>
@@ -216,6 +206,29 @@
 
         <div class="composer">
           <div class="composer-box">
+            <div class="expert-selector-row">
+              <label for="expert-selector">咨询专家</label>
+              <select
+                id="expert-selector"
+                v-model="selectedExpertId"
+                class="input compact expert-selector"
+                :disabled="isStreaming || !currentSession"
+              >
+                <option value="">不选择，由主导师回答</option>
+                <option v-for="expert in experts" :key="expert.id" :value="expert.id">
+                  {{ expert.name }} · {{ expert.role }} · {{ expert.description }}
+                </option>
+              </select>
+              <button
+                v-if="selectedExpert"
+                class="composer-attachment-pill"
+                type="button"
+                :disabled="isStreaming"
+                @click="selectedExpertId = ''"
+              >
+                <span>{{ selectedExpert.name }} · {{ selectedExpert.role }}</span><strong>×</strong>
+              </button>
+            </div>
             <div v-if="attachedChatSelectionLabel" class="composer-attachments">
               <button class="composer-attachment-pill" type="button" @click="clearAttachedChatSelection()">
                 <span>{{ attachedChatSelectionLabel }}</span>
@@ -303,11 +316,11 @@
                 <button
                   class="primary-button send-btn"
                   :class="{ 'stop-btn': isStreaming && activeStreamRequestId }"
-                  :disabled="isStreaming ? !activeStreamRequestId : (isDraftMode && !!draftContent.trim() && !attachedChatSelection?.selected_text?.trim())"
+                  :disabled="isStreaming ? !activeStreamRequestId : (!selectedExpertId && isDraftMode && !!draftContent.trim() && !attachedChatSelection?.selected_text?.trim())"
                   :aria-label="isStreaming && activeStreamRequestId ? '停止生成' : '发送对话'"
                   @click="isStreaming && activeStreamRequestId ? interruptChat() : sendChat()"
                 >
-                  {{ isStreaming && activeStreamRequestId ? "停止生成" : isDraftMode ? draftPrimaryActionLabel : "发送对话" }}
+                  {{ isStreaming && activeStreamRequestId ? "停止生成" : selectedExpert ? `咨询${selectedExpert.name}` : isDraftMode ? draftPrimaryActionLabel : "发送对话" }}
                 </button>
               </div>
             </div>
@@ -675,7 +688,34 @@
               <small :class="`vector-status-${item.vector_status}`" :title="item.last_error">
                 {{ curriculumFileVectorLabel(item) }}
               </small>
+              <div class="curriculum-permission-tags">
+                <span v-if="!item.allowed_expert_ids.length" class="permission-unassigned">尚未授权专家</span>
+                <span v-for="expertId in item.allowed_expert_ids" :key="expertId" class="permission-tag">
+                  {{ expertName(expertId) }}
+                </span>
+              </div>
+              <div v-if="permissionEditingSource === item.source" class="curriculum-permission-editor">
+                <label v-for="expert in experts" :key="expert.id">
+                  <input v-model="permissionDraftExpertIds" type="checkbox" :value="expert.id" />
+                  <span>{{ expert.name }} · {{ expert.role }}</span>
+                </label>
+                <div class="curriculum-permission-actions">
+                  <button class="primary-button compact" type="button" :disabled="savingPermissionSource === item.source" @click="saveCurriculumPermissions(item)">
+                    {{ savingPermissionSource === item.source ? "保存中" : "保存权限" }}
+                  </button>
+                  <button class="ghost-button compact" type="button" :disabled="savingPermissionSource === item.source" @click="closePermissionEditor">取消</button>
+                </div>
+              </div>
             </div>
+            <button
+              v-if="currentUser?.is_admin"
+              class="ghost-button compact"
+              type="button"
+              :disabled="isUploadingCurriculum"
+              @click="openPermissionEditor(item)"
+            >
+              配置权限
+            </button>
             <button
               v-if="currentUser?.is_admin"
               class="reference-delete-button"
@@ -778,7 +818,7 @@ import {
   applyDraftProposalActions,
   cancelChat,
   getDraftProposal,
-  getChatMode,
+  getExperts,
   getCurrentUser,
   getCurriculumFiles,
   getCurriculumRetrievals,
@@ -795,20 +835,20 @@ import {
   rollbackSession,
   saveDraft,
   setDraftMode,
-  setChatMode,
   streamChat,
+  updateCurriculumPermissions,
   uploadCurriculumFile,
   uploadSessionFile,
 } from "@/api";
 import type {
   AuthUser,
-  ChatMode,
   CurriculumFileItem,
   CurriculumRetrievalRecord,
   CurriculumVectorStatus,
   DraftProposal,
   DraftSelection,
   DraftProposalSegment,
+  ExpertAgentItem,
   FlowInfo,
   FlowStage,
   MessageItem,
@@ -829,6 +869,11 @@ const sessionFiles = ref<SessionFileItem[]>([]);
 const curriculumFiles = ref<CurriculumFileItem[]>([]);
 const curriculumStatus = ref<CurriculumVectorStatus | null>(null);
 const curriculumRetrievals = ref<CurriculumRetrievalRecord[]>([]);
+const experts = ref<ExpertAgentItem[]>([]);
+const selectedExpertId = ref("");
+const permissionEditingSource = ref("");
+const permissionDraftExpertIds = ref<string[]>([]);
+const savingPermissionSource = ref("");
 const selectedSessionId = ref("");
 const selectedStageId = ref("");
 const topicInput = ref("光的反射");
@@ -842,7 +887,6 @@ const isStreaming = ref(false);
 const activeStreamRequestId = ref<string | null>(null);
 const activeStreamAbortController = ref<AbortController | null>(null);
 const interruptRequested = ref(false);
-const chatMode = ref<ChatMode>("main");
 const themeMode = ref<"dark" | "light">("dark");
 const saveSuccessVisible = ref(false);
 const workflowPhase = ref<"idle" | "guide" | "draft" | "expert">("idle");
@@ -965,6 +1009,9 @@ const progressPercentage = computed(() => {
 });
 
 const isDraftMode = computed(() => Boolean(currentSession.value?.draft_mode_enabled));
+const selectedExpert = computed(() =>
+  experts.value.find((expert) => expert.id === selectedExpertId.value) || null,
+);
 const curriculumTotalChunks = computed(() =>
   curriculumFiles.value.reduce((total, item) => total + item.chunk_count, 0),
 );
@@ -1389,14 +1436,14 @@ function onDraftEditorInput() {
 
 async function refreshWorkspace() {
   statusText.value = "刷新流程与会话中...";
-  const [flowList, sessionList] = await Promise.all([getFlows(), getSessions()]);
+  const [flowList, sessionList, expertList] = await Promise.all([
+    getFlows(),
+    getSessions(),
+    getExperts(),
+  ]);
   flows.value = flowList;
   sessions.value = sessionList;
-  try {
-    chatMode.value = await getChatMode();
-  } catch {
-    chatMode.value = "main";
-  }
+  experts.value = expertList;
   if (!newSessionFlowName.value && flowList[0]) {
     newSessionFlowName.value = flowList[0].name;
   }
@@ -1427,6 +1474,8 @@ async function logout() {
     curriculumFiles.value = [];
     curriculumStatus.value = null;
     curriculumRetrievals.value = [];
+    experts.value = [];
+    selectedExpertId.value = "";
     showCurriculumModal.value = false;
     draftContent.value = "";
     draftProposal.value = null;
@@ -1447,6 +1496,7 @@ async function loadSession(sessionId: string, loadMessages = true, preserveWarni
   sessionFiles.value = files;
   fileOperationError.value = "";
   selectedSessionId.value = session.id;
+  selectedExpertId.value = "";
   selectedStageId.value = pickStageIdFromSession(session);
   if (loadMessages) {
     messages.value = await getMessages(sessionId);
@@ -1481,6 +1531,45 @@ async function refreshCurriculumFiles() {
     curriculumError.value = error.message || String(error);
   } finally {
     isLoadingCurriculum.value = false;
+  }
+}
+
+function expertName(expertId: string): string {
+  return experts.value.find((expert) => expert.id === expertId)?.name || expertId;
+}
+
+function openPermissionEditor(item: CurriculumFileItem) {
+  permissionEditingSource.value = item.source;
+  permissionDraftExpertIds.value = [...item.allowed_expert_ids];
+  curriculumError.value = "";
+}
+
+function closePermissionEditor() {
+  if (savingPermissionSource.value) return;
+  permissionEditingSource.value = "";
+  permissionDraftExpertIds.value = [];
+}
+
+async function saveCurriculumPermissions(item: CurriculumFileItem) {
+  if (!currentUser.value?.is_admin || savingPermissionSource.value) return;
+  savingPermissionSource.value = item.source;
+  curriculumError.value = "";
+  try {
+    const updated = await updateCurriculumPermissions(
+      item.source,
+      permissionDraftExpertIds.value,
+    );
+    item.allowed_expert_ids = [...updated.allowed_expert_ids];
+    closePermissionEditor();
+    statusText.value = updated.allowed_expert_ids.length
+      ? `已更新 ${item.source} 的专家权限`
+      : `${item.source} 已设为未授权`;
+  } catch (error: any) {
+    curriculumError.value = error.message || String(error);
+  } finally {
+    savingPermissionSource.value = "";
+    permissionEditingSource.value = "";
+    permissionDraftExpertIds.value = [];
   }
 }
 
@@ -1739,20 +1828,6 @@ async function removeReferenceFile(item: SessionFileItem) {
   }
 }
 
-async function toggleChatMode() {
-  if (isStreaming.value) {
-    return;
-  }
-  const nextMode: ChatMode = chatMode.value === "main" ? "subagent" : "main";
-  try {
-    const savedMode = await setChatMode(nextMode);
-    chatMode.value = savedMode;
-    statusText.value = savedMode === "subagent" ? "已切换到Agent模式" : "已切换到主流程模式";
-  } catch (err: any) {
-    statusText.value = `切换失败：${err.message || err}`;
-  }
-}
-
 async function toggleDraftMode() {
   if (isStreaming.value || !currentSession.value) {
     return;
@@ -1848,12 +1923,14 @@ function messageRoleLabel(message: MessageItem) {
   if (message.role === "user") {
     return "教师";
   }
-  if (message.message_type === "stage_expert") {
-    const stage = activeStages.value.find((item) => item.id === message.stage_id);
-    return message.agent_name || stage?.expert || "阶段专家";
+  if (message.message_type === "expert_advice") {
+    return message.agent_name || expertName(message.agent_id || "") || "领域专家";
   }
-  if (message.message_type === "main_tutor" || message.agent_id === "main_agent") {
-    return message.agent_name || "流程引导Agent";
+  if (message.message_type === "stage_expert") {
+    return message.agent_name || "历史阶段专家";
+  }
+  if (message.message_type === "main_tutor" || message.agent_id === "main_tutor" || message.agent_id === "main_agent") {
+    return message.agent_name || "主导师 Agent";
   }
   if (message.message_type === "draft_tutor" || message.agent_id === "draft_agent") {
     return message.agent_name || "草案修订Agent";
@@ -1862,20 +1939,20 @@ function messageRoleLabel(message: MessageItem) {
 }
 
 function createPendingAssistantMessage(
-  requestMode: "main" | "subagent" | "draft",
+  requestMode: "main" | "expert" | "draft",
   stageId: string,
   initialText: string,
 ): { key: string; message: MessageItem } {
-  if (requestMode === "subagent") {
+  if (requestMode === "expert") {
     return {
-      key: "stage_expert",
+      key: "expert_advice",
       message: {
         stage_id: stageId,
         role: "assistant",
         content: initialText,
-        agent_id: currentStage.value?.agent_id || null,
-        agent_name: currentStage.value?.expert || "阶段专家",
-        message_type: "stage_expert",
+        agent_id: selectedExpert.value?.id || null,
+        agent_name: selectedExpert.value?.name || "领域专家",
+        message_type: "expert_advice",
       },
     };
   }
@@ -1885,8 +1962,8 @@ function createPendingAssistantMessage(
       stage_id: stageId,
       role: "assistant",
       content: initialText,
-      agent_id: "main_agent",
-      agent_name: "流程引导Agent",
+      agent_id: "main_tutor",
+      agent_name: "主导师 Agent",
       message_type: "main_tutor",
     },
   };
@@ -1987,7 +2064,13 @@ async function sendChat() {
     return;
   }
 
-  const requestMode = currentSession.value.draft_mode_enabled ? "draft" : chatMode.value;
+  const requestExpert = selectedExpert.value;
+  const requestExpertId = requestExpert?.id || "";
+  const requestMode: "main" | "expert" | "draft" = requestExpertId
+    ? "expert"
+    : currentSession.value.draft_mode_enabled
+      ? "draft"
+      : "main";
   const draftRequestKind = requestMode === "draft" ? (draftContent.value.trim() ? "edit" : "generate") : undefined;
   const selectionPayload = attachedChatSelection.value?.selected_text?.trim() ? attachedChatSelection.value : null;
   const draftContentBeforeRequest = draftContent.value;
@@ -1995,7 +2078,7 @@ async function sendChat() {
     requestMode === "draft" && draftRequestKind === "generate" && !draftContentBeforeRequest.trim();
 
   if (requestMode === "draft" && draftRequestKind === "edit" && !selectionPayload) {
-    statusText.value = "请先在右侧选中要修改的草案内容，再发送给草案编辑 Agent。";
+    statusText.value = "请先在右侧选中要修改的草案内容，再交给主导师编辑。";
     return;
   }
 
@@ -2026,16 +2109,16 @@ async function sendChat() {
   statusText.value =
     requestMode === "draft"
       ? selectionPayload
-        ? "正在围绕您选中的内容与草案Agent协作..."
-        : "正在与草案Agent交互..."
-      : requestMode === "subagent"
+        ? "主导师正在围绕您选中的内容整理草案..."
+        : "主导师正在整理草案..."
+      : requestMode === "expert"
         ? selectionPayload
-          ? "正在请阶段专家围绕您选中的内容做点评..."
-          : "正在等待Agent分析..."
+          ? "正在请领域专家围绕您选中的内容提供建议..."
+          : "正在等待领域专家分析..."
         : selectionPayload
-          ? "正在请主流程围绕您选中的内容做引导..."
-          : "正在等待主流程分析...";
-  updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "subagent" ? "expert" : "guide", statusText.value, "start");
+          ? "正在请主导师围绕您选中的内容做引导..."
+          : "正在等待主导师分析...";
+  updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "expert" ? "expert" : "guide", statusText.value, "start");
   const streamMessages = new Map<string, MessageItem>();
   const placeholderTexts = new Map<string, string>();
   const markStreamMessagesInterrupted = () => {
@@ -2063,6 +2146,7 @@ async function sendChat() {
         type: "chat",
         request_id: requestId,
         message: text,
+        expert_id: requestExpertId || undefined,
         draft_request_kind: draftRequestKind,
         selection: selectionPayload,
       },
@@ -2074,21 +2158,22 @@ async function sendChat() {
           const targetKey =
             requestMode === "draft"
               ? "draft_status"
-              : requestMode === "subagent"
-                ? "stage_expert"
+              : requestMode === "expert"
+                ? "expert_advice"
                 : "main_tutor";
           const pendingMessage = streamMessages.get(targetKey);
           if (pendingMessage) {
             pendingMessage.agent_id = data.agent_id || pendingMessage.agent_id || null;
             pendingMessage.agent_name = data.agent_name || pendingMessage.agent_name || null;
+            pendingMessage.agent_role = data.agent_role || pendingMessage.agent_role || null;
             messages.value = [...messages.value];
           }
           if (requestMode === "draft") {
-            statusText.value = `${data.agent_name || data.agent_id || "流程引导Agent"} 正在陪您一起整理草案`;
-          } else if (requestMode === "subagent") {
-            statusText.value = `${data.agent_name || data.agent_id || "Agent"} 正在回答`;
+            statusText.value = `${data.agent_name || data.agent_id || "主导师 Agent"} 正在陪您一起整理草案`;
+          } else if (requestMode === "expert") {
+            statusText.value = `${data.agent_name || data.agent_id || "领域专家"} 正在回答`;
           } else {
-            statusText.value = `${data.agent_name || data.agent_id || "主流程"} 正在回答`;
+            statusText.value = `${data.agent_name || data.agent_id || "主导师 Agent"} 正在回答`;
           }
         },
         delta: (data) => {
@@ -2115,11 +2200,12 @@ async function sendChat() {
           }
           assistantMessage.agent_id = data.agent_id || assistantMessage.agent_id || null;
           assistantMessage.agent_name = data.agent_name || assistantMessage.agent_name || null;
+          assistantMessage.agent_role = data.agent_role || assistantMessage.agent_role || null;
           messages.value = [...messages.value];
           scrollFeedToBottom();
         },
         draft: (data) => {
-          if (data.message_type === "draft_tutor" || data.agent_id === "draft_agent") {
+          if (data.message_type === "main_tutor" || data.agent_id === "main_tutor") {
             draftStreamingContent.value = data.content || data.text || draftStreamingContent.value;
             draftWorkbenchState.value = draftRequestKind === "edit" ? "edit_streaming" : "generate_streaming";
             if (shouldStreamDraftIntoEditor) {
@@ -2155,8 +2241,8 @@ async function sendChat() {
                 stage_id: stageId,
                 role: "assistant",
                 content: "",
-                agent_id: "main_agent",
-                agent_name: "流程引导Agent",
+                agent_id: "main_tutor",
+                agent_name: "主导师 Agent",
                 message_type: "main_tutor",
               };
               streamMessages.set("draft_status", assistantMessage);
@@ -2169,14 +2255,14 @@ async function sendChat() {
           }
         },
         warning: (data) => {
-          streamWarning.value = `${data.agent_name || "阶段专家"}暂时不可用：${data.message || "本轮由主导师继续指导"}`;
-          statusText.value = "阶段专家降级，主导师继续回答";
+          streamWarning.value = `${data.agent_name || "专家"}暂时不可用：${data.message || "请稍后重试"}`;
+          statusText.value = "专家咨询暂时不可用";
         },
         interrupted: () => {
           interruptRequested.value = true;
           markStreamMessagesInterrupted();
           statusText.value = "已停止生成，本轮内容未保存";
-          updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "subagent" ? "expert" : "guide", statusText.value, "done");
+          updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "expert" ? "expert" : "guide", statusText.value, "done");
         },
         done: async (data) => {
           await loadSession(sessionId, true, true);
@@ -2192,11 +2278,11 @@ async function sendChat() {
               : data.draft_updated
                 ? "右侧草案已经整理好了"
                 : data.draft_status_text || "右侧草案暂时不需要调整";
-          } else if (requestMode === "subagent") {
-            statusText.value = "Agent回复完成";
+          } else if (requestMode === "expert") {
+            statusText.value = `${requestExpert?.name || "专家"}回复完成`;
             updateWorkflowStatus("expert", statusText.value, "done");
           } else {
-            statusText.value = data.degraded ? "主导师已在降级模式下完成回复" : "主流程回复完成";
+            statusText.value = data.degraded ? "主导师已在降级模式下完成回复" : "主导师回复完成";
             updateWorkflowStatus("guide", statusText.value, "done");
           }
         },
@@ -2211,16 +2297,17 @@ async function sendChat() {
     if (interruptRequested.value || err?.name === "AbortError") {
       markStreamMessagesInterrupted();
       statusText.value = "已停止生成，本轮内容未保存";
-      updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "subagent" ? "expert" : "guide", statusText.value, "done");
+      updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "expert" ? "expert" : "guide", statusText.value, "done");
     } else {
       statusText.value = `对话失败：${err.message || err}`;
-      updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "subagent" ? "expert" : "guide", statusText.value, "error");
+      updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "expert" ? "expert" : "guide", statusText.value, "error");
     }
   } finally {
     isStreaming.value = false;
     activeStreamRequestId.value = null;
     activeStreamAbortController.value = null;
     interruptRequested.value = false;
+    selectedExpertId.value = "";
     scrollFeedToBottom();
   }
 }

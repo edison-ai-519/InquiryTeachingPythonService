@@ -9,7 +9,7 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 
 
@@ -18,10 +18,7 @@ TEST_DB = TEST_DIR / "agents.db"
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB.as_posix()}"
 os.environ["UPLOAD_DIR"] = str(TEST_DIR / "uploads")
 os.environ["LLM_API_KEY"] = ""
-os.environ["DIFY_DATASET_API_KEY"] = ""
-os.environ["DIFY_DATASET_ID"] = ""
-os.environ["DIFY_STAGE_AGENT_MODE"] = "mock"
-os.environ["DIFY_STAGE_AGENTS_JSON"] = ""
+os.environ["AGENT_CONFIG_PATH"] = "app/agents/config/agents.yaml"
 os.environ["CURRICULUM_VECTOR_ENABLED"] = "false"
 os.environ["FRONTEND_ORIGIN"] = (
     "http://127.0.0.1:5173,"
@@ -35,13 +32,15 @@ from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from app.core.config import get_settings
+from app.agents.registry import AgentRegistry, get_agent_registry
+from app.agents.service import ExpertAgentService
 from app.db.database import Base, SessionLocal, engine
+from app.db.migrations import ensure_schema_compatibility
 from app.db.models import (
-    AgentConversationModel,
-    AppSettingModel,
     ChatTurnModel,
     CurriculumChunkModel,
     CurriculumSourceModel,
+    CurriculumSourceAgentPermissionModel,
     DraftProposalModel,
     MessageModel,
     RagRecordModel,
@@ -58,28 +57,27 @@ from app.services.curriculum_knowledge_service import (
     detect_subjects,
 )
 from app.services.curriculum_vector_service import CurriculumVectorHit
+from app.services.curriculum_permission_service import CurriculumPermissionService
 from app.services.prompt_service import PromptService
 from app.services.session_file_service import SessionFileService
 from app.workflow.flows import get_flow
 
 
-EXPECTED_STAGE_AGENTS = [
-    "stage_observation_start",
-    "stage_question_refine",
-    "stage_hypothesis",
-    "stage_experiment_design",
-    "stage_new_questions",
-    "stage_conclusion",
-    "stage_extension",
+EXPECTED_EXPERT_IDS = [
+    "insect_agent",
+    "nature_agent",
+    "mathematics_teacher_agent",
+    "safety_agent",
+    "physics_teacher_agent",
 ]
 
 EXPECTED_INSECT_HOTEL_STAGES = [
-    ("natural_materials", "stage_observation_start"),
-    ("habitat_needs", "stage_question_refine"),
-    ("structure_design", "stage_hypothesis"),
-    ("build_and_sensing", "stage_experiment_design"),
-    ("settlement_observation", "stage_conclusion"),
-    ("iteration_sharing", "stage_extension"),
+    "natural_materials",
+    "habitat_needs",
+    "structure_design",
+    "build_and_sensing",
+    "settlement_observation",
+    "iteration_sharing",
 ]
 
 
@@ -131,6 +129,16 @@ def parse_sse(text: str) -> list[tuple[str, dict]]:
     return events
 
 
+def make_curriculum_bundle(payload: dict) -> bytes:
+    output = BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "curriculum.json",
+            json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        )
+    return output.getvalue()
+
+
 class FakeCurriculumVectorStore:
     def __init__(self, *, available: bool = True, error: str = ""):
         self.available = available
@@ -148,12 +156,15 @@ class FakeCurriculumVectorStore:
         self.deleted_sources.append(source)
         self.rows = [row for row in self.rows if row.source != source]
 
-    def query(self, _query, top_k):
+    def query(self, _query, top_k, allowed_sources=None):
         if not self.available:
             raise RuntimeError(self.error or "fake vector unavailable")
+        rows = self.rows
+        if allowed_sources is not None:
+            rows = [row for row in rows if row.source in allowed_sources]
         return [
             CurriculumVectorHit(chunk_id=int(row.id), score=0.95 - index * 0.05)
-            for index, row in enumerate(self.rows[:top_k])
+            for index, row in enumerate(rows[:top_k])
         ]
 
     def rebuild(self, chunks):
@@ -260,7 +271,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response.json()["data"]
 
-    def test_seven_stages_bind_to_seven_stage_agents(self):
+    def test_flows_use_main_tutor_and_experts_are_selectable(self):
         flow_response = self.client.get("/api/flows")
         self.assertEqual(flow_response.status_code, 200)
         inquiry_flow = next(
@@ -268,22 +279,101 @@ class AgentArchitectureApiTests(unittest.TestCase):
             for item in flow_response.json()["data"]
             if item["name"] == "inquiry_7_stage"
         )
-        self.assertEqual(
-            [stage["agent_id"] for stage in inquiry_flow["stages"]],
-            EXPECTED_STAGE_AGENTS,
-        )
+        self.assertTrue(all("agent_id" not in stage for stage in inquiry_flow["stages"]))
+        self.assertTrue(all("expert" not in stage for stage in inquiry_flow["stages"]))
+        expert_response = self.client.get("/api/experts")
+        self.assertEqual(expert_response.status_code, 200)
+        experts = expert_response.json()["data"]
+        self.assertEqual([item["id"] for item in experts], EXPECTED_EXPERT_IDS)
+        self.assertTrue(all(item["role"] and item["capabilities"] for item in experts))
 
-        session_id, _ = self.create_session()
+    def test_agent_registry_rejects_duplicate_id_invalid_kind_and_missing_prompt(self):
+        registry_dir = TEST_DIR / f"registry_{uuid.uuid4().hex}"
+        registry_dir.mkdir(parents=True)
+        cases = [
+            """agents:\n  - {id: main_tutor, kind: main, name: 主导师, role: 主导师, prompt_file: prompts/main_tutor.md}\n  - {id: main_tutor, kind: expert, name: 重复, role: 专家, prompt_file: prompts/main_tutor.md, selectable: true}\n""",
+            """agents:\n  - {id: main_tutor, kind: wrong, name: 主导师, role: 主导师, prompt_file: prompts/main_tutor.md}\n""",
+            """agents:\n  - {id: main_tutor, kind: main, name: 主导师, role: 主导师, prompt_file: missing.md}\n""",
+        ]
         try:
-            agent_response = self.client.get(f"/api/sessions/{session_id}/dify_agents")
-            self.assertEqual(agent_response.status_code, 200)
-            agents = agent_response.json()["data"]
-            self.assertEqual([item["id"] for item in agents], EXPECTED_STAGE_AGENTS)
-            self.assertTrue(all("stage_id" in item for item in agents))
-            self.assertTrue(all(item["configured"] for item in agents))
-            self.assertTrue(all(item["mode"] == "prompt" for item in agents))
+            for index, content in enumerate(cases):
+                config = registry_dir / f"agents_{index}.yaml"
+                config.write_text(content, encoding="utf-8")
+                with self.assertRaises(RuntimeError):
+                    AgentRegistry(config)
         finally:
-            self.delete_session(session_id)
+            shutil.rmtree(registry_dir, ignore_errors=True)
+
+    def test_permission_migration_assigns_existing_math_and_physics_once(self):
+        database_path = TEST_DIR / f"permission-migration-{uuid.uuid4().hex}.db"
+        local_engine = create_engine(
+            f"sqlite:///{database_path.as_posix()}",
+            connect_args={"check_same_thread": False},
+        )
+        LocalSession = sessionmaker(autocommit=False, autoflush=False, bind=local_engine)
+        math_source = "义务教育数学课程标准（2022年版）.docx"
+        physics_source = "义务教育物理课程标准（2022年版）.docx"
+        try:
+            Base.metadata.create_all(local_engine)
+            table_names = set(inspect(local_engine).get_table_names())
+            self.assertNotIn("app_settings", table_names)
+            self.assertNotIn("agent_conversations", table_names)
+            self.assertNotIn(
+                "chat_mode",
+                {column["name"] for column in inspect(local_engine).get_columns("users")},
+            )
+            with LocalSession() as db:
+                for source, count in ((math_source, 267), (physics_source, 96)):
+                    db.add(
+                        CurriculumSourceModel(
+                            source=source,
+                            checksum="test",
+                            chunk_count=count,
+                            vector_chunk_count=count,
+                            vector_status="ready",
+                            embedding_model="test",
+                            last_error="",
+                            updated_at="2026-01-01T00:00:00+00:00",
+                        )
+                    )
+                    db.add_all(
+                        CurriculumChunkModel(
+                            source=source,
+                            source_index=index,
+                            content=f"片段 {index}",
+                            created_at="2026-01-01T00:00:00+00:00",
+                        )
+                        for index in range(count)
+                    )
+                db.commit()
+            with patch("app.db.migrations.engine", local_engine):
+                ensure_schema_compatibility()
+            with LocalSession() as db:
+                self.assertEqual(db.query(CurriculumChunkModel).count(), 363)
+                permissions = {
+                    (row.source, row.agent_id)
+                    for row in db.query(CurriculumSourceAgentPermissionModel).all()
+                }
+                self.assertEqual(
+                    permissions,
+                    {
+                        (math_source, "mathematics_teacher_agent"),
+                        (physics_source, "physics_teacher_agent"),
+                    },
+                )
+                db.query(CurriculumSourceAgentPermissionModel).filter(
+                    CurriculumSourceAgentPermissionModel.source == physics_source
+                ).delete()
+                db.commit()
+            with patch("app.db.migrations.engine", local_engine):
+                ensure_schema_compatibility()
+            with LocalSession() as db:
+                self.assertEqual(
+                    CurriculumPermissionService.allowed_expert_ids(db, physics_source),
+                    [],
+                )
+        finally:
+            local_engine.dispose()
 
     def test_insect_hotel_flow_is_listed_with_expected_stages(self):
         flow_response = self.client.get("/api/flows")
@@ -298,9 +388,28 @@ class AgentArchitectureApiTests(unittest.TestCase):
         self.assertEqual(insect_flow["display_name"], "昆虫旅馆项目探究流")
         self.assertEqual(insect_flow["stage_count"], 6)
         self.assertEqual(
-            [(stage["id"], stage["agent_id"]) for stage in insect_flow["stages"]],
+            [stage["id"] for stage in insect_flow["stages"]],
             EXPECTED_INSECT_HOTEL_STAGES,
         )
+
+    def test_main_tutor_receives_every_stage_direction(self):
+        for flow_name in (
+            "inquiry_7_stage",
+            "three_step_inquiry",
+            "steam_project",
+            "insect_hotel_project",
+        ):
+            flow = get_flow(flow_name)
+            for stage in flow["stages"]:
+                prompt = PromptService.build_guide_agent_prompt(
+                    topic="阶段能力测试",
+                    flow_display_name=flow["display_name"],
+                    stage=stage,
+                    dialog_history="",
+                    doc_input="",
+                )
+                self.assertIn("你是贯穿完整教学设计流程的主导师 Agent", prompt)
+                self.assertIn(stage["direction"], prompt)
 
     def test_insect_hotel_session_initializes_expected_outputs_and_agents(self):
         session_id, stage_id = self.create_session(
@@ -316,17 +425,12 @@ class AgentArchitectureApiTests(unittest.TestCase):
             self.assertEqual(len(session["outputs"]), 6)
             self.assertEqual(
                 [item["stage_id"] for item in session["outputs"]],
-                [stage_id for stage_id, _ in EXPECTED_INSECT_HOTEL_STAGES],
+                EXPECTED_INSECT_HOTEL_STAGES,
             )
-
-            agent_response = self.client.get(f"/api/sessions/{session_id}/dify_agents")
-            self.assertEqual(agent_response.status_code, 200)
-            agents = agent_response.json()["data"]
             self.assertEqual(
-                [item["id"] for item in agents],
-                [agent_id for _, agent_id in EXPECTED_INSECT_HOTEL_STAGES],
+                self.client.get(f"/api/sessions/{session_id}/stage_agents").status_code,
+                404,
             )
-            self.assertNotIn("stage_new_questions", [item["id"] for item in agents])
         finally:
             self.delete_session(session_id)
 
@@ -588,7 +692,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
             admin_client.close()
             disabled_client.close()
 
-    def test_first_registration_claims_legacy_sessions_and_chat_mode(self):
+    def test_first_registration_claims_legacy_sessions_without_chat_mode(self):
         database_path = TEST_DIR / f"legacy-{uuid.uuid4().hex}.db"
         local_engine = create_engine(
             f"sqlite:///{database_path.as_posix()}",
@@ -598,13 +702,6 @@ class AgentArchitectureApiTests(unittest.TestCase):
         LocalSession = sessionmaker(autocommit=False, autoflush=False, bind=local_engine)
         try:
             with LocalSession() as db:
-                db.add(
-                    AppSettingModel(
-                        key="global_chat_mode",
-                        value="subagent",
-                        updated_at="2026-01-01T00:00:00+00:00",
-                    )
-                )
                 legacy = SessionModel(
                     id="legacy_session",
                     owner_user_id=None,
@@ -624,11 +721,10 @@ class AgentArchitectureApiTests(unittest.TestCase):
                 db.refresh(legacy)
 
                 self.assertEqual(legacy.owner_user_id, user.id)
-                self.assertEqual(user.chat_mode, "subagent")
         finally:
             local_engine.dispose()
 
-    def test_users_have_isolated_sessions_and_chat_modes(self):
+    def test_users_have_isolated_sessions_and_main_tutor_chat(self):
         alice = TestClient(app)
         bob = TestClient(app)
         try:
@@ -663,17 +759,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
             self.assertEqual(alice.get(f"/api/sessions/{bob_session}").status_code, 404)
             self.assertEqual(bob.delete(f"/api/sessions/{alice_session}").status_code, 404)
 
-            self.assertEqual(
-                alice.put(
-                    "/api/settings/chat-mode",
-                    json={"chat_mode": "subagent"},
-                ).status_code,
-                200,
-            )
-            self.assertEqual(
-                bob.get("/api/settings/chat-mode").json()["data"]["chat_mode"],
-                "main",
-            )
+            self.assertEqual(alice.get("/api/settings/chat-mode").status_code, 404)
             alice_events = parse_sse(
                 alice.post(
                     f"/api/sessions/{alice_session}/chat",
@@ -686,8 +772,15 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     json={"type": "chat", "message": "Bob 的第一轮提问"},
                 ).text
             )
-            self.assertEqual(alice_events[0][1]["chat_mode"], "subagent")
-            self.assertEqual(bob_events[0][1]["chat_mode"], "main")
+            self.assertNotIn("chat_mode", alice_events[0][1])
+            self.assertNotIn("chat_mode", bob_events[0][1])
+            self.assertTrue(
+                all(
+                    data.get("agent_id") == "main_tutor"
+                    for name, data in alice_events
+                    if name == "delta"
+                )
+            )
         finally:
             alice.close()
             bob.close()
@@ -766,16 +859,6 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     created_at="2026-01-01T00:00:00+00:00",
                 )
             )
-            db.add(
-                AgentConversationModel(
-                    id="conversation_isolation_test",
-                    session_id=first["id"],
-                    agent_id="stage_observation_start",
-                    conversation_id="conversation-1",
-                    created_at="2026-01-01T00:00:00+00:00",
-                    updated_at="2026-01-01T00:00:00+00:00",
-                )
-            )
             db.commit()
 
         switched = self.client.post(
@@ -812,13 +895,6 @@ class AgentArchitectureApiTests(unittest.TestCase):
                 .count(),
                 1,
             )
-            self.assertEqual(
-                db.query(AgentConversationModel)
-                .filter(AgentConversationModel.session_id == first["id"])
-                .count(),
-                1,
-            )
-
         self.delete_session(first["id"])
         self.assertEqual(self.get_session(second["id"])["flow_name"], "three_step_inquiry")
         self.delete_session(second["id"])
@@ -860,7 +936,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
             )
             self.assertEqual(
                 [item["agent_id"] for item in messages],
-                [None, "main_agent"],
+                [None, "main_tutor"],
             )
             self.assertNotIn("===DRAFT_START===", messages[1]["content"])
 
@@ -875,16 +951,10 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     .one()
                 )
                 self.assertFalse(turn.expert_message_id)
-                self.assertTrue(turn.rag_record_id)
+                self.assertFalse(turn.rag_record_id)
                 self.assertEqual(
                     db.query(RagRecordModel)
                     .filter(RagRecordModel.session_id == session_id)
-                    .count(),
-                    1,
-                )
-                self.assertEqual(
-                    db.query(AgentConversationModel)
-                    .filter(AgentConversationModel.session_id == session_id)
                     .count(),
                     0,
                 )
@@ -1089,6 +1159,33 @@ class AgentArchitectureApiTests(unittest.TestCase):
                 files={"file": (source, "初中实验应记录证据。".encode("utf-8"), "text/markdown")},
             )
             self.assertEqual(uploaded.status_code, 200, uploaded.text)
+            self.assertEqual(uploaded.json()["data"]["allowed_expert_ids"], [])
+            permission_response = admin_client.put(
+                "/api/curriculum/files/permissions",
+                json={
+                    "source": source,
+                    "expert_ids": [
+                        "physics_teacher_agent",
+                        "mathematics_teacher_agent",
+                        "physics_teacher_agent",
+                    ],
+                },
+            )
+            self.assertEqual(permission_response.status_code, 200, permission_response.text)
+            self.assertEqual(
+                permission_response.json()["data"]["allowed_expert_ids"],
+                ["physics_teacher_agent", "mathematics_teacher_agent"],
+            )
+            denied_permission = ordinary_client.put(
+                "/api/curriculum/files/permissions",
+                json={"source": source, "expert_ids": []},
+            )
+            self.assertEqual(denied_permission.status_code, 403)
+            invalid_permission = admin_client.put(
+                "/api/curriculum/files/permissions",
+                json={"source": source, "expert_ids": ["unknown_agent"]},
+            )
+            self.assertEqual(invalid_permission.status_code, 400)
             self.assertEqual(ordinary_client.get("/api/curriculum/status").status_code, 403)
             self.assertEqual(ordinary_client.get("/api/curriculum/export").status_code, 403)
             self.assertEqual(ordinary_client.get("/api/curriculum/retrievals").status_code, 403)
@@ -1097,7 +1194,12 @@ class AgentArchitectureApiTests(unittest.TestCase):
             self.assertEqual(exported.status_code, 200)
             with zipfile.ZipFile(BytesIO(exported.content)) as archive:
                 payload = json.loads(archive.read("curriculum.json").decode("utf-8"))
+            self.assertEqual(payload["version"], 2)
             exported_source = next(item for item in payload["sources"] if item["source"] == source)
+            self.assertEqual(
+                exported_source["allowed_expert_ids"],
+                ["mathematics_teacher_agent", "physics_teacher_agent"],
+            )
             serialized = json.dumps(exported_source, ensure_ascii=False)
             self.assertIn("初中实验应记录证据", serialized)
             self.assertNotIn("password_hash", serialized)
@@ -1107,19 +1209,93 @@ class AgentArchitectureApiTests(unittest.TestCase):
                 admin_client.delete("/api/curriculum/files", params={"source": source}).status_code,
                 200,
             )
+            with SessionLocal() as db:
+                self.assertEqual(
+                    db.query(CurriculumSourceAgentPermissionModel)
+                    .filter(CurriculumSourceAgentPermissionModel.source == source)
+                    .count(),
+                    0,
+                )
             imported = admin_client.post(
                 "/api/curriculum/import",
                 files={"file": ("curriculum-knowledge.zip", exported.content, "application/zip")},
             )
             self.assertEqual(imported.status_code, 200, imported.text)
             listed = admin_client.get("/api/curriculum/files").json()["data"]
-            self.assertIn(source, {item["source"] for item in listed})
+            restored = next(item for item in listed if item["source"] == source)
+            self.assertEqual(
+                restored["allowed_expert_ids"],
+                ["mathematics_teacher_agent", "physics_teacher_agent"],
+            )
         finally:
             with SessionLocal() as db:
                 CurriculumKnowledgeService(db).delete_source(source)
                 db.commit()
             admin_client.close()
             ordinary_client.close()
+
+    def test_curriculum_v1_import_is_unassigned_and_invalid_v2_rolls_back(self):
+        source_v1 = f"legacy_{uuid.uuid4().hex}.md"
+        rejected_source = f"rejected_{uuid.uuid4().hex}.md"
+        admin_client = TestClient(app)
+        try:
+            admin_client.post(
+                "/api/auth/admin/register",
+                json={
+                    "username": f"bundle_admin_{uuid.uuid4().hex[:8]}",
+                    "password": "valid-password-123",
+                },
+            )
+            v1 = make_curriculum_bundle(
+                {
+                    "version": 1,
+                    "sources": [
+                        {
+                            "source": source_v1,
+                            "chunks": [{"source_index": 0, "content": "旧版知识内容"}],
+                        }
+                    ],
+                }
+            )
+            imported = admin_client.post(
+                "/api/curriculum/import",
+                files={"file": ("v1.zip", v1, "application/zip")},
+            )
+            self.assertEqual(imported.status_code, 200, imported.text)
+            listed = admin_client.get("/api/curriculum/files").json()["data"]
+            legacy = next(item for item in listed if item["source"] == source_v1)
+            self.assertEqual(legacy["allowed_expert_ids"], [])
+
+            invalid_v2 = make_curriculum_bundle(
+                {
+                    "version": 2,
+                    "sources": [
+                        {
+                            "source": rejected_source,
+                            "allowed_expert_ids": ["unknown_agent"],
+                            "chunks": [{"source_index": 0, "content": "不应导入"}],
+                        }
+                    ],
+                }
+            )
+            rejected = admin_client.post(
+                "/api/curriculum/import",
+                files={"file": ("invalid-v2.zip", invalid_v2, "application/zip")},
+            )
+            self.assertEqual(rejected.status_code, 400)
+            with SessionLocal() as db:
+                self.assertEqual(
+                    db.query(CurriculumChunkModel)
+                    .filter(CurriculumChunkModel.source == rejected_source)
+                    .count(),
+                    0,
+                )
+        finally:
+            with SessionLocal() as db:
+                CurriculumKnowledgeService(db).delete_source(source_v1)
+                CurriculumKnowledgeService(db).delete_source(rejected_source)
+                db.commit()
+            admin_client.close()
 
     def test_chat_injects_curriculum_reference_and_persists_sources(self):
         source = f"小学信息科技课标_{uuid.uuid4().hex}.md"
@@ -1128,11 +1304,25 @@ class AgentArchitectureApiTests(unittest.TestCase):
                 source,
                 "小学三年级学生适合使用图形化工具体验人工智能，任务步骤应简短，并设置安全边界。",
             )
+            CurriculumPermissionService.replace_permissions(
+                db,
+                source,
+                ["mathematics_teacher_agent"],
+            )
             db.commit()
 
         session_id, _ = self.create_session(topic="小学三年级人工智能")
         try:
-            _, events = self.stream_chat(session_id, "设计一个适合小学三年级的人工智能活动")
+            response = self.client.post(
+                f"/api/sessions/{session_id}/chat",
+                json={
+                    "type": "chat",
+                    "message": "设计一个适合小学三年级的人工智能活动",
+                    "expert_id": "mathematics_teacher_agent",
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            events = parse_sse(response.text)
             done = next(data for name, data in events if name == "done")
             self.assertEqual(done["rag_sources"], [source])
             self.assertTrue(done["rag_record_id"])
@@ -1159,6 +1349,48 @@ class AgentArchitectureApiTests(unittest.TestCase):
                 db.query(CurriculumChunkModel).filter(
                     CurriculumChunkModel.source == source
                 ).delete(synchronize_session=False)
+                db.commit()
+
+    def test_rag_permissions_isolate_bm25_vector_and_apply_immediately(self):
+        physics_source = f"physics_{uuid.uuid4().hex}.md"
+        math_source = f"math_{uuid.uuid4().hex}.md"
+        vector_store = FakeCurriculumVectorStore()
+        settings = get_settings()
+        try:
+            with SessionLocal() as db, patch.object(settings, "curriculum_vector_enabled", True):
+                service = CurriculumKnowledgeService(db, settings, vector_store)
+                service.ingest(physics_source, "共同检索词 物理变量控制与测量误差")
+                service.ingest(math_source, "共同检索词 数学统计与图表分析")
+                CurriculumPermissionService.replace_permissions(
+                    db, physics_source, ["physics_teacher_agent"]
+                )
+                CurriculumPermissionService.replace_permissions(
+                    db, math_source, ["mathematics_teacher_agent"]
+                )
+                db.commit()
+
+                physics_sources = CurriculumPermissionService.allowed_sources(
+                    db, "physics_teacher_agent"
+                )
+                physics_results = service.retrieve(
+                    "共同检索词",
+                    top_k=4,
+                    allowed_sources=physics_sources,
+                )
+                self.assertTrue(physics_results)
+                self.assertEqual({item.source for item in physics_results}, {physics_source})
+
+                CurriculumPermissionService.replace_permissions(db, physics_source, [])
+                db.commit()
+                self.assertEqual(
+                    CurriculumPermissionService.allowed_sources(db, "physics_teacher_agent"),
+                    [],
+                )
+                self.assertEqual(service.retrieve("共同检索词", allowed_sources=[]), [])
+        finally:
+            with SessionLocal() as db:
+                CurriculumKnowledgeService(db).delete_source(physics_source)
+                CurriculumKnowledgeService(db).delete_source(math_source)
                 db.commit()
 
     def test_chat_cancel_endpoint_marks_active_stream_as_cancelled(self):
@@ -1368,117 +1600,56 @@ class AgentArchitectureApiTests(unittest.TestCase):
         finally:
             self.delete_session(session_id)
 
-    def test_conversation_ids_are_reused_per_stage_and_isolated_between_stages(self):
+    def test_expert_selection_is_one_request_only(self):
         session_id, _ = self.create_session()
         try:
-            self.client.put("/api/settings/chat-mode", json={"chat_mode": "subagent"})
-            self.stream_chat(session_id, "观察问题一")
-            self.stream_chat(session_id, "观察问题二")
-            with SessionLocal() as db:
-                observation_row = (
-                    db.query(AgentConversationModel)
-                    .filter(
-                        AgentConversationModel.session_id == session_id,
-                        AgentConversationModel.agent_id == "stage_observation_start",
-                    )
-                    .one()
-                )
-                observation_conversation_id = observation_row.conversation_id
-                self.assertEqual(
-                    db.query(AgentConversationModel)
-                    .filter(AgentConversationModel.session_id == session_id)
-                    .count(),
-                    1,
-                )
-
-            current = self.get_session(session_id)
-            current_draft = current["outputs"][0]["draft_content"]
-            advance = self.client.post(
+            self.set_draft_mode(session_id, True)
+            response = self.client.post(
                 f"/api/sessions/{session_id}/chat",
                 json={
-                    "type": "sys_action",
-                    "action": "next_stage",
-                    "final_content": current_draft,
+                    "type": "chat",
+                    "message": "怎样控制实验变量？",
+                    "expert_id": "physics_teacher_agent",
                 },
             )
-            self.assertEqual(advance.status_code, 200)
-            self.stream_chat(session_id, "请提炼核心问题")
-
-            with SessionLocal() as db:
-                rows = (
-                    db.query(AgentConversationModel)
-                    .filter(AgentConversationModel.session_id == session_id)
-                    .all()
-                )
-                self.assertEqual({row.agent_id for row in rows}, {
-                    "stage_observation_start",
-                    "stage_question_refine",
-                })
-
-            stage_back = self.client.post(
-                f"/api/sessions/{session_id}/rollback",
-                json={"steps": 1, "stage_back": True},
-            )
-            self.assertEqual(stage_back.status_code, 200)
-            self.stream_chat(session_id, "回到观察阶段继续补充")
-
-            with SessionLocal() as db:
-                observation_row = (
-                    db.query(AgentConversationModel)
-                    .filter(
-                        AgentConversationModel.session_id == session_id,
-                        AgentConversationModel.agent_id == "stage_observation_start",
-                    )
-                    .one()
-                )
-                self.assertEqual(
-                    observation_row.conversation_id,
-                    observation_conversation_id,
-                )
-                self.assertEqual(
-                    db.query(AgentConversationModel)
-                    .filter(AgentConversationModel.session_id == session_id)
-                    .count(),
-                    2,
-                )
-        finally:
-            self.client.put("/api/settings/chat-mode", json={"chat_mode": "main"})
-            self.delete_session(session_id)
-
-    def test_subagent_mode_streams_without_main_reply(self):
-        session_id, _ = self.create_session()
-        try:
-            response = self.client.put(
-                "/api/settings/chat-mode",
-                json={"chat_mode": "subagent"},
-            )
             self.assertEqual(response.status_code, 200)
-            _, events = self.stream_chat(session_id, "专家不可用时继续")
-            warning_events = [data for name, data in events if name == "warning"]
-            self.assertEqual(warning_events, [])
-            done = events[-1][1]
-            self.assertFalse(done["degraded"])
-            self.assertIsNone(done["failed_agent_id"])
-            self.assertEqual(done["chat_mode"], "subagent")
+            events = parse_sse(response.text)
+            delta_types = [data["message_type"] for name, data in events if name == "delta"]
+            self.assertTrue(delta_types)
+            self.assertEqual(set(delta_types), {"expert_advice"})
+            self.assertEqual(events[-1][1]["agent_id"], "physics_teacher_agent")
+            self.assertEqual(events[-1][1]["rag_sources"], [])
+            self.assertIsNone(events[-1][1]["rag_record_id"])
 
             messages = self.get_messages(session_id)
-            self.assertEqual([item["message_type"] for item in messages], ["chat", "stage_expert"])
+            self.assertEqual([item["message_type"] for item in messages], ["chat", "expert_advice"])
+            self.assertFalse(self.get_session(session_id)["outputs"][0]["draft_content"])
             with SessionLocal() as db:
-                self.assertEqual(
-                    db.query(AgentConversationModel)
-                    .filter(AgentConversationModel.session_id == session_id)
-                    .count(),
-                    1,
+                history = ContextService.format_dialog_history(
+                    ContextService.load_messages(db, session_id)
                 )
-                row = (
-                    db.query(AgentConversationModel)
-                    .filter(AgentConversationModel.session_id == session_id)
+                self.assertIn("领域专家-physics_teacher_agent", history)
+                turn = (
+                    db.query(ChatTurnModel)
+                    .filter(ChatTurnModel.session_id == session_id)
                     .one()
                 )
-                self.assertEqual(row.agent_id, "stage_observation_start")
-                self.assertTrue(row.conversation_id.startswith("mock_stage_observation_start"))
+                self.assertTrue(turn.expert_message_id)
+                self.assertEqual(turn.expert_message_id, turn.assistant_message_id)
+
+            self.set_draft_mode(session_id, False)
+            _, next_events = self.stream_chat(session_id, "继续推进教学设计")
+            self.assertEqual(
+                {data["message_type"] for name, data in next_events if name == "delta"},
+                {"main_tutor"},
+            )
+
+            invalid = self.client.post(
+                f"/api/sessions/{session_id}/chat",
+                json={"type": "chat", "message": "错误专家", "expert_id": "main_tutor"},
+            )
+            self.assertEqual(invalid.status_code, 400)
         finally:
-            self.client.put("/api/settings/chat-mode", json={"chat_mode": "main"})
             self.delete_session(session_id)
 
     def test_stage_back_keeps_messages_and_reopens_previous_stage(self):
@@ -1563,12 +1734,15 @@ class AgentArchitectureApiTests(unittest.TestCase):
 
             stage = get_flow("inquiry_7_stage")["stages"][0]
             prompts = [
-                PromptService.build_stage_agent_prompt(
+                ExpertAgentService.build_prompt(
+                    agent=get_agent_registry().selectable_expert("insect_agent"),
                     topic="测试课题",
                     flow_display_name="七阶段探究",
                     stage=stage,
                     dialog_history="",
                     doc_input=doc_input,
+                    current_draft="",
+                    user_message="请提供建议",
                 ),
                 PromptService.build_guide_agent_prompt(
                     topic="测试课题",

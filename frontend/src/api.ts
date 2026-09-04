@@ -1,12 +1,11 @@
 import type {
-  DifyAgentItem,
   AuthUser,
-  ChatMode,
   CurriculumFileItem,
   CurriculumRetrievalRecord,
   CurriculumVectorStatus,
   DraftProposal,
   DraftSelection,
+  ExpertAgentItem,
   FlowInfo,
   MessageItem,
   SessionDetail,
@@ -78,8 +77,8 @@ export async function getMessages(sessionId: string): Promise<MessageItem[]> {
   return payload.data || [];
 }
 
-export async function getDifyAgents(sessionId: string): Promise<DifyAgentItem[]> {
-  const payload = await readJson<ApiEnvelope<DifyAgentItem[]>>(`${API_BASE}/api/sessions/${sessionId}/dify_agents`);
+export async function getExperts(): Promise<ExpertAgentItem[]> {
+  const payload = await readJson<ApiEnvelope<ExpertAgentItem[]>>(`${API_BASE}/api/experts`);
   return payload.data || [];
 }
 
@@ -153,20 +152,6 @@ export async function getCurrentUser(): Promise<AuthUser> {
 
 export async function logoutUser(): Promise<void> {
   await readJson<ApiEnvelope<null>>(`${API_BASE}/api/auth/logout`, { method: "POST" });
-}
-
-export async function getChatMode(): Promise<ChatMode> {
-  const payload = await readJson<ApiEnvelope<{ chat_mode: ChatMode }>>(`${API_BASE}/api/settings/chat-mode`);
-  return payload.data?.chat_mode || "main";
-}
-
-export async function setChatMode(chatMode: ChatMode): Promise<ChatMode> {
-  const payload = await readJson<ApiEnvelope<{ chat_mode: ChatMode }>>(`${API_BASE}/api/settings/chat-mode`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_mode: chatMode }),
-  });
-  return payload.data?.chat_mode || "main";
 }
 
 export async function setDraftMode(sessionId: string, enabled: boolean): Promise<SessionDetail> {
@@ -252,6 +237,7 @@ export type StreamChatPayload = {
   message?: string;
   action?: "next_stage" | "prev_stage" | "intro" | "confirm_stage";
   final_content?: string;
+  expert_id?: string;
   draft_request_kind?: "generate" | "edit";
   selection?: DraftSelection | null;
 };
@@ -340,6 +326,20 @@ export async function deleteCurriculumFile(source: string): Promise<void> {
     `${API_BASE}/api/curriculum/files?source=${encodeURIComponent(source)}`,
     { method: "DELETE" },
   );
+}
+
+export async function updateCurriculumPermissions(
+  source: string,
+  expertIds: string[],
+): Promise<{ source: string; allowed_expert_ids: string[] }> {
+  const payload = await readJson<
+    ApiEnvelope<{ source: string; allowed_expert_ids: string[] }>
+  >(`${API_BASE}/api/curriculum/files/permissions`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source, expert_ids: expertIds }),
+  });
+  return payload.data;
 }
 
 export async function getCurriculumStatus(): Promise<CurriculumVectorStatus> {

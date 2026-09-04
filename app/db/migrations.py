@@ -55,3 +55,67 @@ def ensure_schema_compatibility() -> None:
                 """
             )
         )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS curriculum_source_agent_permissions (
+                    source VARCHAR NOT NULL,
+                    agent_id VARCHAR NOT NULL,
+                    created_at VARCHAR NOT NULL,
+                    PRIMARY KEY (source, agent_id),
+                    FOREIGN KEY(source) REFERENCES curriculum_sources(source) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_curriculum_permissions_agent_id "
+                "ON curriculum_source_agent_permissions (agent_id)"
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    key VARCHAR PRIMARY KEY,
+                    applied_at VARCHAR NOT NULL
+                )
+                """
+            )
+        )
+        migration_key = "curriculum_agent_permissions_v1"
+        applied = connection.execute(
+            text("SELECT 1 FROM schema_migrations WHERE key = :key"),
+            {"key": migration_key},
+        ).first()
+        if not applied:
+            connection.execute(
+                text(
+                    """
+                    INSERT OR IGNORE INTO curriculum_source_agent_permissions
+                        (source, agent_id, created_at)
+                    SELECT source, 'physics_teacher_agent', datetime('now')
+                    FROM curriculum_sources
+                    WHERE source = '义务教育物理课程标准（2022年版）.docx'
+                    """
+                )
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT OR IGNORE INTO curriculum_source_agent_permissions
+                        (source, agent_id, created_at)
+                    SELECT source, 'mathematics_teacher_agent', datetime('now')
+                    FROM curriculum_sources
+                    WHERE source = '义务教育数学课程标准（2022年版）.docx'
+                    """
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migrations (key, applied_at) "
+                    "VALUES (:key, datetime('now'))"
+                ),
+                {"key": migration_key},
+            )
