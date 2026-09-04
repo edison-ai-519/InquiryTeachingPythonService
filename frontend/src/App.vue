@@ -1,447 +1,146 @@
 <template>
   <AuthPanel v-if="!authLoading && !currentUser" @authenticated="handleAuthenticated" />
   <div v-else-if="authLoading" class="auth-loading">正在验证登录状态…</div>
-  <div v-else>
+  <div v-else class="workspace-page">
+  <AppHeader
+    v-model="selectedExpertId"
+    :experts="experts"
+    :user="currentUser"
+    :session="currentSession"
+    :stage="currentStage"
+    :stage-progress="currentSession?.status === 'completed' ? '已完成' : `阶段 ${currentStageIndex + 1} / ${activeStages.length}`"
+    :streaming="isStreaming"
+    :sidebar-collapsed="!leftSidebarVisible"
+    :theme-mode="themeMode"
+    @toggle-sidebar="toggleLeftSidebar"
+    @toggle-theme="toggleTheme"
+    @logout="logout"
+  />
   <div
-    class="app-shell"
+    class="workspace-grid"
     :class="{
       'left-sidebar-collapsed': !leftSidebarVisible,
       'right-sidebar-collapsed': !rightSidebarVisible,
     }"
   >
-    <!-- LEFT COLUMN: Document Explorer -->
-    <aside class="explorer-column">
-      <section class="brand-card glass">
-        <div class="brand-main">
-          <div>
-            <p class="eyebrow">AI 教师探究式教学指导平台</p>
-            <h1>探究式教案工作台</h1>
-          </div>
-          <div class="brand-actions">
-            <button class="ghost-button compact theme-toggle-btn" @click="toggleTheme">
-              {{ themeMode === "dark" ? "浅色模式" : "深色模式" }}
-            </button>
-            <div class="user-account" v-if="currentUser">
-              <span>{{ currentUser.username }}</span>
-              <button class="ghost-button compact" type="button" @click="logout">退出</button>
-            </div>
-            <div class="status-pill" :class="{ live: isStreaming }">
-              <span class="status-dot"></span>
-              {{ isStreaming ? "SSE 流式中" : "已连接" }}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="glass panel explorer-panel">
-        <div class="panel-head">
-          <h2>教案文档列表</h2>
-          <div class="panel-actions">
-            <button class="icon-button compact danger" @click="handleDeleteSession" :disabled="!currentSession" title="删除当前会话">🗑 删除</button>
-            <button class="icon-button compact" @click="showNewSessionModal = true" title="新建会话">＋ 新建</button>
-          </div>
-        </div>
-
-        <div class="session-selector-panel">
-          <div class="selector-row">
-            <label>当前会话</label>
-            <select :value="selectedSessionId" :disabled="isUploadingFile || sessions.length === 0" @change="e => selectSession((e.target as HTMLSelectElement).value)" class="input compact">
-              <option v-if="sessions.length === 0" value="">暂无会话</option>
-              <option v-for="item in sessions" :key="item.id" :value="item.id">
-                {{ item.topic }} · {{ item.flow_display_name }}
-              </option>
-            </select>
-          </div>
-        </div>
-
-        <div v-if="currentSession && currentStage" class="stage-summary-card">
-          <div class="stage-summary-head">
-            <strong>当前阶段</strong>
-            <span>{{ currentSession.status === 'completed' ? '已完成' : `第 ${currentStageIndex + 1}/${activeStages.length} 阶段` }}</span>
-          </div>
-          <div class="stage-summary-title">{{ currentStage.name }}</div>
-          <div class="stage-summary-meta">
-            <span>阶段目标：{{ currentStage.display_direction || currentStage.direction }}</span>
-            <span>流程：{{ currentSession.flow_display_name }}</span>
-          </div>
-        </div>
-
-        <div class="doc-list" v-if="currentSession">
-          <div
-            v-for="stage in activeStages"
-            :key="stage.id"
-            class="doc-item"
-            :class="{
-              active: stage.id === selectedStageId,
-              current: stage.id === currentStageId
-            }"
-            @click="inspectStage(stage.id)"
-          >
-            <div class="doc-header">
-              <span class="doc-title">{{ stage.name }}</span>
-              <span
-                class="doc-badge"
-                :class="{
-                  confirmed: activeStageOutput(stage.id)?.confirmed,
-                  active: stage.id === currentStageId && currentSession.status !== 'completed',
-                  pending: stage.id !== currentStageId && !activeStageOutput(stage.id)?.confirmed
-                }"
-              >
-                {{ activeStageOutput(stage.id)?.confirmed ? '已定稿' : (stage.id === currentStageId && currentSession.status !== 'completed' ? '进行中' : '未开始') }}
-              </span>
-            </div>
-            <div class="doc-meta">
-              主导师推进：{{ stage.display_direction || stage.direction }}
-            </div>
-            <div
-              v-if="activeStageOutput(stage.id)?.draft_content || activeStageOutput(stage.id)?.final_content"
-              class="doc-preview markdown-preview"
-              v-html="renderMarkdown(activeStageOutput(stage.id)?.draft_content || activeStageOutput(stage.id)?.final_content || '')"
-            ></div>
-          </div>
-        </div>
-        <div v-else class="empty-state">
-          请先创建或选择一个会话。
-        </div>
-      </section>
-    </aside>
+    <WorkspaceSidebar
+      :collapsed="!leftSidebarVisible"
+      :session="currentSession"
+      :sessions="sessions"
+      :selected-session-id="selectedSessionId"
+      :stages="activeStages"
+      :selected-stage-id="selectedStageId"
+      :current-stage-id="currentStageId"
+      :progress="currentSession?.status === 'completed' ? '已完成' : `${currentStageIndex + 1}/${activeStages.length}`"
+      :uploading="isUploadingFile"
+      :search="sessionSearchQuery"
+      :output="activeStageOutput"
+      @update:search="sessionSearchQuery = $event"
+      @new-session="showNewSessionModal = true"
+      @delete-session="handleDeleteSession"
+      @select-session="selectSession"
+      @select-stage="inspectStage"
+    />
 
     <!-- CENTER COLUMN: Main Conversation -->
     <section class="chat-column">
-      <section class="glass progress-panel" v-if="currentSession">
-        <div class="progress-container">
-          <div class="progress-header">
-            <span class="progress-title">探究进度 ({{ currentSession.flow_display_name }})</span>
-            <div class="progress-header-actions">
-              <span class="progress-percentage">
-                {{ currentSession.status === 'completed' ? '已完成' : `第 ${currentStageIndex + 1}/${activeStages.length} 阶段` }}
-              </span>
-              <div class="sidebar-toggle-group" aria-label="边栏显示控制">
-                <button
-                  class="sidebar-toggle-button"
-                  :class="{ active: leftSidebarVisible }"
-                  type="button"
-                  :title="leftSidebarVisible ? '收起左侧边栏' : '展开左侧边栏'"
-                  @click="toggleLeftSidebar"
-                >
-                  <span class="sidebar-toggle-icon left" aria-hidden="true"></span>
-                </button>
-                <button
-                  class="sidebar-toggle-button"
-                  :class="{ active: rightSidebarVisible }"
-                  type="button"
-                  :title="rightSidebarVisible ? '收起右侧边栏' : '展开右侧边栏'"
-                  @click="toggleRightSidebar"
-                >
-                  <span class="sidebar-toggle-icon right" aria-hidden="true"></span>
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
-            <div class="progress-steps">
-              <div
-                v-for="(stage, idx) in activeStages"
-                :key="stage.id"
-                class="progress-step-dot"
-                :class="{
-                  completed: idx < currentStageIndex || currentSession.status === 'completed',
-                  active: idx === currentStageIndex && currentSession.status !== 'completed',
-                  pending: idx > currentStageIndex && currentSession.status !== 'completed'
-                }"
-                :style="{ left: activeStages.length > 1 ? (idx / (activeStages.length - 1)) * 100 + '%' : '50%' }"
-              >
-                <span class="step-num">{{ idx + 1 }}</span>
-                <span class="step-tooltip">{{ stage.name }} · {{ stage.display_direction || stage.direction }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ConversationPanel
+        :session="currentSession"
+        :stage="currentStage"
+        :messages="messages"
+        :stage-names="stageNameMap"
+        :warning="streamWarning"
+        :streaming="isStreaming"
+        :render="renderMarkdown"
+        :message-role-label="messageRoleLabel"
+        @rollback="rollbackRecent"
+        @feed-ready="feedRef = $event"
+      >
 
-      <section class="glass conversation-panel">
-        <div class="panel-head">
-          <h2>主对话</h2>
-          <div class="toolbar">
-            <button class="ghost-button compact" @click="rollbackRecent" :disabled="!currentSession" title="撤销最近一轮对话">
-              ↺ 回滚
-            </button>
-          </div>
-        </div>
-
-        <div v-if="streamWarning" class="stream-warning">
-          {{ streamWarning }}
-        </div>
-
-        <div class="message-feed" ref="feedRef">
-          <article
-            v-for="message in messages"
-            :key="message.id || message.created_at || `${message.message_type}-${message.content}`"
-            class="message-card"
-            :class="[message.role, message.message_type || 'chat']"
-          >
-            <div class="message-meta">
-              <div class="message-meta-main">
-                <span>{{ messageRoleLabel(message) }}</span>
-                <small>{{ stageNameMap[message.stage_id] || message.stage_id }}</small>
-                <small v-if="message.agent_role || message.agent_id">{{ message.agent_role || message.agent_id }}</small>
-              </div>
-              <div v-if="showWorkflowBadgeForMessage(message)" class="message-meta-status">
-                <span v-if="workflowPhase === 'guide'" class="workflow-status-badge guide active">流程引导中</span>
-                <span v-if="workflowPhase === 'draft'" class="workflow-status-badge draft active">草案生成中</span>
-                <span v-if="workflowPhase === 'expert'" class="workflow-status-badge expert active">专家点评中</span>
-              </div>
-            </div>
-            <div class="message-content markdown-content" v-html="renderMarkdown(message.content)"></div>
-            <div v-if="message.interrupted" class="message-interrupted" role="status">
-              ⏹ 已停止生成
-            </div>
-          </article>
-
-          <div v-if="!messages.length" class="empty-state">
-            在左侧选择会话并开始对话，系统将引导您完成教学设计。
-          </div>
-        </div>
-
-        <div class="composer">
-          <div class="composer-box">
-            <div class="expert-selector-row">
-              <label for="expert-selector">咨询专家</label>
-              <select
-                id="expert-selector"
-                v-model="selectedExpertId"
-                class="input compact expert-selector"
-                :disabled="isStreaming || !currentSession"
-              >
-                <option value="">不选择，由主导师回答</option>
-                <option v-for="expert in experts" :key="expert.id" :value="expert.id">
-                  {{ expert.name }} · {{ expert.role }} · {{ expert.description }}
-                </option>
-              </select>
-              <button
-                v-if="selectedExpert"
-                class="composer-attachment-pill"
-                type="button"
-                :disabled="isStreaming"
-                @click="selectedExpertId = ''"
-              >
-                <span>{{ selectedExpert.name }} · {{ selectedExpert.role }}</span><strong>×</strong>
-              </button>
-            </div>
-            <div v-if="attachedChatSelectionLabel" class="composer-attachments">
-              <button class="composer-attachment-pill" type="button" @click="clearAttachedChatSelection()">
-                <span>{{ attachedChatSelectionLabel }}</span>
-                <strong>×</strong>
-              </button>
-            </div>
-            <div v-if="sessionFiles.length" class="composer-reference-list" aria-label="已上传参考资料">
-              <div v-for="item in sessionFiles" :key="item.id" class="composer-reference-card">
-                <div class="composer-reference-icon" aria-hidden="true">
-                  <FileText :size="22" />
-                </div>
-                <div class="reference-file-copy">
-                  <span :title="item.name">{{ item.name }}</span>
-                  <small :class="`status-${item.status}`">
-                    {{ fileStatusLabel(item) }}
-                  </small>
-                  <small v-if="item.error_message" class="reference-file-reason" :title="item.error_message">
-                    {{ item.error_message }}
-                  </small>
-                </div>
-                <button
-                  class="reference-delete-button"
-                  type="button"
-                  :title="`删除 ${item.name}`"
-                  :disabled="isStreaming || deletingFileIds.includes(item.id)"
-                  @click="removeReferenceFile(item)"
-                >
-                  <LoaderCircle v-if="deletingFileIds.includes(item.id)" class="spin-icon" :size="14" />
-                  <X v-else :size="18" />
-                </button>
-              </div>
-            </div>
-            <div class="composer-input-row">
-              <textarea
-                ref="chatInputRef"
-                v-model="chatInput"
-                class="chat-input"
-                rows="2"
-                wrap="soft"
-                placeholder="输入课堂切入点、问题追问、实验思路或阶段补充内容；可先从右侧添加 @行号引用。Enter 发送，Shift+Enter 换行"
-                @input="resizeChatInput"
-                @keydown="handleComposerKeydown"
-              />
-            </div>
-            <div class="composer-toolbar">
-              <div class="composer-toolbar-left">
-                <button
-                  class="icon-button composer-upload-button"
-                  type="button"
-                  aria-label="上传参考资料"
-                  title="上传 PDF、DOCX、TXT 或 MD 参考资料"
-                  :disabled="isStreaming || isUploadingFile || sessionFiles.length >= 10 || !currentSession"
-                  @click="openFilePicker"
-                >
-                  <LoaderCircle v-if="isUploadingFile" class="spin-icon" :size="18" />
-                  <Paperclip v-else :size="18" />
-                  <span v-if="sessionFiles.length" class="composer-upload-count">{{ sessionFiles.length }}</span>
-                </button>
-                <button
-                  class="icon-button composer-upload-button curriculum-button"
-                  type="button"
-                  aria-label="课标知识库"
-                  title="课标知识库"
-                  @click="openCurriculumPanel"
-                >
-                  <BookOpen :size="18" />
-                  <span v-if="curriculumFiles.length" class="composer-upload-count">{{ curriculumFiles.length }}</span>
-                </button>
-                <input
-                  ref="fileInputRef"
-                  class="visually-hidden"
-                  type="file"
-                  multiple
-                  accept=".pdf,.docx,.txt,.md"
-                  @change="handleFileSelection"
-                />
-                <p v-if="fileOperationError" class="composer-file-error" role="status" :title="fileOperationError">
-                  {{ fileOperationError }}
-                </p>
-              </div>
-              <div class="composer-actions">
-                <button class="ghost-button compact draft-mode-btn" :class="{ active: isDraftMode }" :disabled="isStreaming || !currentSession" @click="toggleDraftMode">
-                  {{ isDraftMode ? "退出草案模式" : "进入草案模式" }}
-                </button>
-                <button
-                  class="primary-button send-btn"
-                  :class="{ 'stop-btn': isStreaming && activeStreamRequestId }"
-                  :disabled="isStreaming ? !activeStreamRequestId : (!selectedExpertId && isDraftMode && !!draftContent.trim() && !attachedChatSelection?.selected_text?.trim())"
-                  :aria-label="isStreaming && activeStreamRequestId ? '停止生成' : '发送对话'"
-                  @click="isStreaming && activeStreamRequestId ? interruptChat() : sendChat()"
-                >
-                  {{ isStreaming && activeStreamRequestId ? "停止生成" : selectedExpert ? `咨询${selectedExpert.name}` : isDraftMode ? draftPrimaryActionLabel : "发送对话" }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+        <ChatComposer
+          v-model="chatInput"
+          :expert="selectedExpert"
+          :selection-label="attachedChatSelectionLabel"
+          :files="sessionFiles"
+          :deleting-ids="deletingFileIds"
+          :streaming="isStreaming"
+          :uploading="isUploadingFile"
+          :session="currentSession"
+          :draft-mode="isDraftMode"
+          :request-id="activeStreamRequestId"
+          :file-error="fileOperationError"
+          :send-disabled="isStreaming ? !activeStreamRequestId : (!selectedExpertId && isDraftMode && !!draftContent.trim() && !attachedChatSelection?.selected_text?.trim())"
+          :file-status-label="fileStatusLabel"
+          @input-ready="chatInputRef = $event"
+          @resize="resizeChatInput"
+          @keydown="handleComposerKeydown"
+          @clear-expert="selectedExpertId = ''"
+          @clear-selection="clearAttachedChatSelection()"
+          @remove-file="removeReferenceFile"
+          @open-file="openFilePicker"
+          @open-curriculum="openCurriculumPanel"
+          @toggle-draft="toggleDraftMode"
+          @send="sendChat"
+          @stop="interruptChat"
+        >
+          <template #file-input><input ref="fileInputRef" class="visually-hidden" type="file" multiple accept=".pdf,.docx,.txt,.md" @change="handleFileSelection" /></template>
+        </ChatComposer>
+      </ConversationPanel>
     </section>
 
     <!-- RIGHT COLUMN: Document Display & Editor -->
-    <section class="glass panel document-column" :class="{ 'document-column-drafting': workflowPhase === 'draft' }">
-      <div class="document-header">
-        <div class="document-title-area">
-          <h2>教案文档展示</h2>
-          <p v-if="currentSession">课题: {{ currentSession.topic }} · {{ currentSession.flow_display_name }}</p>
-        </div>
-        <div class="document-actions" v-if="currentSession">
-          <button class="ghost-button compact" @click="goPreviousStage" :disabled="currentStageIndex === 0 || isStreaming">
-            ◀ 上一阶段
-          </button>
-          <button class="primary-button compact" @click="goNextStage" :disabled="isStreaming || currentSession.status === 'completed' || selectedStageId !== currentStageId">
-            定稿并进入下一阶段 ▶
-          </button>
-          <button class="ghost-button compact" @click="saveDraftToServer" :disabled="!selectedStageId">
-            保存
-          </button>
-          <button class="ghost-button compact" @click="exportCurrentPlan">
-            ⤓ 导出
-          </button>
-        </div>
-      </div>
+    <DocumentWorkbench
+      v-model="draftContent"
+      :session="currentSession"
+      :stage="activeStages.find(stage => stage.id === selectedStageId) || currentStage"
+      :selected-stage-id="selectedStageId"
+      :current-stage-id="currentStageId"
+      :stage-index="currentStageIndex"
+      :streaming="isStreaming"
+      :drafting="workflowPhase === 'draft'"
+      :proposal="draftProposal"
+      :proposal-label="draftProposal ? proposalStatusLabel(draftProposal.status) : draftWorkbenchEmptyText"
+      :visual-lines="draftVisualLines"
+      :scroll-top="draftEditorScrollTop"
+      :line-height="draftEditorLineHeight"
+      :cursor-line="currentDraftCursorLine"
+      :selection-label="currentSelectionReferenceLabel"
+      :attached-label="attachedChatSelectionLabel"
+      @previous="goPreviousStage"
+      @next="goNextStage"
+      @save="saveDraftToServer"
+      @export="exportCurrentPlan"
+      @preview="openDraftReviewOverlay"
+      @editor-ready="draftEditorRef = $event"
+      @editor-input="onDraftEditorInput"
+      @editor-scroll="syncDraftEditorScroll"
+      @capture-selection="captureDraftSelection"
+      @add-selection="addSelectionToChat"
+      @clear-selection="clearDraftSelection"
+    />
 
-      <div class="document-body" v-if="currentSession && selectedStageId">
-        <div
-          class="draft-workbench draft-workbench-unified glass"
-          :class="{ active: isDraftMode }"
-        >
-          <div class="draft-workbench-head">
-            <div>
-              <strong>草案工作台</strong>
-              <p>右侧专注于 Markdown 原稿编辑；解析后的预览与差异审批统一放在全屏审阅幕布中完成。</p>
-            </div>
-            <div class="draft-head-actions">
-              <button class="ghost-button compact" @click="openDraftReviewOverlay">
-                进入预览
-              </button>
-              <div v-if="isDraftMode" class="draft-tip-anchor" tabindex="0" aria-label="草案模式说明">
-                <span class="draft-tip-icon">i</span>
-                <div class="draft-tip-popover">
-                  {{ draftWorkbenchEmptyText }}
-                </div>
-              </div>
-              <span v-if="draftProposal" class="draft-proposal-status" :class="draftProposal.status">
-                {{ proposalStatusLabel(draftProposal.status) }}
-              </span>
-            </div>
-          </div>
-
-          <div class="draft-editor-shell">
-            <div class="draft-editor-head">
-              <strong>Markdown 草案</strong>
-              <span>可直接编辑，也可选中后在对话框发起修改</span>
-            </div>
-            <div
-              v-if="lastDraftSelection && currentSelectionReferenceLabel"
-              class="draft-selection-action"
-            >
-              <span>{{ currentSelectionReferenceLabel }}</span>
-              <div class="draft-selection-action-buttons">
-                <button
-                  v-if="attachedChatSelectionLabel !== currentSelectionReferenceLabel"
-                  class="ghost-button compact"
-                  @click="addSelectionToChat"
-                >
-                  添加到对话
-                </button>
-                <button class="ghost-button compact" @click="clearDraftSelection">
-                  取消选取
-                </button>
-              </div>
-            </div>
-            <div class="draft-editor-pane">
-              <div class="draft-line-gutter" aria-hidden="true">
-                <div
-                  class="draft-line-gutter-inner"
-                  :style="{ transform: `translateY(-${draftEditorScrollTop}px)` }"
-                >
-                  <span
-                    v-for="line in draftVisualLines"
-                    :key="line.key"
-                    class="draft-line-number"
-                    :class="{ active: line.logicalLine === currentDraftCursorLine, continuation: line.continuation }"
-                    :style="{ height: `${draftEditorLineHeight}px`, lineHeight: `${draftEditorLineHeight}px` }"
-                  >
-                    {{ line.label }}
-                  </span>
-                </div>
-              </div>
-              <textarea
-                ref="draftEditorRef"
-                v-model="draftContent"
-                class="document-textarea draft-editor-textarea"
-                spellcheck="false"
-                placeholder="这里可以直接编辑 Markdown 草稿"
-                @input="onDraftEditorInput"
-                @scroll="syncDraftEditorScroll"
-                @select="captureDraftSelection"
-                @keyup="captureDraftSelection"
-                @mouseup="captureDraftSelection"
-              ></textarea>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div v-else class="empty-state">
-        请从左侧列表选择一个阶段文档进行查看或编辑。
-      </div>
-    </section>
-
+    <DraftReviewOverlay
+      :visible="showDraftReviewOverlay"
+      :proposal="draftProposal"
+      :description="draftProposalDescription || '这里展示当前草案解析后的 Markdown 效果。'"
+      :segments="visibleDraftSegments"
+      :active-segment-id="activeReviewSegmentId"
+      :blocks="reviewPreviewBlocks"
+      :active-block-id="activePreviewBlockId"
+      :render="renderMarkdown"
+      :proposal-status-label="proposalStatusLabel"
+      :segment-status-label="segmentStatusLabel"
+      :segment-label="draftSegmentLabel"
+      :segment-summary="reviewSegmentSummary"
+      @close="closeDraftReviewOverlay"
+      @apply-all="applyAllDraftProposalActions"
+      @apply="(id, action) => applyDraftProposalAction(id, action)"
+      @select-segment="selectReviewSegment"
+      @preview-ready="reviewPreviewRef = $event"
+    />
     <div
       v-if="showDraftReviewOverlay"
-      class="draft-review-overlay"
+      class="draft-review-overlay legacy-hidden"
     >
       <div class="draft-review-canvas glass">
         <div class="draft-review-overlay-head">
@@ -574,7 +273,47 @@
       </div>
     </div>
 
-    <div v-if="showCurriculumModal" class="modal-overlay" @click.self="showCurriculumModal = false">
+    <CurriculumModal
+      ref="curriculumModalRef"
+      :visible="showCurriculumModal"
+      :admin="Boolean(currentUser?.is_admin)"
+      :files="curriculumFiles"
+      :total-chunks="curriculumTotalChunks"
+      :status="curriculumStatus"
+      :status-label="curriculumStatusLabel"
+      :operation="curriculumAdminOperation"
+      :loading="isLoadingCurriculum"
+      :loading-admin="isLoadingCurriculumAdmin"
+      :uploading="isUploadingCurriculum"
+      :error="curriculumError"
+      :upload-results="curriculumUploadResults"
+      :experts="experts"
+      :editing-source="permissionEditingSource"
+      :permission-draft="permissionDraftExpertIds"
+      :saving-source="savingPermissionSource"
+      :deleting-sources="deletingCurriculumSources"
+      :retrievals="curriculumRetrievals"
+      :format-date="formatCurriculumDate"
+      :vector-label="curriculumFileVectorLabel"
+      :expert-name="expertName"
+      :mode-label="retrievalModeLabel"
+      :score="formatScore"
+      @close="showCurriculumModal = false"
+      @rebuild="handleRebuildCurriculumVectors"
+      @export="handleExportCurriculum"
+      @import="openCurriculumBundlePicker"
+      @bundle-selected="handleCurriculumBundleSelection"
+      @pick-files="openCurriculumFilePicker"
+      @drop-files="handleCurriculumDrop"
+      @files-selected="handleCurriculumFileSelection"
+      @toggle-permission="togglePermissionExpert"
+      @save-permissions="saveCurriculumPermissions"
+      @cancel-permissions="closePermissionEditor"
+      @edit-permissions="openPermissionEditor"
+      @delete-file="removeCurriculumSource"
+      @refresh-admin="refreshCurriculumAdminData"
+    />
+    <div v-if="showCurriculumModal" class="modal-overlay legacy-hidden" @click.self="showCurriculumModal = false">
       <section class="modal-content curriculum-modal glass" role="dialog" aria-modal="true" aria-labelledby="curriculum-title">
         <div class="curriculum-modal-head">
           <div>
@@ -808,7 +547,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AuthPanel from "@/components/AuthPanel.vue";
-import { BookOpen, Database, Download, FileText, History, LoaderCircle, Paperclip, RefreshCw, Upload, X } from "lucide-vue-next";
+import AppHeader from "@/components/AppHeader.vue";
+import ChatComposer from "@/components/ChatComposer.vue";
+import ConversationPanel from "@/components/ConversationPanel.vue";
+import CurriculumModal from "@/components/CurriculumModal.vue";
+import DocumentWorkbench from "@/components/DocumentWorkbench.vue";
+import DraftReviewOverlay from "@/components/DraftReviewOverlay.vue";
+import WorkspaceSidebar from "@/components/WorkspaceSidebar.vue";
+import { BookOpen, Database, Download, FileText, History, LoaderCircle, RefreshCw, Upload, X } from "lucide-vue-next";
 import {
   createSession,
   deleteCurriculumFile,
@@ -875,6 +621,7 @@ const permissionEditingSource = ref("");
 const permissionDraftExpertIds = ref<string[]>([]);
 const savingPermissionSource = ref("");
 const selectedSessionId = ref("");
+const sessionSearchQuery = ref("");
 const selectedStageId = ref("");
 const topicInput = ref("光的反射");
 const chatInput = ref("");
@@ -887,7 +634,7 @@ const isStreaming = ref(false);
 const activeStreamRequestId = ref<string | null>(null);
 const activeStreamAbortController = ref<AbortController | null>(null);
 const interruptRequested = ref(false);
-const themeMode = ref<"dark" | "light">("dark");
+const themeMode = ref<"dark" | "light">("light");
 const saveSuccessVisible = ref(false);
 const workflowPhase = ref<"idle" | "guide" | "draft" | "expert">("idle");
 const workflowStatusText = ref("准备就绪");
@@ -898,6 +645,7 @@ const chatInputRef = ref<HTMLTextAreaElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const curriculumFileInputRef = ref<HTMLInputElement | null>(null);
 const curriculumBundleInputRef = ref<HTMLInputElement | null>(null);
+const curriculumModalRef = ref<any>(null);
 const draftEditorRef = ref<HTMLTextAreaElement | null>(null);
 const reviewPreviewRef = ref<HTMLElement | null>(null);
 const showDraftReviewOverlay = ref(false);
@@ -1544,6 +1292,12 @@ function openPermissionEditor(item: CurriculumFileItem) {
   curriculumError.value = "";
 }
 
+function togglePermissionExpert(expertId: string) {
+  permissionDraftExpertIds.value = permissionDraftExpertIds.value.includes(expertId)
+    ? permissionDraftExpertIds.value.filter((item) => item !== expertId)
+    : [...permissionDraftExpertIds.value, expertId];
+}
+
 function closePermissionEditor() {
   if (savingPermissionSource.value) return;
   permissionEditingSource.value = "";
@@ -1603,7 +1357,20 @@ function openCurriculumFilePicker() {
   if (!currentUser.value?.is_admin || isUploadingCurriculum.value) {
     return;
   }
+  if (curriculumModalRef.value?.openFilePicker) {
+    curriculumModalRef.value.openFilePicker();
+    return;
+  }
   curriculumFileInputRef.value?.click();
+}
+
+function openCurriculumBundlePicker() {
+  if (!currentUser.value?.is_admin || curriculumAdminOperation.value) return;
+  if (curriculumModalRef.value?.openBundlePicker) {
+    curriculumModalRef.value.openBundlePicker();
+    return;
+  }
+  curriculumBundleInputRef.value?.click();
 }
 
 async function importCurriculumFiles(files: File[]) {
