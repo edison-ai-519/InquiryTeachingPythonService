@@ -177,3 +177,76 @@ class CurriculumSourceAgentPermissionModel(Base):
     created_at = Column(String, nullable=False)
 
     __table_args__ = (Index("ix_curriculum_permissions_agent_id", "agent_id"),)
+
+
+class KnowledgeEntitySourceModel(Base):
+    __tablename__ = "knowledge_entity_sources"
+
+    entity_id = Column(
+        String,
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    source = Column(
+        String,
+        ForeignKey("curriculum_sources.source", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at = Column(String, nullable=False)
+
+    __table_args__ = (Index("ix_knowledge_entity_sources_source", "source"),)
+
+
+class KnowledgeEntityModel(Base):
+    __tablename__ = "knowledge_entities"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False, index=True)
+    entity_type = Column(String, nullable=False, index=True)
+    aliases_json = Column(Text, nullable=False, default="[]")
+    description = Column(Text, nullable=False, default="")
+    source = Column(String, nullable=False, default="")
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+
+class KnowledgeRelationModel(Base):
+    __tablename__ = "knowledge_relations"
+
+    id = Column(String, primary_key=True)
+    subject_entity_id = Column(
+        String,
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    predicate = Column(String, nullable=False, index=True)
+    object_entity_id = Column(
+        String,
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    description = Column(Text, nullable=False, default="")
+    evidence_source = Column(Text, nullable=False, default="")
+    confidence = Column(String, nullable=False, default="medium")
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+
+class KnowledgeEntityMentionModel(Base):
+    __tablename__ = "knowledge_entity_mentions"
+
+    entity_id = Column(
+        String,
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    chunk_id = Column(
+        Integer,
+        ForeignKey("curriculum_chunks.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    source = Column(String, nullable=False, default="", index=True)
+
+    __table_args__ = (Index("ix_knowledge_mentions_source", "source"),)

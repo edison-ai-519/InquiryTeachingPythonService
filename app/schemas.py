@@ -35,6 +35,16 @@ class DraftSelection(BaseModel):
     block_id: str | None = None
 
 
+class GraphSelection(BaseModel):
+    entity_ids: list[str] = Field(default_factory=list)
+    relation_ids: list[str] = Field(default_factory=list)
+    path_ids: list[str] = Field(default_factory=list)
+
+
+class KnowledgeEntityRagSourcesRequest(BaseModel):
+    sources: list[str] = Field(default_factory=list)
+
+
 class ChatRequest(BaseModel):
     type: Literal["chat", "sys_action"] = "chat"
     request_id: str | None = Field(default=None, min_length=1, max_length=128)
@@ -44,6 +54,7 @@ class ChatRequest(BaseModel):
     expert_id: str | None = Field(default=None, min_length=1, max_length=128)
     draft_request_kind: Literal["generate", "edit"] | None = None
     selection: DraftSelection | None = None
+    graph_selection: GraphSelection | None = None
 
 
 class RollbackRequest(BaseModel):

@@ -79,6 +79,46 @@ export type CurriculumRetrievalRecord = {
   created_at: string;
 };
 
+export type KnowledgeEntity = {
+  id: string;
+  name: string;
+  entity_type: "insect" | "plant" | "habitat" | "season" | "behavior" | "concept" | string;
+  aliases: string[];
+  description: string;
+  source: string;
+  rag_sources: string[];
+};
+
+export type KnowledgeRelation = {
+  id: string;
+  subject_entity_id: string;
+  predicate: string;
+  predicate_label?: string;
+  object_entity_id: string;
+  description: string;
+  evidence_source: string;
+  confidence: "high" | "medium" | "low" | string;
+};
+
+export type KnowledgePath = {
+  id: string;
+  relation_ids: string[];
+  score: number;
+};
+
+export type KnowledgeGraphPayload = {
+  entities: KnowledgeEntity[];
+  relations: KnowledgeRelation[];
+  paths: KnowledgePath[];
+  recommended_path_ids: string[];
+};
+
+export type GraphSelectionPayload = {
+  entity_ids: string[];
+  relation_ids: string[];
+  path_ids: string[];
+};
+
 export type FlowInfo = {
   name: string;
   display_name: string;

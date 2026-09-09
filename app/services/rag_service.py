@@ -106,6 +106,29 @@ class RagService:
         return "\n".join(sections)
 
     @staticmethod
+    def format_graph_rag_context(query: str, results: list[CurriculumSearchResult]) -> str:
+        sections = [
+            "<graph_rag_reference>",
+            f"以下内容是依据教师选中的知识图谱节点召回的文档片段。节点查询：{query}",
+        ]
+        for index, result in enumerate(results, start=1):
+            sections.extend(
+                [
+                    "",
+                    f"[{index}] 来源：{result.source}",
+                    f"相关内容：{result.content}",
+                ]
+            )
+        sections.extend(
+            [
+                "",
+                "知识图谱链路是本轮回答的主要依据；这些片段仅用于补充背景、定义和教学资料。不要把未被证据支持的关系说成确定因果。",
+                "</graph_rag_reference>",
+            ]
+        )
+        return "\n".join(sections)
+
+    @staticmethod
     def merge_context(doc_input: str, curriculum_context: str) -> str:
         return "\n\n".join(
             item.strip()

@@ -15,6 +15,7 @@
     @toggle-sidebar="toggleLeftSidebar"
     @toggle-theme="toggleTheme"
     @logout="logout"
+    @open-graph-admin="openGraphAdmin"
   />
   <div
     class="workspace-grid"
@@ -56,7 +57,6 @@
         @rollback="rollbackRecent"
         @feed-ready="feedRef = $event"
       >
-
         <ChatComposer
           v-model="chatInput"
           :expert="selectedExpert"
@@ -89,35 +89,67 @@
     </section>
 
     <!-- RIGHT COLUMN: Document Display & Editor -->
-    <DocumentWorkbench
-      v-model="draftContent"
-      :session="currentSession"
-      :stage="activeStages.find(stage => stage.id === selectedStageId) || currentStage"
-      :selected-stage-id="selectedStageId"
-      :current-stage-id="currentStageId"
-      :stage-index="currentStageIndex"
-      :streaming="isStreaming"
-      :drafting="workflowPhase === 'draft'"
-      :proposal="draftProposal"
-      :proposal-label="draftProposal ? proposalStatusLabel(draftProposal.status) : draftWorkbenchEmptyText"
-      :visual-lines="draftVisualLines"
-      :scroll-top="draftEditorScrollTop"
-      :line-height="draftEditorLineHeight"
-      :cursor-line="currentDraftCursorLine"
-      :selection-label="currentSelectionReferenceLabel"
-      :attached-label="attachedChatSelectionLabel"
-      @previous="goPreviousStage"
-      @next="goNextStage"
-      @save="saveDraftToServer"
-      @export="exportCurrentPlan"
-      @preview="openDraftReviewOverlay"
-      @editor-ready="draftEditorRef = $event"
-      @editor-input="onDraftEditorInput"
-      @editor-scroll="syncDraftEditorScroll"
-      @capture-selection="captureDraftSelection"
-      @add-selection="addSelectionToChat"
-      @clear-selection="clearDraftSelection"
-    />
+    <div class="right-panel-container">
+      <div v-if="isInsectOrNatureExpert" class="right-panel-toggle">
+        <button
+          type="button"
+          class="toggle-button"
+          :class="{ active: showGraphInRightPanel }"
+          @click="showGraphInRightPanel = true"
+        >
+          图谱
+        </button>
+        <button
+          type="button"
+          class="toggle-button"
+          :class="{ active: !showGraphInRightPanel }"
+          @click="showGraphInRightPanel = false"
+        >
+          编辑器
+        </button>
+      </div>
+      <DocumentWorkbench
+        v-if="!isInsectOrNatureExpert || !showGraphInRightPanel"
+        v-model="draftContent"
+        :session="currentSession"
+        :stage="activeStages.find(stage => stage.id === selectedStageId) || currentStage"
+        :selected-stage-id="selectedStageId"
+        :current-stage-id="currentStageId"
+        :stage-index="currentStageIndex"
+        :streaming="isStreaming"
+        :drafting="workflowPhase === 'draft'"
+        :proposal="draftProposal"
+        :proposal-label="draftProposal ? proposalStatusLabel(draftProposal.status) : draftWorkbenchEmptyText"
+        :visual-lines="draftVisualLines"
+        :scroll-top="draftEditorScrollTop"
+        :line-height="draftEditorLineHeight"
+        :cursor-line="currentDraftCursorLine"
+        :selection-label="currentSelectionReferenceLabel"
+        :attached-label="attachedChatSelectionLabel"
+        @previous="goPreviousStage"
+        @next="goNextStage"
+        @save="saveDraftToServer"
+        @export="exportCurrentPlan"
+        @preview="openDraftReviewOverlay"
+        @editor-ready="draftEditorRef = $event"
+        @editor-input="onDraftEditorInput"
+        @editor-scroll="syncDraftEditorScroll"
+        @capture-selection="captureDraftSelection"
+        @add-selection="addSelectionToChat"
+        @clear-selection="clearDraftSelection"
+      />
+      <KnowledgeGraphPanel
+        v-if="isInsectOrNatureExpert && showGraphInRightPanel"
+        :graph="knowledgeGraph"
+        :selected-entity-ids="selectedGraphEntityIds"
+        :loading="isLoadingKnowledgeGraph"
+        :streaming="isStreaming"
+        :agent-name="selectedExpert?.name || ''"
+        @close="showGraphInRightPanel = false"
+        @toggle-node="toggleGraphEntity"
+        @answer="sendGraphSelectedChat"
+      />
+    </div>
 
     <DraftReviewOverlay
       :visible="showDraftReviewOverlay"
@@ -312,6 +344,14 @@
       @edit-permissions="openPermissionEditor"
       @delete-file="removeCurriculumSource"
       @refresh-admin="refreshCurriculumAdminData"
+    />
+    <KnowledgeGraphAdminModal
+      v-if="showGraphAdminModal"
+      :graph="graphAdminData"
+      :files="curriculumFiles"
+      :saving="isSavingGraphNode"
+      @close="showGraphAdminModal = false"
+      @save="saveGraphNodeSources"
     />
     <div v-if="showCurriculumModal" class="modal-overlay legacy-hidden" @click.self="showCurriculumModal = false">
       <section class="modal-content curriculum-modal glass" role="dialog" aria-modal="true" aria-labelledby="curriculum-title">
@@ -553,6 +593,8 @@ import ConversationPanel from "@/components/ConversationPanel.vue";
 import CurriculumModal from "@/components/CurriculumModal.vue";
 import DocumentWorkbench from "@/components/DocumentWorkbench.vue";
 import DraftReviewOverlay from "@/components/DraftReviewOverlay.vue";
+import KnowledgeGraphPanel from "@/components/KnowledgeGraphPanel.vue";
+import KnowledgeGraphAdminModal from "@/components/KnowledgeGraphAdminModal.vue";
 import WorkspaceSidebar from "@/components/WorkspaceSidebar.vue";
 import { BookOpen, Database, Download, FileText, History, LoaderCircle, RefreshCw, Upload, X } from "lucide-vue-next";
 import {
@@ -569,6 +611,8 @@ import {
   getCurriculumFiles,
   getCurriculumRetrievals,
   getCurriculumStatus,
+  getKnowledgeGraphCandidates,
+  getKnowledgeGraphAdmin,
   exportSession,
   getFlows,
   getMessages,
@@ -583,6 +627,7 @@ import {
   setDraftMode,
   streamChat,
   updateCurriculumPermissions,
+  updateKnowledgeGraphEntityRagSources,
   uploadCurriculumFile,
   uploadSessionFile,
 } from "@/api";
@@ -597,6 +642,8 @@ import type {
   ExpertAgentItem,
   FlowInfo,
   FlowStage,
+  GraphSelectionPayload,
+  KnowledgeGraphPayload,
   MessageItem,
   SessionDetail,
   SessionFileItem,
@@ -670,6 +717,24 @@ const curriculumUploadResults = ref<Array<{
   status: "pending" | "success" | "failed";
   message: string;
 }>>([]);
+const showKnowledgeGraphPanel = ref(false);
+const showGraphInRightPanel = ref(false);
+const showGraphAdminModal = ref(false);
+const isSavingGraphNode = ref(false);
+const graphAdminData = ref<KnowledgeGraphPayload>({
+  entities: [],
+  relations: [],
+  paths: [],
+  recommended_path_ids: [],
+});
+const isLoadingKnowledgeGraph = ref(false);
+const knowledgeGraph = ref<KnowledgeGraphPayload>({
+  entities: [],
+  relations: [],
+  paths: [],
+  recommended_path_ids: [],
+});
+const selectedGraphEntityIds = ref<string[]>([]);
 const currentDraftCursorLine = ref(1);
 const draftEditorScrollTop = ref(0);
 const draftEditorMeasureWidth = ref(0);
@@ -682,6 +747,18 @@ let draftMeasureCanvas: HTMLCanvasElement | null = null;
 
 // New ref for modal
 const showNewSessionModal = ref(false);
+
+function resetKnowledgeGraphState() {
+  showKnowledgeGraphPanel.value = false;
+  isLoadingKnowledgeGraph.value = false;
+  knowledgeGraph.value = {
+    entities: [],
+    relations: [],
+    paths: [],
+    recommended_path_ids: [],
+  };
+  selectedGraphEntityIds.value = [];
+}
 
 function applyTheme(mode: "dark" | "light") {
   document.body.classList.toggle("theme-light", mode === "light");
@@ -759,6 +836,9 @@ const progressPercentage = computed(() => {
 const isDraftMode = computed(() => Boolean(currentSession.value?.draft_mode_enabled));
 const selectedExpert = computed(() =>
   experts.value.find((expert) => expert.id === selectedExpertId.value) || null,
+);
+const isInsectOrNatureExpert = computed(() =>
+  selectedExpertId.value === 'nature_agent',
 );
 const curriculumTotalChunks = computed(() =>
   curriculumFiles.value.reduce((total, item) => total + item.chunk_count, 0),
@@ -1225,6 +1305,7 @@ async function logout() {
     experts.value = [];
     selectedExpertId.value = "";
     showCurriculumModal.value = false;
+    resetKnowledgeGraphState();
     draftContent.value = "";
     draftProposal.value = null;
     draftStreamingContent.value = "";
@@ -1246,6 +1327,7 @@ async function loadSession(sessionId: string, loadMessages = true, preserveWarni
   selectedSessionId.value = session.id;
   selectedExpertId.value = "";
   selectedStageId.value = pickStageIdFromSession(session);
+  resetKnowledgeGraphState();
   if (loadMessages) {
     messages.value = await getMessages(sessionId);
   }
@@ -1799,6 +1881,82 @@ function createStreamRequestId() {
   return `chat_${Date.now()}_${randomId}`;
 }
 
+async function openKnowledgeGraphPanel() {
+  if (!currentSession.value || isStreaming.value) {
+    return;
+  }
+  if (!selectedExpertId.value) {
+    statusText.value = "请先选择专家 Agent，再查看知识图谱";
+    return;
+  }
+  const message = chatInput.value.trim();
+  showGraphInRightPanel.value = true;
+  isLoadingKnowledgeGraph.value = true;
+  streamWarning.value = "";
+  try {
+    const graph = await getKnowledgeGraphCandidates(currentSession.value.id, message, selectedExpertId.value || undefined);
+    knowledgeGraph.value = graph;
+    selectedGraphEntityIds.value = [];
+    statusText.value = graph.entities.length ? "已生成局部知识图谱，请选择回答节点" : "没有找到相关图谱关系";
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+    statusText.value = "知识图谱解析失败";
+  } finally {
+    isLoadingKnowledgeGraph.value = false;
+  }
+}
+
+async function openGraphAdmin() {
+  if (!currentUser.value?.is_admin) return;
+  try {
+    graphAdminData.value = await getKnowledgeGraphAdmin();
+    showGraphAdminModal.value = true;
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+  }
+}
+
+async function saveGraphNodeSources(entityId: string, sources: string[]) {
+  if (!currentUser.value?.is_admin || isSavingGraphNode.value) return;
+  isSavingGraphNode.value = true;
+  try {
+    const savedSources = await updateKnowledgeGraphEntityRagSources(entityId, sources);
+    const entity = graphAdminData.value.entities.find((item) => item.id === entityId);
+    if (entity) entity.rag_sources = savedSources;
+    statusText.value = "节点知识库配置已保存";
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+  } finally {
+    isSavingGraphNode.value = false;
+  }
+}
+
+
+
+function toggleGraphEntity(entityId: string) {
+  const current = selectedGraphEntityIds.value;
+  selectedGraphEntityIds.value = current.includes(entityId)
+    ? current.filter((item) => item !== entityId)
+    : [...current, entityId];
+}
+
+function buildGraphSelection(): GraphSelectionPayload {
+  return {
+    entity_ids: [...selectedGraphEntityIds.value],
+    relation_ids: [],
+    path_ids: [],
+  };
+}
+
+async function sendGraphSelectedChat() {
+  if (!selectedGraphEntityIds.value.length) {
+    statusText.value = "请先选择至少一个图谱节点";
+    return;
+  }
+  await sendChat(buildGraphSelection());
+  showKnowledgeGraphPanel.value = false;
+}
+
 async function interruptChat() {
   if (!isStreaming.value || !currentSession.value || !activeStreamRequestId.value) {
     return;
@@ -1815,7 +1973,7 @@ async function interruptChat() {
   }
 }
 
-async function sendChat() {
+async function sendChat(graphSelection: GraphSelectionPayload | null = null) {
   if (isStreaming.value) {
     return;
   }
@@ -1916,6 +2074,7 @@ async function sendChat() {
         expert_id: requestExpertId || undefined,
         draft_request_kind: draftRequestKind,
         selection: selectionPayload,
+        graph_selection: graphSelection,
       },
       {
         stage: () => {
@@ -2022,6 +2181,11 @@ async function sendChat() {
           }
         },
         warning: (data) => {
+          if (data.warning_type === "graph_selection") {
+            streamWarning.value = data.message || "您选择的图谱链路与当前问题关联较弱。";
+            statusText.value = "图谱链路需要调整";
+            return;
+          }
           streamWarning.value = `${data.agent_name || "专家"}暂时不可用：${data.message || "请稍后重试"}`;
           statusText.value = "专家咨询暂时不可用";
         },
@@ -2293,6 +2457,17 @@ watch(saveSuccessVisible, (visible) => {
   if (!visible && saveSuccessTimer) {
     window.clearTimeout(saveSuccessTimer);
     saveSuccessTimer = undefined;
+  }
+});
+
+watch(selectedExpertId, (newExpertId) => {
+  if (newExpertId === 'nature_agent') {
+    showGraphInRightPanel.value = true;
+    if (currentSession.value && !isStreaming.value) {
+      openKnowledgeGraphPanel();
+    }
+  } else {
+    showGraphInRightPanel.value = false;
   }
 });
 </script>

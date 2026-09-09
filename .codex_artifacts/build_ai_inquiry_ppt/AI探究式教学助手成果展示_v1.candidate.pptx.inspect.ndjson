@@ -1,0 +1,377 @@
+{"kind":"deck","id":"pr/uwqaos","name":"Deck"}
+{"kind":"layout","layoutId":"1e3b95ab-fe85-48c1-a690-0573d27c7ab0","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"1c9fd721-9edf-4b1e-9acf-10d58121a4e3","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/jlnmr2","slide":1,"title":"AI 探究式教学助手","textShapes":8}
+{"kind":"shape","id":"sh/bqt8n6pk","slide":1,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/cr29gb65","slide":1,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/dsbapg7q","slide":1,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/ytkrilov","slide":1,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/0vm9kv61","slide":1,"text":"AI 探究式教学助手","textPreview":"AI 探究式教学助手","textChars":10,"textLines":1,"bbox":[74,156,620,72]}
+{"kind":"textbox","id":"sh/lwvat07m","slide":1,"text":"InquiryTeachingPythonService 成果展示","textPreview":"InquiryTeachingPythonService 成果展示","textChars":33,"textLines":1,"bbox":[78,244,610,44]}
+{"kind":"textbox","id":"sh/ex0r6hor","slide":1,"text":"当前成果 · 项目特点 · 技术架构 · 未来方向","textPreview":"当前成果 · 项目特点 · 技术架构 · 未来方向","textChars":25,"textLines":1,"bbox":[80,330,640,34]}
+{"kind":"textbox","id":"sh/fy98fmpc","slide":1,"text":"教师在环","textPreview":"教师在环","textChars":4,"textLines":1,"bbox":[82,438,136,34]}
+{"kind":"textbox","id":"sh/7atg7qxk","slide":1,"text":"阶段化流程","textPreview":"阶段化流程","textChars":5,"textLines":1,"bbox":[242,438,150,34]}
+{"kind":"textbox","id":"sh/6pkfelwf","slide":1,"text":"智能协同","textPreview":"智能协同","textChars":4,"textLines":1,"bbox":[416,438,136,34]}
+{"kind":"shape","id":"sh/tcby90fq","slide":1,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/8b2xgve5","slide":1,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/jm9g36xo","slide":1,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"image","id":"im/mxgzatkn","slide":1,"name":"","geometry":"roundRect","alt":"AI 探究式教学助手视觉参考","bbox":[720,64,500,450]}
+{"kind":"notes","id":"nt/jlnmr2","slide":1,"text":"内容依据当前仓库 README、PROJECT_STRUCTURE、前后端代码和已生成的发展规划文档整理。"}
+{"kind":"slide","id":"sl/ow20da","slide":2,"title":"CHAPTER","textShapes":19}
+{"kind":"shape","id":"sh/by58bqlg","slide":2,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/czep4vm1","slide":2,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/x0nqd036","slide":2,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/2tc7y14j","slide":2,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/ovup0bmp","slide":2,"text":"CHAPTER","textPreview":"CHAPTER","textChars":7,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/pw3q9g3a","slide":2,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/e5s7u14n","slide":2,"text":"项目背景与目标","textPreview":"项目背景与目标","textChars":7,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/f6lo3658","slide":2,"text":"从教师备课痛点出发，构建可持续打磨的探究式教学助手","textPreview":"从教师备课痛点出发，构建可持续打磨的探究式教学助手","textChars":25,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"shape","id":"sh/bq1ovits","slide":2,"bbox":[74,242,340,280]}
+{"kind":"shape","id":"sh/apsnmxcn","slide":2,"bbox":[96,266,8,48]}
+{"kind":"textbox","id":"sh/xsj6xsby","slide":2,"text":"项目定位","textPreview":"项目定位","textChars":4,"textLines":1,"bbox":[118,264,244,46]}
+{"kind":"textbox","id":"sh/wra5onud","slide":2,"text":"面向中小学教师，围绕真实课堂探究活动，辅助完成教学设计、课堂实施与迭代优化。","textPreview":"面向中小学教师，围绕真实课堂探究活动，辅助完成教学设计、课堂实施与迭代优化。","textChars":38,"textLines":1,"bbox":[118,324,270,184]}
+{"kind":"shape","id":"sh/je1oz2t4","slide":2,"bbox":[462,252,310,120]}
+{"kind":"textbox","id":"sh/ytsnqxcj","slide":2,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[706,268,44,28]}
+{"kind":"shape","id":"sh/lg361cba","slide":2,"bbox":[484,276,8,48]}
+{"kind":"textbox","id":"sh/kfa5s7up","slide":2,"text":"服务对象","textPreview":"服务对象","textChars":4,"textLines":1,"bbox":[506,274,214,46]}
+{"kind":"textbox","id":"sh/fyh4nyd0","slide":2,"text":"一线教师与课堂探究活动","textPreview":"一线教师与课堂探究活动","textChars":11,"textLines":1,"bbox":[506,334,240,24]}
+{"kind":"shape","id":"sh/exonedcf","slide":2,"bbox":[812,252,310,120]}
+{"kind":"textbox","id":"sh/2pgzi50z","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1056,268,44,28]}
+{"kind":"shape","id":"sh/3qp0bahk","slide":2,"bbox":[834,276,8,48]}
+{"kind":"textbox","id":"sh/4ryhkfi5","slide":2,"text":"主要目标","textPreview":"主要目标","textChars":4,"textLines":1,"bbox":[856,274,214,46]}
+{"kind":"textbox","id":"sh/ps7idkzq","slide":2,"text":"辅助完成教学设计与迭代","textPreview":"辅助完成教学设计与迭代","textChars":11,"textLines":1,"bbox":[856,334,240,24]}
+{"kind":"shape","id":"sh/ulwze503","slide":2,"bbox":[462,402,310,120]}
+{"kind":"textbox","id":"sh/fmp07q1o","slide":2,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[706,418,44,28]}
+{"kind":"shape","id":"sh/gnyhgvi9","slide":2,"bbox":[484,426,8,48]}
+{"kind":"textbox","id":"sh/ho7i90ze","slide":2,"text":"输出形式","textPreview":"输出形式","textChars":4,"textLines":1,"bbox":[506,424,214,46]}
+{"kind":"textbox","id":"sh/6xwzal0r","slide":2,"text":"对话、草稿、导出资源","textPreview":"对话、草稿、导出资源","textChars":10,"textLines":1,"bbox":[506,484,240,24]}
+{"kind":"shape","id":"sh/7y5g3q1c","slide":2,"bbox":[812,402,310,120]}
+{"kind":"textbox","id":"sh/9cv2poju","slide":2,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1056,418,44,28]}
+{"kind":"shape","id":"sh/8b2lgj29","slide":2,"bbox":[834,426,8,48]}
+{"kind":"textbox","id":"sh/natkne14","slide":2,"text":"项目价值","textPreview":"项目价值","textChars":4,"textLines":1,"bbox":[856,424,214,46]}
+{"kind":"textbox","id":"sh/m9k3e9kj","slide":2,"text":"提升设计效率与探究质量","textPreview":"提升设计效率与探究质量","textChars":11,"textLines":1,"bbox":[856,484,240,24]}
+{"kind":"shape","id":"sh/1ob2lojy","slide":2,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/0n21cj2d","slide":2,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/zmtkje1s","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"image","id":"im/alcnix8n","slide":2,"name":"","geometry":"roundRect","alt":"用户提供的自然风教育科技参考图","bbox":[842,78,360,202]}
+{"kind":"notes","id":"nt/ow20da","slide":2,"text":"参考 README 中项目定位、主导师与领域专家、会话参考资料等说明。"}
+{"kind":"slide","id":"sl/k0hf4p","slide":3,"title":"AI FOR INQUIRY TEACHING","textShapes":23}
+{"kind":"shape","id":"sh/50ve9sra","slide":3,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/ix4fyx8j","slide":3,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/3ydw7294","slide":3,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/gv2xwnqd","slide":3,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/hwve5sry","slide":3,"text":"AI FOR INQUIRY TEACHING","textPreview":"AI FOR INQUIRY TEACHING","textChars":23,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/utkfud87","slide":3,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/vutw3i9s","slide":3,"text":"七阶段探究式教学流","textPreview":"七阶段探究式教学流","textChars":9,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/8r2xs3qh","slide":3,"text":"以阶段推进保证教学方案逐步成形","textPreview":"以阶段推进保证教学方案逐步成形","textChars":15,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"textbox","id":"sh/tsbe18r2","slide":3,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[82,318,92,92]}
+{"kind":"textbox","id":"sh/t8ve9wj6","slide":3,"text":"导入情境","textPreview":"导入情境","textChars":4,"textLines":1,"bbox":[56,424,146,32]}
+{"kind":"shape","id":"sh/s7mdgril","slide":3,"bbox":[182,364,62,0]}
+{"kind":"textbox","id":"sh/76dw7m10","slide":3,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[244,318,92,92]}
+{"kind":"textbox","id":"sh/654veh0v","slide":3,"text":"提出问题","textPreview":"提出问题","textChars":4,"textLines":1,"bbox":[218,424,146,32]}
+{"kind":"shape","id":"sh/54ve5cja","slide":3,"bbox":[344,364,62,0]}
+{"kind":"textbox","id":"sh/kj2dc7ip","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[406,318,92,92]}
+{"kind":"textbox","id":"sh/jitw3214","slide":3,"text":"猜想假设","textPreview":"猜想假设","textChars":4,"textLines":1,"bbox":[380,424,146,32]}
+{"kind":"shape","id":"sh/yhkvah0j","slide":3,"bbox":[506,364,62,0]}
+{"kind":"textbox","id":"sh/xgbe1cjy","slide":3,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[568,318,92,92]}
+{"kind":"textbox","id":"sh/wf2d87id","slide":3,"text":"设计方案","textPreview":"设计方案","textChars":4,"textLines":1,"bbox":[542,424,146,32]}
+{"kind":"shape","id":"sh/oz6do7q9","slide":3,"bbox":[668,364,62,0]}
+{"kind":"textbox","id":"sh/pkfehcru","slide":3,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[730,318,92,92]}
+{"kind":"textbox","id":"sh/2xovmx8j","slide":3,"text":"观察实验","textPreview":"观察实验","textChars":4,"textLines":1,"bbox":[704,424,146,32]}
+{"kind":"shape","id":"sh/nyxwf29o","slide":3,"bbox":[830,364,62,0]}
+{"kind":"textbox","id":"sh/0vmdknqd","slide":3,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[892,318,92,92]}
+{"kind":"textbox","id":"sh/1wvedsry","slide":3,"text":"表达交流","textPreview":"表达交流","textChars":4,"textLines":1,"bbox":[866,424,146,32]}
+{"kind":"shape","id":"sh/et4vix87","slide":3,"bbox":[992,364,62,0]}
+{"kind":"textbox","id":"sh/fudwb29s","slide":3,"text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1054,318,92,92]}
+{"kind":"textbox","id":"sh/krqxwrqh","slide":3,"text":"总结评价","textPreview":"总结评价","textChars":4,"textLines":1,"bbox":[1028,424,146,32]}
+{"kind":"textbox","id":"sh/lszepwr2","slide":3,"text":"流程价值","textPreview":"流程价值","textChars":4,"textLines":1,"bbox":[86,528,120,34]}
+{"kind":"shape","id":"sh/fyl8buxg","slide":3,"bbox":[210,535,10,10]}
+{"kind":"textbox","id":"sh/uxc72pwv","slide":3,"text":"把一次开放对话转化为可推进的教学过程","textPreview":"把一次开放对话转化为可推进的教学过程","textChars":18,"textLines":1,"bbox":[232,526,820,34]}
+{"kind":"shape","id":"sh/hk3qdkfm","slide":3,"bbox":[210,569,10,10]}
+{"kind":"textbox","id":"sh/gzup4fe1","slide":3,"text":"每个阶段保留草案，教师可以确认、回退和继续打磨","textPreview":"每个阶段保留草案，教师可以确认、回退和继续打磨","textChars":23,"textLines":1,"bbox":[232,560,820,34]}
+{"kind":"shape","id":"sh/3m58fuxc","slide":3,"bbox":[210,603,10,10]}
+{"kind":"textbox","id":"sh/2lwr6pw7","slide":3,"text":"适合科学探究、自然观察和跨学科项目学习","textPreview":"适合科学探究、自然观察和跨学科项目学习","textChars":19,"textLines":1,"bbox":[232,594,820,34]}
+{"kind":"shape","id":"sh/ponqh4fi","slide":3,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/4ne98zex","slide":3,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/jq183ax8","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"notes","id":"nt/k0hf4p","slide":3,"text":"七阶段流程来自项目工作流设计。"}
+{"kind":"slide","id":"sl/y6iy8t","slide":4,"title":"AI FOR INQUIRY TEACHING","textShapes":18}
+{"kind":"shape","id":"sh/1g7mtoje","slide":4,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/etgni9kn","slide":4,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/zup4re18","slide":4,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/oji5o325","slide":4,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/9krmx8ja","slide":4,"text":"AI FOR INQUIRY TEACHING","textPreview":"AI FOR INQUIRY TEACHING","textChars":23,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/mhgnmtkz","slide":4,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/ni94vy1k","slide":4,"text":"教师在环机制","textPreview":"教师在环机制","textChars":6,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/wni5s321","slide":4,"text":"教师掌握关键判断，AI 负责整理、建议和生成","textPreview":"教师掌握关键判断，AI 负责整理、建议和生成","textChars":22,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"shape","id":"sh/xor618jm","slide":4,"bbox":[90,250,240,178]}
+{"kind":"textbox","id":"sh/9kzmlwj6","slide":4,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[264,266,44,28]}
+{"kind":"shape","id":"sh/8jqlcr2l","slide":4,"bbox":[112,274,8,48]}
+{"kind":"textbox","id":"sh/nih4j610","slide":4,"text":"设定目标","textPreview":"设定目标","textChars":4,"textLines":1,"bbox":[134,272,144,46]}
+{"kind":"textbox","id":"sh/mh83a1kf","slide":4,"text":"主题、年级、场地、课时","textPreview":"主题、年级、场地、课时","textChars":11,"textLines":1,"bbox":[134,332,170,82]}
+{"kind":"shape","id":"sh/xojmpgj2","slide":4,"bbox":[375,250,240,178]}
+{"kind":"textbox","id":"sh/wnqlgb2h","slide":4,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[549,266,44,28]}
+{"kind":"shape","id":"sh/vmh4n61w","slide":4,"bbox":[397,274,8,48]}
+{"kind":"textbox","id":"sh/al83e1kb","slide":4,"text":"选择专家","textPreview":"选择专家","textChars":4,"textLines":1,"bbox":[419,272,144,46]}
+{"kind":"textbox","id":"sh/dsf2dcjy","slide":4,"text":"按问题选择合适顾问","textPreview":"按问题选择合适顾问","textChars":9,"textLines":1,"bbox":[419,332,170,82]}
+{"kind":"shape","id":"sh/cr6l472d","slide":4,"bbox":[660,250,240,178]}
+{"kind":"textbox","id":"sh/4valkra9","slide":4,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[834,266,44,28]}
+{"kind":"shape","id":"sh/5wjmtwbu","slide":4,"bbox":[682,274,8,48]}
+{"kind":"textbox","id":"sh/i983ihs3","slide":4,"text":"审阅草案","textPreview":"审阅草案","textChars":4,"textLines":1,"bbox":[704,272,144,46]}
+{"kind":"textbox","id":"sh/3u14rmto","slide":4,"text":"接受、拒绝或继续追问","textPreview":"接受、拒绝或继续追问","textChars":10,"textLines":1,"bbox":[704,332,170,82]}
+{"kind":"shape","id":"sh/szalora5","slide":4,"bbox":[945,250,240,178]}
+{"kind":"textbox","id":"sh/d0jmxwrq","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1119,266,44,28]}
+{"kind":"shape","id":"sh/qxs3mhsz","slide":4,"bbox":[967,274,8,48]}
+{"kind":"textbox","id":"sh/ry14vm9k","slide":4,"text":"确认成果","textPreview":"确认成果","textChars":4,"textLines":1,"bbox":[989,272,144,46]}
+{"kind":"textbox","id":"sh/03ulsbah","slide":4,"text":"导出并用于真实课堂","textPreview":"导出并用于真实课堂","textChars":9,"textLines":1,"bbox":[989,332,170,82]}
+{"kind":"textbox","id":"sh/143m1grm","slide":4,"text":"这套机制让教师专业判断保留在流程中心。AI 不直接替教师拍板，而是把资料、建议和草案整理到更容易判断的位置。","textPreview":"这套机制让教师专业判断保留在流程中心。AI 不直接替教师拍板，而是把资料、建议和草案整理到更容易判断的位置。","textChars":54,"textLines":1,"bbox":[140,500,1000,70]}
+{"kind":"shape","id":"sh/by5orat4","slide":4,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/axw7y5cj","slide":4,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/xk76t0bu","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"notes","id":"nt/y6iy8t","slide":4,"text":"教师在环基于当前交互流程：阶段推进、专家选择、草案审阅和导出。"}
+{"kind":"slide","id":"sl/ayd1k5","slide":5,"title":"AI FOR INQUIRY TEACHING","textShapes":21}
+{"kind":"shape","id":"sh/14zmdgn6","slide":5,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/e183214f","slide":5,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/z2h4b650","slide":5,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/o7a58bmx","slide":5,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/98jmhg3i","slide":5,"text":"AI FOR INQUIRY TEACHING","textPreview":"AI FOR INQUIRY TEACHING","textChars":23,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/m5s3614r","slide":5,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/n614f65c","slide":5,"text":"主导师与专家 Agent 协同","textPreview":"主导师与专家 Agent 协同","textChars":15,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/wba5cvmt","slide":5,"text":"主导师推进全局，领域专家处理本轮专业问题","textPreview":"主导师推进全局，领域专家处理本轮专业问题","textChars":20,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"shape","id":"sh/xcjml03e","slide":5,"bbox":[486,250,310,156]}
+{"kind":"textbox","id":"sh/9kni10fq","slide":5,"text":"M","textPreview":"M","textChars":1,"textLines":1,"bbox":[730,266,44,28]}
+{"kind":"shape","id":"sh/oze18vyl","slide":5,"bbox":[508,274,8,48]}
+{"kind":"textbox","id":"sh/ny50zqx0","slide":5,"text":"主导师 Agent","textPreview":"主导师 Agent","textChars":9,"textLines":1,"bbox":[530,272,214,46]}
+{"kind":"textbox","id":"sh/mxwj6lgf","slide":5,"text":"流程推进、上下文维护、草案生成、专家建议整合","textPreview":"流程推进、上下文维护、草案生成、专家建议整合","textChars":22,"textLines":1,"bbox":[530,332,240,60]}
+{"kind":"shape","id":"sh/xo7i50f2","slide":5,"bbox":[116,178,150,94]}
+{"kind":"shape","id":"sh/wny1cfeh","slide":5,"bbox":[138,202,8,48]}
+{"kind":"textbox","id":"sh/bmp03axw","slide":5,"text":"昆虫","textPreview":"昆虫","textChars":2,"textLines":1,"bbox":[160,200,54,46]}
+{"kind":"textbox","id":"sh/algja5gb","slide":5,"text":"本轮建议","textPreview":"本轮建议","textChars":4,"textLines":1,"bbox":[160,236,80,22]}
+{"kind":"shape","id":"sh/ds3itgfy","slide":5,"bbox":[266,225,220,0]}
+{"kind":"shape","id":"sh/cruh0byd","slide":5,"bbox":[290,178,150,94]}
+{"kind":"shape","id":"sh/4by1gb69","slide":5,"bbox":[312,202,8,48]}
+{"kind":"textbox","id":"sh/5c7i9gne","slide":5,"text":"自然生态","textPreview":"自然生态","textChars":4,"textLines":1,"bbox":[334,200,54,46]}
+{"kind":"textbox","id":"sh/i9gje1o3","slide":5,"text":"本轮建议","textPreview":"本轮建议","textChars":4,"textLines":1,"bbox":[334,236,80,22]}
+{"kind":"shape","id":"sh/3ap0765o","slide":5,"bbox":[440,225,46,0]}
+{"kind":"shape","id":"sh/sfi1kv65","slide":5,"bbox":[884,178,150,94]}
+{"kind":"shape","id":"sh/d0rid0nq","slide":5,"bbox":[906,202,8,48]}
+{"kind":"textbox","id":"sh/qdgjiloz","slide":5,"text":"数学数据","textPreview":"数学数据","textChars":4,"textLines":1,"bbox":[928,200,54,46]}
+{"kind":"textbox","id":"sh/re90bq5k","slide":5,"text":"本轮建议","textPreview":"本轮建议","textChars":4,"textLines":1,"bbox":[928,236,80,22]}
+{"kind":"shape","id":"sh/03i1ov61","slide":5,"bbox":[796,225,88,0]}
+{"kind":"shape","id":"sh/14r2h0nm","slide":5,"bbox":[1058,178,150,94]}
+{"kind":"shape","id":"sh/byd4nup4","slide":5,"bbox":[1080,202,8,48]}
+{"kind":"textbox","id":"sh/ax43ep8j","slide":5,"text":"安全伦理","textPreview":"安全伦理","textChars":4,"textLines":1,"bbox":[1102,200,54,46]}
+{"kind":"textbox","id":"sh/x0vmp47u","slide":5,"text":"本轮建议","textPreview":"本轮建议","textChars":4,"textLines":1,"bbox":[1102,236,80,22]}
+{"kind":"shape","id":"sh/czmlgzq9","slide":5,"bbox":[796,225,262,0]}
+{"kind":"shape","id":"sh/nut4jups","slide":5,"bbox":[290,470,150,94]}
+{"kind":"shape","id":"sh/29k3ap87","slide":5,"bbox":[312,494,8,48]}
+{"kind":"textbox","id":"sh/pwbml47y","slide":5,"text":"物理探究","textPreview":"物理探究","textChars":4,"textLines":1,"bbox":[334,492,54,46]}
+{"kind":"textbox","id":"sh/ov2lczqd","slide":5,"text":"本轮建议","textPreview":"本轮建议","textChars":4,"textLines":1,"bbox":[334,528,80,22]}
+{"kind":"shape","id":"sh/7qx4vepw","slide":5,"bbox":[440,517,46,0]}
+{"kind":"shape","id":"sh/mponm98r","slide":5,"bbox":[884,470,150,94]}
+{"kind":"shape","id":"sh/ud47ad4v","slide":5,"bbox":[906,494,8,48]}
+{"kind":"textbox","id":"sh/ved8jilg","slide":5,"text":"课程知识","textPreview":"课程知识","textChars":4,"textLines":1,"bbox":[928,492,54,46]}
+{"kind":"textbox","id":"sh/gfmpcnm1","slide":5,"text":"RAG 支撑","textPreview":"RAG 支撑","textChars":6,"textLines":1,"bbox":[928,528,80,22]}
+{"kind":"shape","id":"sh/hgvqls3m","slide":5,"bbox":[796,517,88,0]}
+{"kind":"textbox","id":"sh/69k76t4z","slide":5,"text":"专家回答后自动回到主导师，避免多角色同时改写最终教案。","textPreview":"专家回答后自动回到主导师，避免多角色同时改写最终教案。","textChars":27,"textLines":1,"bbox":[260,602,760,32]}
+{"kind":"shape","id":"sh/7at8fyl4","slide":5,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/8b2p83mp","slide":5,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/tcvqh83a","slide":5,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"notes","id":"nt/ayd1k5","slide":5,"text":"当前仓库配置包含 main_tutor 与昆虫、自然生态、数学、安全、物理等专家 Agent。"}
+{"kind":"slide","id":"sl/lkgx2z","slide":6,"title":"AI FOR INQUIRY TEACHING","textShapes":30}
+{"kind":"shape","id":"sh/4fq9ozy9","slide":6,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/3eh8fuxo","slide":6,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/id87mpg3","slide":6,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/d4jql4fq","slide":6,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/s3a9szy5","slide":6,"text":"AI FOR INQUIRY TEACHING","textPreview":"AI FOR INQUIRY TEACHING","textChars":23,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/r2h8jex0","slide":6,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/q18rq9gf","slide":6,"text":"系统架构与核心能力","textPreview":"系统架构与核心能力","textChars":9,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/18jqpof2","slide":6,"text":"FastAPI、Vue3、SQLite 与 SSE 支撑实时教学工作台","textPreview":"FastAPI、Vue3、SQLite 与 SSE 支撑实时教学工作台","textChars":35,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"shape","id":"sh/07a9wjyh","slide":6,"bbox":[76,166,780,82]}
+{"kind":"textbox","id":"sh/i1gbu14b","slide":6,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[790,182,44,28]}
+{"kind":"shape","id":"sh/j2ps365w","slide":6,"bbox":[98,190,8,48]}
+{"kind":"textbox","id":"sh/k3ytwbmh","slide":6,"text":"前端工作台","textPreview":"前端工作台","textChars":5,"textLines":1,"bbox":[120,188,684,46]}
+{"kind":"textbox","id":"sh/547u5gn2","slide":6,"text":"Vue3 / 聊天 / 草稿 / 导出","textPreview":"Vue3 / 聊天 / 草稿 / 导出","textChars":19,"textLines":1,"bbox":[120,224,710,10]}
+{"kind":"textbox","id":"sh/65gbyl47","slide":6,"text":"对话交互","textPreview":"对话交互","textChars":4,"textLines":1,"bbox":[486,191,104,34]}
+{"kind":"textbox","id":"sh/769c7q5s","slide":6,"text":"内容草稿","textPreview":"内容草稿","textChars":4,"textLines":1,"bbox":[608,191,104,34]}
+{"kind":"textbox","id":"sh/srit0vmd","slide":6,"text":"一键导出","textPreview":"一键导出","textChars":4,"textLines":1,"bbox":[730,191,104,34]}
+{"kind":"shape","id":"sh/tsru90ny","slide":6,"bbox":[76,270,780,82]}
+{"kind":"textbox","id":"sh/m9wbmh43","slide":6,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[790,286,44,28]}
+{"kind":"shape","id":"sh/na5svm5o","slide":6,"bbox":[98,294,8,48]}
+{"kind":"textbox","id":"sh/re183ilg","slide":6,"text":"服务编排层","textPreview":"服务编排层","textChars":5,"textLines":1,"bbox":[120,292,684,46]}
+{"kind":"textbox","id":"sh/qds7udkv","slide":6,"text":"FastAPI / SSE / 流程管理","textPreview":"FastAPI / SSE / 流程管理","textChars":20,"textLines":1,"bbox":[120,328,710,10]}
+{"kind":"textbox","id":"sh/dg3q5s3m","slide":6,"text":"API 服务","textPreview":"API 服务","textChars":6,"textLines":1,"bbox":[486,295,104,34]}
+{"kind":"textbox","id":"sh/cfapwn21","slide":6,"text":"SSE 流式","textPreview":"SSE 流式","textChars":6,"textLines":1,"bbox":[608,295,104,34]}
+{"kind":"textbox","id":"sh/3a18zil4","slide":6,"text":"流程推进","textPreview":"流程推进","textChars":4,"textLines":1,"bbox":[730,295,104,34]}
+{"kind":"shape","id":"sh/29s7qdkz","slide":6,"bbox":[76,374,780,82]}
+{"kind":"textbox","id":"sh/pcjq1s3a","slide":6,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[790,390,44,28]}
+{"kind":"shape","id":"sh/4bapsn2p","slide":6,"bbox":[98,398,8,48]}
+{"kind":"textbox","id":"sh/n6l8b2lo","slide":6,"text":"Agent 能力层","textPreview":"Agent 能力层","textChars":9,"textLines":1,"bbox":[120,396,684,46]}
+{"kind":"textbox","id":"sh/m5cr2xk3","slide":6,"text":"主导师 / 专家 / RAG","textPreview":"主导师 / 专家 / RAG","textChars":14,"textLines":1,"bbox":[120,432,710,10]}
+{"kind":"textbox","id":"sh/kr65wzil","slide":6,"text":"主导师","textPreview":"主导师","textChars":3,"textLines":1,"bbox":[486,399,104,34]}
+{"kind":"textbox","id":"sh/5cfm54j6","slide":6,"text":"阶段专家","textPreview":"阶段专家","textChars":4,"textLines":1,"bbox":[608,399,104,34]}
+{"kind":"textbox","id":"sh/iponu90f","slide":6,"text":"知识增强","textPreview":"知识增强","textChars":4,"textLines":1,"bbox":[730,399,104,34]}
+{"kind":"shape","id":"sh/jqx43u10","slide":6,"bbox":[76,478,780,82]}
+{"kind":"textbox","id":"sh/sf650jih","slide":6,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[790,494,44,28]}
+{"kind":"shape","id":"sh/tgz69oj2","slide":6,"bbox":[98,502,8,48]}
+{"kind":"textbox","id":"sh/6dony90r","slide":6,"text":"数据与存储层","textPreview":"数据与存储层","textChars":6,"textLines":1,"bbox":[120,500,684,46]}
+{"kind":"textbox","id":"sh/7exo7e1w","slide":6,"text":"SQLite / 会话 / 草稿 / 知识库","textPreview":"SQLite / 会话 / 草稿 / 知识库","textChars":22,"textLines":1,"bbox":[120,536,710,10]}
+{"kind":"textbox","id":"sh/gjq54jit","slide":6,"text":"会话数据","textPreview":"会话数据","textChars":4,"textLines":1,"bbox":[486,503,104,34]}
+{"kind":"textbox","id":"sh/hkz6xoje","slide":6,"text":"草稿数据","textPreview":"草稿数据","textChars":4,"textLines":1,"bbox":[608,503,104,34]}
+{"kind":"textbox","id":"sh/1g7exkj2","slide":6,"text":"知识片段","textPreview":"知识片段","textChars":4,"textLines":1,"bbox":[730,503,104,34]}
+{"kind":"textbox","id":"sh/fepwva1c","slide":6,"text":"技术目标：让教师在一个工作台里完成咨询、生成、审阅和沉淀。","textPreview":"技术目标：让教师在一个工作台里完成咨询、生成、审阅和沉淀。","textChars":29,"textLines":1,"bbox":[874,482,320,78]}
+{"kind":"shape","id":"sh/edgf250r","slide":6,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/tcnetkj6","slide":6,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/sbex0f2l","slide":6,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"image","id":"im/ni9g7yd4","slide":6,"name":"","geometry":"ellipse","alt":"系统架构参考视觉","bbox":[900,178,258,258]}
+{"kind":"notes","id":"nt/lkgx2z","slide":6,"text":"架构依据 README 与 PROJECT_STRUCTURE：FastAPI 后端、Vue3 前端、SQLite 数据库、SSE 流式响应。"}
+{"kind":"slide","id":"sl/zbkei4","slide":7,"title":"AI FOR INQUIRY TEACHING","textShapes":21}
+{"kind":"shape","id":"sh/1sbuh0bu","slide":7,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/epkb6lcj","slide":7,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/fqtcfqt4","slide":7,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/ovmdcful","slide":7,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/pwvul0b6","slide":7,"text":"AI FOR INQUIRY TEACHING","textPreview":"AI FOR INQUIRY TEACHING","textChars":23,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/2tkva5cf","slide":7,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/nutcjat0","slide":7,"text":"会话、草稿、回滚与导出","textPreview":"会话、草稿、回滚与导出","textChars":11,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/cjmdgfuh","slide":7,"text":"当前成果已经覆盖教师从讨论到成稿的主要动作","textPreview":"当前成果已经覆盖教师从讨论到成稿的主要动作","textChars":21,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"shape","id":"sh/xkvupkb2","slide":7,"bbox":[162,252,214,118]}
+{"kind":"textbox","id":"sh/t8ret8jm","slide":7,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[310,268,44,28]}
+{"kind":"shape","id":"sh/s7idk321","slide":7,"bbox":[184,276,8,48]}
+{"kind":"textbox","id":"sh/769wry1g","slide":7,"text":"创建会话","textPreview":"创建会话","textChars":4,"textLines":1,"bbox":[206,274,118,46]}
+{"kind":"textbox","id":"sh/650vidkv","slide":7,"text":"围绕主题形成项目空间","textPreview":"围绕主题形成项目空间","textChars":10,"textLines":1,"bbox":[206,334,144,22]}
+{"kind":"shape","id":"sh/hcbexsji","slide":7,"bbox":[430,252,214,118]}
+{"kind":"textbox","id":"sh/gb2don2x","slide":7,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[578,268,44,28]}
+{"kind":"shape","id":"sh/fatwvi1s","slide":7,"bbox":[452,276,8,48]}
+{"kind":"textbox","id":"sh/u9kvmdk7","slide":7,"text":"上传资料","textPreview":"上传资料","textChars":4,"textLines":1,"bbox":[474,274,118,46]}
+{"kind":"textbox","id":"sh/xg7uloje","slide":7,"text":"补充校本材料与参考文本","textPreview":"补充校本材料与参考文本","textChars":11,"textLines":1,"bbox":[474,334,144,22]}
+{"kind":"shape","id":"sh/wfydcj2t","slide":7,"bbox":[698,252,214,118]}
+{"kind":"textbox","id":"sh/oz2d83ap","slide":7,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[846,268,44,28]}
+{"kind":"shape","id":"sh/9kbe1ora","slide":7,"bbox":[720,276,8,48]}
+{"kind":"textbox","id":"sh/mxkv6tsj","slide":7,"text":"生成草稿","textPreview":"生成草稿","textChars":4,"textLines":1,"bbox":[742,274,118,46]}
+{"kind":"textbox","id":"sh/nytwzy94","slide":7,"text":"主导师输出阶段化内容","textPreview":"主导师输出阶段化内容","textChars":10,"textLines":1,"bbox":[742,334,144,22]}
+{"kind":"shape","id":"sh/wnmdc3al","slide":7,"bbox":[430,438,214,118]}
+{"kind":"textbox","id":"sh/xove58r6","slide":7,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[578,454,44,28]}
+{"kind":"shape","id":"sh/alkvatsv","slide":7,"bbox":[452,462,8,48]}
+{"kind":"textbox","id":"sh/bmtw3y9g","slide":7,"text":"审阅修改","textPreview":"审阅修改","textChars":4,"textLines":1,"bbox":[474,460,118,46]}
+{"kind":"textbox","id":"sh/krmdgnax","slide":7,"text":"教师确认后继续推进","textPreview":"教师确认后继续推进","textChars":9,"textLines":1,"bbox":[474,520,144,22]}
+{"kind":"shape","id":"sh/lsve98ri","slide":7,"bbox":[698,438,214,118]}
+{"kind":"textbox","id":"sh/fyh8v6xw","slide":7,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[846,454,44,28]}
+{"kind":"shape","id":"sh/ex87m1gb","slide":7,"bbox":[720,462,8,48]}
+{"kind":"textbox","id":"sh/10jqxgfm","slide":7,"text":"回滚导出","textPreview":"回滚导出","textChars":4,"textLines":1,"bbox":[742,460,118,46]}
+{"kind":"textbox","id":"sh/gzapobyh","slide":7,"text":"保留可控迭代和成果沉淀","textPreview":"保留可控迭代和成果沉淀","textChars":11,"textLines":1,"bbox":[742,520,144,22]}
+{"kind":"shape","id":"sh/7uhor6xk","slide":7,"bbox":[376,310,48,0]}
+{"kind":"shape","id":"sh/6t87i1gz","slide":7,"bbox":[644,310,48,0]}
+{"kind":"shape","id":"sh/twzqtwfq","slide":7,"bbox":[805,374,0,58]}
+{"kind":"shape","id":"sh/svqpkry5","slide":7,"bbox":[644,496,48,0]}
+{"kind":"textbox","id":"sh/bq183qx4","slide":7,"text":"这些能力让平台从聊天工具变成可持续打磨的教学创作环境。","textPreview":"这些能力让平台从聊天工具变成可持续打磨的教学创作环境。","textChars":27,"textLines":1,"bbox":[164,584,820,32]}
+{"kind":"shape","id":"sh/qps7ulgj","slide":7,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/yd8bipcn","slide":7,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/zy1srut8","slide":7,"text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"notes","id":"nt/zbkei4","slide":7,"text":"依据当前 App.vue、session_files、sessions、export 等模块能力整理。"}
+{"kind":"slide","id":"sl/l4m03h","slide":8,"title":"AI FOR INQUIRY TEACHING","textShapes":15}
+{"kind":"shape","id":"sh/0zqpcbyh","slide":8,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/fyh836xw","slide":8,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/ex87algb","slide":8,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/p4jq90fy","slide":8,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/o3a9gvyd","slide":8,"text":"AI FOR INQUIRY TEACHING","textPreview":"AI FOR INQUIRY TEACHING","textChars":23,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/n2187qxs","slide":8,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/2187elg7","slide":8,"text":"课程知识库与 RAG","textPreview":"课程知识库与 RAG","textChars":10,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/58fqxwzu","slide":8,"text":"课标文件可上传、授权、检索和审计","textPreview":"课标文件可上传、授权、检索和审计","textChars":16,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"shape","id":"sh/476p4ry9","slide":8,"bbox":[86,226,300,260]}
+{"kind":"textbox","id":"sh/61w36dsj","slide":8,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[320,242,44,28]}
+{"kind":"shape","id":"sh/72pkzi94","slide":8,"bbox":[108,250,8,48]}
+{"kind":"textbox","id":"sh/s3yl8nap","slide":8,"text":"资料入口","textPreview":"资料入口","textChars":4,"textLines":1,"bbox":[130,248,204,46]}
+{"kind":"textbox","id":"sh/t47218ra","slide":8,"text":"管理员上传 PDF、DOCX、TXT、MD。系统提取正文、切分片段，并写入课程知识库。","textPreview":"管理员上传 PDF、DOCX、TXT、MD。系统提取正文、切分片段，并写入课程知识库。","textChars":43,"textLines":1,"bbox":[130,308,230,164]}
+{"kind":"shape","id":"sh/upg3adsv","slide":8,"bbox":[438,226,300,260]}
+{"kind":"textbox","id":"sh/fqpk3i9g","slide":8,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[672,242,44,28]}
+{"kind":"shape","id":"sh/grylcna1","slide":8,"bbox":[460,250,8,48]}
+{"kind":"textbox","id":"sh/hs725sr6","slide":8,"text":"权限控制","textPreview":"权限控制","textChars":4,"textLines":1,"bbox":[482,248,204,46]}
+{"kind":"textbox","id":"sh/2tg3exsr","slide":8,"text":"新文件默认未授权。管理员按专家配置可查询来源，下一轮咨询立即生效。","textPreview":"新文件默认未授权。管理员按专家配置可查询来源，下一轮咨询立即生效。","textChars":33,"textLines":1,"bbox":[482,308,230,164]}
+{"kind":"shape","id":"sh/3u9k729c","slide":8,"bbox":[790,226,300,260]}
+{"kind":"textbox","id":"sh/zy9kv2pk","slide":8,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1024,242,44,28]}
+{"kind":"shape","id":"sh/yx0jmxoz","slide":8,"bbox":[812,250,8,48]}
+{"kind":"textbox","id":"sh/l0r2xc7q","slide":8,"text":"混合检索","textPreview":"混合检索","textChars":4,"textLines":1,"bbox":[834,248,204,46]}
+{"kind":"textbox","id":"sh/0zi1o765","slide":8,"text":"BM25 与本地向量检索结合。向量不可用时可退回 BM25，保证基础可用。","textPreview":"BM25 与本地向量检索结合。向量不可用时可退回 BM25，保证基础可用。","textChars":37,"textLines":1,"bbox":[834,308,230,164]}
+{"kind":"textbox","id":"sh/bu9krip8","slide":8,"text":"检索记录会保存专家 ID、授权来源、命中片段和评分，便于教学内容追踪。","textPreview":"检索记录会保存专家 ID、授权来源、命中片段和评分，便于教学内容追踪。","textChars":35,"textLines":1,"bbox":[140,540,930,34]}
+{"kind":"shape","id":"sh/qtgjid83","slide":8,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/dwr2ts7e","slide":8,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/cvi1kn6t","slide":8,"text":"08","textPreview":"08","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"notes","id":"nt/l4m03h","slide":8,"text":"依据 README 中本地课标混合 RAG 与 curriculum_knowledge_service、rag_service、curriculum_permission_service。"}
+{"kind":"slide","id":"sl/0kvzem","slide":9,"title":"AI FOR INQUIRY TEACHING","textShapes":23}
+{"kind":"shape","id":"sh/jut4by5o","slide":9,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/4f25k369","slide":9,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/5gbmd8nu","slide":9,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/6hknmdof","slide":9,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/sj25o36l","slide":9,"text":"AI FOR INQUIRY TEACHING","textPreview":"AI FOR INQUIRY TEACHING","textChars":23,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/tkvmh8nq","slide":9,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/ml03a9ob","slide":9,"text":"当前完成情况","textPreview":"当前完成情况","textChars":6,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/7m943epg","slide":9,"text":"核心闭环已经形成，下一步重点转向试点化和后台化","textPreview":"核心闭环已经形成，下一步重点转向试点化和后台化","textChars":23,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"shape","id":"sh/361c76xo","slide":9,"bbox":[86,204,476,88]}
+{"kind":"textbox","id":"sh/25svy1g3","slide":9,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[496,220,44,28]}
+{"kind":"shape","id":"sh/p83u9gfe","slide":9,"bbox":[108,228,8,48]}
+{"kind":"textbox","id":"sh/o7ad0by9","slide":9,"text":"登录与会话隔离","textPreview":"登录与会话隔离","textChars":7,"textLines":1,"bbox":[130,226,380,46]}
+{"kind":"textbox","id":"sh/f21c3mxc","slide":9,"text":"教师可独立创建和管理会话","textPreview":"教师可独立创建和管理会话","textChars":12,"textLines":1,"bbox":[130,262,406,16]}
+{"kind":"shape","id":"sh/e1svu1gr","slide":9,"bbox":[634,204,476,88]}
+{"kind":"textbox","id":"sh/14ju5wfi","slide":9,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[1044,220,44,28]}
+{"kind":"shape","id":"sh/g3adwryx","slide":9,"bbox":[656,228,8,48]}
+{"kind":"textbox","id":"sh/rehczmxg","slide":9,"text":"主导师与专家","textPreview":"主导师与专家","textChars":6,"textLines":1,"bbox":[678,226,380,46]}
+{"kind":"textbox","id":"sh/6d8bqhgv","slide":9,"text":"支持显式选择专家进行本轮咨询","textPreview":"支持显式选择专家进行本轮咨询","textChars":14,"textLines":1,"bbox":[678,262,406,16]}
+{"kind":"shape","id":"sh/u98v2h0n","slide":9,"bbox":[86,320,476,88]}
+{"kind":"textbox","id":"sh/vahwbmh8","slide":9,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[496,336,44,28]}
+{"kind":"shape","id":"sh/wbqd4rit","slide":9,"bbox":[108,344,8,48]}
+{"kind":"textbox","id":"sh/hczedcze","slide":9,"text":"课标 RAG","textPreview":"课标 RAG","textChars":6,"textLines":1,"bbox":[130,342,380,46]}
+{"kind":"textbox","id":"sh/id8v6h0z","slide":9,"text":"支持文件上传、权限、检索和审计","textPreview":"支持文件上传、权限、检索和审计","textChars":15,"textLines":1,"bbox":[130,378,406,16]}
+{"kind":"shape","id":"sh/jehwfmh4","slide":9,"bbox":[634,320,476,88]}
+{"kind":"textbox","id":"sh/4zqd8rip","slide":9,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[1044,336,44,28]}
+{"kind":"shape","id":"sh/50zehwza","slide":9,"bbox":[656,344,8,48]}
+{"kind":"textbox","id":"sh/61sva10v","slide":9,"text":"草案工作台","textPreview":"草案工作台","textChars":5,"textLines":1,"bbox":[678,342,380,46]}
+{"kind":"textbox","id":"sh/r21wj6hg","slide":9,"text":"支持编辑、审阅、保存和导出","textPreview":"支持编辑、审阅、保存和导出","textChars":13,"textLines":1,"bbox":[678,378,406,16]}
+{"kind":"shape","id":"sh/1w3y90ji","slide":9,"bbox":[86,436,476,88]}
+{"kind":"textbox","id":"sh/gvuhgv2x","slide":9,"text":"…","textPreview":"…","textChars":1,"textLines":1,"bbox":[496,452,44,28]}
+{"kind":"shape","id":"sh/fulg7q1c","slide":9,"bbox":[108,460,8,48]}
+{"kind":"textbox","id":"sh/etczelk7","slide":9,"text":"后台管理","textPreview":"后台管理","textChars":4,"textLines":1,"bbox":[130,458,380,46]}
+{"kind":"textbox","id":"sh/p0nyd0ju","slide":9,"text":"需要组织、项目、数据和日志管理","textPreview":"需要组织、项目、数据和日志管理","textChars":15,"textLines":1,"bbox":[130,494,406,16]}
+{"kind":"shape","id":"sh/ozuhkf29","slide":9,"bbox":[634,436,476,88]}
+{"kind":"textbox","id":"sh/nylgba1o","slide":9,"text":"…","textPreview":"…","textChars":1,"textLines":1,"bbox":[1044,452,44,28]}
+{"kind":"shape","id":"sh/2xczi5k3","slide":9,"bbox":[656,460,8,48]}
+{"kind":"textbox","id":"sh/x4nyhkjq","slide":9,"text":"课堂数据","textPreview":"课堂数据","textChars":4,"textLines":1,"bbox":[678,458,380,46]}
+{"kind":"textbox","id":"sh/c3eh8f25","slide":9,"text":"需要学生观察记录和长期项目档案","textPreview":"需要学生观察记录和长期项目档案","textChars":15,"textLines":1,"bbox":[678,494,406,16]}
+{"kind":"shape","id":"sh/8vitw3qp","slide":9,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/twbap87a","slide":9,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/690bud8j","slide":9,"text":"09","textPreview":"09","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"image","id":"im/upgze10f","slide":9,"name":"","geometry":"roundRect","alt":"用户提供的自然风教育科技参考图","bbox":[842,78,360,202]}
+{"kind":"notes","id":"nt/0kvzem","slide":9,"text":"完成情况依据当前仓库模块与已完成文档汇总。"}
+{"kind":"slide","id":"sl/1iiqkb","slide":10,"title":"AI FOR INQUIRY TEACHING","textShapes":18}
+{"kind":"shape","id":"sh/dwbupsjm","slide":10,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/q90vud0b","slide":10,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/ba9cni1w","slide":10,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/kz2d0nid","slide":10,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/l0betszy","slide":10,"text":"AI FOR INQUIRY TEACHING","textPreview":"AI FOR INQUIRY TEACHING","textChars":23,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/yxkvyd07","slide":10,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/zytwri1s","slide":10,"text":"未来路线图","textPreview":"未来路线图","textChars":5,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/83md47i9","slide":10,"text":"从备课助手走向自然探究项目平台","textPreview":"从备课助手走向自然探究项目平台","textChars":15,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"textbox","id":"sh/94vexczu","slide":10,"text":"近期","textPreview":"近期","textChars":2,"textLines":1,"bbox":[208,150,86,86]}
+{"kind":"shape","id":"sh/lkjmhgzm","slide":10,"bbox":[108,238,292,230]}
+{"kind":"textbox","id":"sh/0ja5obi1","slide":10,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[334,254,44,28]}
+{"kind":"shape","id":"sh/zi14f6hg","slide":10,"bbox":[130,262,8,48]}
+{"kind":"textbox","id":"sh/ehsnml0v","slide":10,"text":"打磨标杆场景","textPreview":"打磨标杆场景","textChars":6,"textLines":1,"bbox":[152,260,196,46]}
+{"kind":"textbox","id":"sh/9oj6l0zy","slide":10,"text":"昆虫生命周期观察、课程包样例、关键接口并发测试","textPreview":"昆虫生命周期观察、课程包样例、关键接口并发测试","textChars":23,"textLines":1,"bbox":[152,320,222,134]}
+{"kind":"shape","id":"sh/8na5svid","slide":10,"bbox":[408,354,62,0]}
+{"kind":"textbox","id":"sh/nm14jqhs","slide":10,"text":"中期","textPreview":"中期","textChars":2,"textLines":1,"bbox":[578,150,86,86]}
+{"kind":"shape","id":"sh/mlsnql07","slide":10,"bbox":[478,238,292,230]}
+{"kind":"textbox","id":"sh/pszm9wze","slide":10,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[704,254,44,28]}
+{"kind":"shape","id":"sh/4rq5grit","slide":10,"bbox":[500,262,8,48]}
+{"kind":"textbox","id":"sh/gvu5wrqp","slide":10,"text":"后台数据管理","textPreview":"后台数据管理","textChars":6,"textLines":1,"bbox":[522,260,196,46]}
+{"kind":"textbox","id":"sh/hw3m5w7a","slide":10,"text":"用户、学校、班级、项目、知识库、日志和权限管理","textPreview":"用户、学校、班级、项目、知识库、日志和权限管理","textChars":23,"textLines":1,"bbox":[522,320,222,134]}
+{"kind":"shape","id":"sh/u9snu18j","slide":10,"bbox":[778,354,62,0]}
+{"kind":"textbox","id":"sh/va1436p4","slide":10,"text":"长期","textPreview":"长期","textChars":2,"textLines":1,"bbox":[948,150,86,86]}
+{"kind":"shape","id":"sh/4zu50bq1","slide":10,"bbox":[848,238,292,230]}
+{"kind":"textbox","id":"sh/50369g76","slide":10,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1074,254,44,28]}
+{"kind":"shape","id":"sh/ixcny18v","slide":10,"bbox":[870,262,8,48]}
+{"kind":"textbox","id":"sh/3ylo76pg","slide":10,"text":"课堂数据闭环","textPreview":"课堂数据闭环","textChars":6,"textLines":1,"bbox":[892,260,196,46]}
+{"kind":"textbox","id":"sh/s3e54vqx","slide":10,"text":"学生记录、图片、传感器、成长档案和区域项目管理","textPreview":"学生记录、图片、传感器、成长档案和区域项目管理","textChars":23,"textLines":1,"bbox":[892,320,222,134]}
+{"kind":"textbox","id":"sh/d4n6dg7i","slide":10,"text":"并发测试重点：多人登录、SSE 流式响应、文件上传、RAG 权限、索引重建和数据库锁冲突。","textPreview":"并发测试重点：多人登录、SSE 流式响应、文件上传、RAG 权限、索引重建和数据库锁冲突。","textChars":45,"textLines":1,"bbox":[150,546,980,44]}
+{"kind":"shape","id":"sh/nyp83u9k","slide":10,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/mxg7upsz","slide":10,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/9k7q5krq","slide":10,"text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"notes","id":"nt/1iiqkb","slide":10,"text":"未来方向依据平台未来发展方向与测试规划文档整理，重点包括后台系统、长期观察昆虫生命周期和并发测试。"}

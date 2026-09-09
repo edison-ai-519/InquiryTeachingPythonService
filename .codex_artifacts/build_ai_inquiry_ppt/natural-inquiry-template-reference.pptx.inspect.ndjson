@@ -1,0 +1,107 @@
+{"kind":"deck","id":"pr/qvvgdx","name":"Deck"}
+{"kind":"layout","layoutId":"175497d7-2401-43bf-8a66-dd80f03390c7","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"20ea8b47-6079-4cb4-a687-1f4d726f038a","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/mnccaa","slide":1,"title":"自然探究教育汇报模板","textShapes":7}
+{"kind":"shape","id":"sh/fyt4byhc","slide":1,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/gz25k3yx","slide":1,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/h0bmd8zi","slide":1,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/6t03e9gv","slide":1,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/svilgjy1","slide":1,"text":"自然探究教育汇报模板","textPreview":"自然探究教育汇报模板","textChars":10,"textLines":1,"bbox":[72,172,610,68]}
+{"kind":"textbox","id":"sh/twrm9oz6","slide":1,"text":"适用于自然教育、探究式教学、AI 助教与课程项目汇报","textPreview":"适用于自然教育、探究式教学、AI 助教与课程项目汇报","textChars":26,"textLines":1,"bbox":[76,258,590,74]}
+{"kind":"textbox","id":"sh/y5g3a9gj","slide":1,"text":"清爽专业","textPreview":"清爽专业","textChars":4,"textLines":1,"bbox":[78,382,150,34]}
+{"kind":"textbox","id":"sh/j6p43eh4","slide":1,"text":"自然风","textPreview":"自然风","textChars":3,"textLines":1,"bbox":[250,382,150,34]}
+{"kind":"textbox","id":"sh/j25sfql0","slide":1,"text":"教育科技","textPreview":"教育科技","textChars":4,"textLines":1,"bbox":[390,382,150,34]}
+{"kind":"shape","id":"sh/i1cbmlkv","slide":1,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/5onah036","slide":1,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/43etov2l","slide":1,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"image","id":"im/qho3610b","slide":1,"name":"","geometry":"roundRect","alt":"自然风教育科技封面参考","bbox":[710,70,500,430]}
+{"kind":"notes","id":"nt/mnccaa","slide":1,"text":"模板参考页。视觉来源为用户提供的自然风教育科技图片，用于以后自然教育和探究式教学汇报复用。"}
+{"kind":"slide","id":"sl/ncghdr","slide":2,"title":"CHAPTER","textShapes":8}
+{"kind":"shape","id":"sh/k7m90net","slide":2,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/j6t87ix8","slide":2,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/y5krydwn","slide":2,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/twvqdsfa","slide":2,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/8vm947ep","slide":2,"text":"CHAPTER","textPreview":"CHAPTER","textChars":7,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/7ud8b2x4","slide":2,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/694r2xwj","slide":2,"text":"章节页版式","textPreview":"章节页版式","textChars":5,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/h0fqhcv6","slide":2,"text":"大号页码、浅色留白、青绿色强调线","textPreview":"大号页码、浅色留白、青绿色强调线","textChars":16,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"textbox","id":"sh/gz6987e1","slide":2,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[88,220,300,180]}
+{"kind":"textbox","id":"sh/6tsna5sf","slide":2,"text":"项目背景与目标","textPreview":"项目背景与目标","textChars":7,"textLines":1,"bbox":[430,292,520,58]}
+{"kind":"textbox","id":"sh/7u143a90","slide":2,"text":"用于每个大章节开场，保持画面轻盈，突出主题","textPreview":"用于每个大章节开场，保持画面轻盈，突出主题","textChars":21,"textLines":1,"bbox":[434,366,540,38]}
+{"kind":"shape","id":"sh/8vu5cfal","slide":2,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/tw3m5kr6","slide":2,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/uxcne5sr","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"notes","id":"nt/ncghdr","slide":2,"text":"模板参考页。"}
+{"kind":"slide","id":"sl/c6bh5u","slide":3,"title":"AI FOR INQUIRY TEACHING","textShapes":19}
+{"kind":"shape","id":"sh/dsb6twj6","slide":3,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/q5k7yhkf","slide":3,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/r6torm10","slide":3,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/43ipwr29","slide":3,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/54r6pwju","slide":3,"text":"AI FOR INQUIRY TEACHING","textPreview":"AI FOR INQUIRY TEACHING","textChars":23,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/i10nuhkj","slide":3,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/329onm1o","slide":3,"text":"内容页版式","textPreview":"内容页版式","textChars":5,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/gzi5s72d","slide":3,"text":"左侧观点，右侧四个证据块","textPreview":"左侧观点，右侧四个证据块","textChars":12,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"shape","id":"sh/h0r6lcjy","slide":3,"bbox":[70,240,360,300]}
+{"kind":"shape","id":"sh/pgnyloje","slide":3,"bbox":[92,264,8,48]}
+{"kind":"textbox","id":"sh/ofexs3it","slide":3,"text":"页面主论点","textPreview":"页面主论点","textChars":5,"textLines":1,"bbox":[114,262,264,46]}
+{"kind":"textbox","id":"sh/nelgjy1o","slide":3,"text":"用较短文字说明本页要表达的核心判断，适合项目概述、问题背景和价值说明。","textPreview":"用较短文字说明本页要表达的核心判断，适合项目概述、问题背景和价值说明。","textChars":35,"textLines":1,"bbox":[114,322,290,204]}
+{"kind":"shape","id":"sh/2dcfqt03","slide":3,"bbox":[490,220,300,140]}
+{"kind":"textbox","id":"sh/1c3yhoji","slide":3,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[724,236,44,28]}
+{"kind":"shape","id":"sh/0ruxojix","slide":3,"bbox":[512,244,8,48]}
+{"kind":"textbox","id":"sh/fqlgfe1c","slide":3,"text":"证据一","textPreview":"证据一","textChars":3,"textLines":1,"bbox":[534,242,204,46]}
+{"kind":"textbox","id":"sh/epcfm90r","slide":3,"text":"一到两句话说明具体能力。","textPreview":"一到两句话说明具体能力。","textChars":12,"textLines":1,"bbox":[534,302,230,44]}
+{"kind":"shape","id":"sh/do3yd4j6","slide":3,"bbox":[820,220,300,140]}
+{"kind":"textbox","id":"sh/snuxkji1","slide":3,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1054,236,44,28]}
+{"kind":"shape","id":"sh/47ex0jqh","slide":3,"bbox":[842,244,8,48]}
+{"kind":"textbox","id":"sh/5s7ytor2","slide":3,"text":"证据二","textPreview":"证据二","textChars":3,"textLines":1,"bbox":[864,242,204,46]}
+{"kind":"textbox","id":"sh/i5wfy98r","slide":3,"text":"一到两句话说明具体能力。","textPreview":"一到两句话说明具体能力。","textChars":12,"textLines":1,"bbox":[864,302,230,44]}
+{"kind":"shape","id":"sh/j65gre9c","slide":3,"bbox":[490,390,300,140]}
+{"kind":"textbox","id":"sh/w3exwzql","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[724,406,44,28]}
+{"kind":"shape","id":"sh/h4nyp4r6","slide":3,"bbox":[512,414,8,48]}
+{"kind":"textbox","id":"sh/u1wfu9sf","slide":3,"text":"证据三","textPreview":"证据三","textChars":3,"textLines":1,"bbox":[534,412,204,46]}
+{"kind":"textbox","id":"sh/v25gnu90","slide":3,"text":"一到两句话说明具体能力。","textPreview":"一到两句话说明具体能力。","textChars":12,"textLines":1,"bbox":[534,472,230,44]}
+{"kind":"shape","id":"sh/gzyh83qp","slide":3,"bbox":[820,390,300,140]}
+{"kind":"textbox","id":"sh/10ry18ra","slide":3,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1054,406,44,28]}
+{"kind":"shape","id":"sh/but0r2tc","slide":3,"bbox":[842,414,8,48]}
+{"kind":"textbox","id":"sh/qtkjyxs7","slide":3,"text":"证据四","textPreview":"证据四","textChars":3,"textLines":1,"bbox":[864,412,204,46]}
+{"kind":"textbox","id":"sh/dwb2tcbi","slide":3,"text":"一到两句话说明具体能力。","textPreview":"一到两句话说明具体能力。","textChars":12,"textLines":1,"bbox":[864,472,230,44]}
+{"kind":"shape","id":"sh/cv2107ax","slide":3,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/zitkv2to","slide":3,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/yhkj2xs3","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"notes","id":"nt/c6bh5u","slide":3,"text":"模板参考页。"}
+{"kind":"slide","id":"sl/q4fgb5","slide":4,"title":"AI FOR INQUIRY TEACHING","textShapes":17}
+{"kind":"shape","id":"sh/ve54761o","slide":4,"bbox":[0,0,1280,30]}
+{"kind":"shape","id":"sh/gfe5gbi9","slide":4,"bbox":[0,690,1280,30]}
+{"kind":"shape","id":"sh/hgnm9gju","slide":4,"bbox":[0,90,180,180]}
+{"kind":"shape","id":"sh/2hwnil0f","slide":4,"bbox":[1010,24,210,210]}
+{"kind":"textbox","id":"sh/3i54b61k","slide":4,"text":"AI FOR INQUIRY TEACHING","textPreview":"AI FOR INQUIRY TEACHING","textChars":23,"textLines":1,"bbox":[70,36,520,26]}
+{"kind":"shape","id":"sh/4jy5kbi5","slide":4,"bbox":[70,72,250,0]}
+{"kind":"textbox","id":"sh/pk7mdgjq","slide":4,"text":"图解页版式","textPreview":"图解页版式","textChars":5,"textLines":1,"bbox":[70,92,740,70]}
+{"kind":"textbox","id":"sh/ylc36h0v","slide":4,"text":"适合系统架构、流程图和路线图","textPreview":"适合系统架构、流程图和路线图","textChars":14,"textLines":1,"bbox":[72,162,720,40]}
+{"kind":"shape","id":"sh/jml4zm1g","slide":4,"bbox":[110,290,170,100]}
+{"kind":"textbox","id":"sh/zu987ils","slide":4,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[214,306,44,28]}
+{"kind":"shape","id":"sh/et07ydkn","slide":4,"bbox":[132,314,8,48]}
+{"kind":"textbox","id":"sh/1wbq9s3y","slide":4,"text":"输入","textPreview":"输入","textChars":2,"textLines":1,"bbox":[154,312,74,46]}
+{"kind":"textbox","id":"sh/0vi90n2d","slide":4,"text":"资料与问题","textPreview":"资料与问题","textChars":5,"textLines":1,"bbox":[154,348,100,28]}
+{"kind":"shape","id":"sh/rq983ilw","slide":4,"bbox":[288,340,70,0]}
+{"kind":"shape","id":"sh/qp07udkb","slide":4,"bbox":[360,290,170,100]}
+{"kind":"textbox","id":"sh/dsrq5832","slide":4,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[464,306,44,28]}
+{"kind":"shape","id":"sh/cripw32h","slide":4,"bbox":[382,314,8,48]}
+{"kind":"textbox","id":"sh/32p8zyl0","slide":4,"text":"编排","textPreview":"编排","textChars":2,"textLines":1,"bbox":[404,312,74,46]}
+{"kind":"textbox","id":"sh/21g7qt4f","slide":4,"text":"流程与专家","textPreview":"流程与专家","textChars":5,"textLines":1,"bbox":[404,348,100,28]}
+{"kind":"shape","id":"sh/6xwr2to7","slide":4,"bbox":[538,340,70,0]}
+{"kind":"shape","id":"sh/7yp8by5s","slide":4,"bbox":[610,290,170,100]}
+{"kind":"textbox","id":"sh/szy9436d","slide":4,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[714,306,44,28]}
+{"kind":"shape","id":"sh/t07qd8ni","slide":4,"bbox":[632,314,8,48]}
+{"kind":"textbox","id":"sh/u1gr6do3","slide":4,"text":"生成","textPreview":"生成","textChars":2,"textLines":1,"bbox":[654,312,74,46]}
+{"kind":"textbox","id":"sh/f2psfy5o","slide":4,"text":"草案与资源","textPreview":"草案与资源","textChars":5,"textLines":1,"bbox":[654,348,100,28]}
+{"kind":"shape","id":"sh/g3y98369","slide":4,"bbox":[788,340,70,0]}
+{"kind":"shape","id":"sh/ho7ah8nu","slide":4,"bbox":[860,290,170,100]}
+{"kind":"textbox","id":"sh/2p0radof","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[964,306,44,28]}
+{"kind":"shape","id":"sh/3q9sji50","slide":4,"bbox":[882,314,8,48]}
+{"kind":"textbox","id":"sh/dwv2pgbe","slide":4,"text":"审阅","textPreview":"审阅","textChars":2,"textLines":1,"bbox":[904,312,74,46]}
+{"kind":"textbox","id":"sh/cvmlwbut","slide":4,"text":"教师确认","textPreview":"教师确认","textChars":4,"textLines":1,"bbox":[904,348,100,28]}
+{"kind":"shape","id":"sh/budkn6t8","slide":4,"bbox":[72,666,360,0]}
+{"kind":"textbox","id":"sh/qtk3u1cn","slide":4,"text":"InquiryTeachingPythonService 项目汇报","textPreview":"InquiryTeachingPythonService 项目汇报","textChars":33,"textLines":1,"bbox":[460,650,360,28]}
+{"kind":"textbox","id":"sh/l0v2tgba","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1138,638,70,36]}
+{"kind":"notes","id":"nt/q4fgb5","slide":4,"text":"模板参考页。"}

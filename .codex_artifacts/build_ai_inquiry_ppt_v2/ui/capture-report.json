@@ -1,0 +1,134 @@
+{
+  "source": "原始frontend Vue组件，由5179端口的独立Vite服务加载；未修改应用代码、样式或DOM。",
+  "data_boundary": "账号、会话、消息、草稿、修改建议、文件清单、召回记录、索引状态及分值均为浏览器内的演示数据；流程定义与专家配置直接读取项目源码。所有API请求均由Playwright在浏览器内拦截；未访问真实后端、数据库或模型。",
+  "required_caption": "真实界面 · 演示数据",
+  "viewport": [
+    1600,
+    1000
+  ],
+  "scale": 1.5,
+  "checks": [
+    "真实Vue工作台加载",
+    "专家选择弹层与选择交互",
+    "草稿选区添加到对话",
+    "候选差异审阅展示",
+    "导出按钮完成演示Markdown下载",
+    "管理员课标及召回展开",
+    "专家资料授权编辑界面",
+    "新建会话弹窗",
+    "未登录界面"
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/flows"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/experts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/curriculum/files"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions/demo-insect-hotel"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions/demo-insect-hotel/files"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions/demo-insect-hotel/messages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions/demo-insect-hotel/draft-proposal"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions/demo-insect-hotel/export"
+    },
+    {
+      "method": "GET",
+      "path": "/api/curriculum/files"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/flows"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/experts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/curriculum/files"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions/demo-insect-hotel"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions/demo-insect-hotel/files"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions/demo-insect-hotel/messages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions/demo-insect-hotel/draft-proposal"
+    },
+    {
+      "method": "GET",
+      "path": "/api/curriculum/files"
+    },
+    {
+      "method": "GET",
+      "path": "/api/curriculum/status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/curriculum/retrievals"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me"
+    }
+  ],
+  "artifacts": [
+    "01-workspace-overview.png",
+    "02-expert-selector.png",
+    "03-selection-to-chat.png",
+    "04-draft-review.png",
+    "05-curriculum-rag-admin.png",
+    "05b-curriculum-panel.png",
+    "06-expert-source-permissions.png",
+    "07-new-session.png",
+    "08-auth-panel.png",
+    "09-curriculum-readonly.png",
+    "09b-curriculum-readonly-panel.png",
+    "workbench.png"
+  ]
+}

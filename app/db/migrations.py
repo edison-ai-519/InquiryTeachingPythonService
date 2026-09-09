@@ -77,6 +77,102 @@ def ensure_schema_compatibility() -> None:
         connection.execute(
             text(
                 """
+                CREATE TABLE IF NOT EXISTS knowledge_entities (
+                    id VARCHAR PRIMARY KEY,
+                    name VARCHAR NOT NULL,
+                    entity_type VARCHAR NOT NULL,
+                    aliases_json TEXT NOT NULL DEFAULT '[]',
+                    description TEXT NOT NULL DEFAULT '',
+                    source VARCHAR NOT NULL DEFAULT '',
+                    created_at VARCHAR NOT NULL,
+                    updated_at VARCHAR NOT NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_knowledge_entities_name ON knowledge_entities (name)")
+        )
+        connection.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_knowledge_entities_entity_type ON knowledge_entities (entity_type)")
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS knowledge_entity_sources (
+                    entity_id VARCHAR NOT NULL,
+                    source VARCHAR NOT NULL,
+                    created_at VARCHAR NOT NULL,
+                    PRIMARY KEY (entity_id, source),
+                    FOREIGN KEY(entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE,
+                    FOREIGN KEY(source) REFERENCES curriculum_sources(source) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_entity_sources_source "
+                "ON knowledge_entity_sources (source)"
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS knowledge_relations (
+                    id VARCHAR PRIMARY KEY,
+                    subject_entity_id VARCHAR NOT NULL,
+                    predicate VARCHAR NOT NULL,
+                    object_entity_id VARCHAR NOT NULL,
+                    description TEXT NOT NULL DEFAULT '',
+                    evidence_source TEXT NOT NULL DEFAULT '',
+                    confidence VARCHAR NOT NULL DEFAULT 'medium',
+                    created_at VARCHAR NOT NULL,
+                    updated_at VARCHAR NOT NULL,
+                    FOREIGN KEY(subject_entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE,
+                    FOREIGN KEY(object_entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_relations_subject_entity_id "
+                "ON knowledge_relations (subject_entity_id)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_relations_object_entity_id "
+                "ON knowledge_relations (object_entity_id)"
+            )
+        )
+        connection.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_knowledge_relations_predicate ON knowledge_relations (predicate)")
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS knowledge_entity_mentions (
+                    entity_id VARCHAR NOT NULL,
+                    chunk_id INTEGER NOT NULL,
+                    source VARCHAR NOT NULL DEFAULT '',
+                    PRIMARY KEY (entity_id, chunk_id),
+                    FOREIGN KEY(entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE,
+                    FOREIGN KEY(chunk_id) REFERENCES curriculum_chunks(id) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_mentions_source "
+                "ON knowledge_entity_mentions (source)"
+            )
+        )
+        connection.execute(
+            text(
+                """
                 CREATE TABLE IF NOT EXISTS schema_migrations (
                     key VARCHAR PRIMARY KEY,
                     applied_at VARCHAR NOT NULL

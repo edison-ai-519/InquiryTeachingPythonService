@@ -1,0 +1,334 @@
+{"kind":"deck","id":"pr/zujw3i","name":"Deck"}
+{"kind":"layout","layoutId":"/ppt/slideMasters/slideMaster1.xml","name":"","type":"master"}
+{"kind":"layout","layoutId":"/ppt/slideLayouts/slideLayout1.xml","name":"空白","type":"blank"}
+{"kind":"layout","layoutId":"/ppt/slideLayouts/slideLayout2.xml","name":"标题和内容","type":"obj","placeholders":[{"name":"title","type":"title","textPreview":"单击此处编辑母版标题样式"},{"name":"2","textPreview":"单击此处编辑母版文本样式 | 第二级 | 第三级 | 第四级 | 第五级"},{"name":"dateTime","type":"dateTime","textPreview":"2024/12/9"},{"name":"footer","type":"footer"},{"name":"slideNumber","type":"slideNumber","textPreview":"‹#›"}]}
+{"kind":"slide","id":"sl/y90nupkv","slide":1,"title":"BUPTBUPTBUPT","textShapes":8}
+{"kind":"shape","id":"sh/14fyhgbe","slide":1,"name":"矩形: 圆角 41","bbox":[0,0,1280,720]}
+{"kind":"shape","id":"sh/wn6dc7eh","slide":1,"name":"矩形 9","bbox":[907.51,0,372.49,720]}
+{"kind":"shape","id":"sh/nqxgjqtk","slide":1,"name":"矩形 43","bbox":[503.18,622.65,218.7,25.85]}
+{"kind":"shape","id":"sh/mpozalcz","slide":1,"name":"矩形 44","bbox":[733.92,622.65,218.7,25.85]}
+{"kind":"shape","id":"sh/9sfylgbq","slide":1,"name":"矩形 45","bbox":[964.66,622.65,218.7,25.85]}
+{"kind":"shape","id":"sh/kbmh0v25","slide":1,"name":"直接连接符 89","bbox":[52.53,511.89,0,142.78]}
+{"kind":"textbox","id":"sh/jm1kbuds","slide":1,"textChars":12,"textLines":1}
+{"kind":"textbox","id":"sh/ul4vaxgb","slide":1,"textChars":6,"textLines":1}
+{"kind":"textbox","id":"sh/vmdcj2xw","slide":1,"textChars":50,"textLines":1}
+{"kind":"textbox","id":"sh/4r6dg7et","slide":1,"textChars":8,"textLines":1}
+{"kind":"textbox","id":"sh/5sfepcfe","slide":1,"textChars":48,"textLines":1}
+{"kind":"textbox","id":"sh/3qxwn2x8","slide":1,"textChars":7,"textLines":1}
+{"kind":"shape","id":"sh/ylsjipw7","slide":1,"name":"矩形 73","bbox":[129.8,496.71,192.2,38.78]}
+{"kind":"textbox","id":"sh/ozmd8r65","slide":1,"textChars":4,"textLines":1}
+{"kind":"shape","id":"sh/loj2dkvy","slide":1,"name":"直接连接符 76","bbox":[52.53,75.93,0,142.78]}
+{"kind":"textbox","id":"sh/ipovexwn","slide":1,"textChars":4,"textLines":1}
+{"kind":"image","id":"im/ul8bqpob","slide":1,"name":"图片 85","bbox":[-6.32,-16.33,127.4,131.91]}
+{"kind":"image","id":"im/hozal472","slide":1,"name":"图片 40","bbox":[733.93,124.93,381.8,468.13]}
+{"kind":"slide","id":"sl/hwbqtkby","slide":2,"title":"CONTENTS","textShapes":15}
+{"kind":"shape","id":"sh/ba9cn6l4","slide":2,"name":"矩形: 圆角 34","bbox":[0,0,1280,720]}
+{"kind":"shape","id":"sh/9072xkry","slide":2,"name":"矩形: 圆角 1","bbox":[0,0,1280,720]}
+{"kind":"textbox","id":"sh/r65knqtk","slide":2,"textChars":8,"textLines":1}
+{"kind":"shape","id":"sh/t8byxkn2","slide":2,"name":"矩形 19","bbox":[939.22,596,340.78,124]}
+{"kind":"shape","id":"sh/s72xofmh","slide":2,"name":"矩形 20","bbox":[70.67,694.15,296.63,25.85]}
+{"kind":"shape","id":"sh/76twva5c","slide":2,"name":"矩形 21","bbox":[383.63,694.15,296.63,25.85]}
+{"kind":"shape","id":"sh/65kfmpor","slide":2,"name":"矩形 22","bbox":[696.59,694.15,296.63,25.85]}
+{"kind":"textbox","id":"sh/u94fqp4n","slide":2,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/p0vy54na","slide":2,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/4zmxwzmp","slide":2,"textChars":2,"textLines":1}
+{"kind":"shape","id":"sh/nmpcj6ls","slide":2,"name":"直接连接符 30","bbox":[189.39,361.37,256.01,0]}
+{"kind":"textbox","id":"sh/69wbilcj","slide":2,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/tw7ud0va","slide":2,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/svedkvup","slide":2,"textChars":2,"textLines":1}
+{"kind":"shape","id":"sh/fypcfqdg","slide":2,"name":"直接连接符 43","bbox":[623.64,361.37,256.01,0]}
+{"kind":"textbox","id":"sh/107uh0v6","slide":2,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/gzydovul","slide":2,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/v2lc36dw","slide":2,"textChars":2,"textLines":1}
+{"kind":"shape","id":"sh/a1cba1wb","slide":2,"name":"直接连接符 48","bbox":[189.39,547.99,256.01,0]}
+{"kind":"textbox","id":"sh/1wzix87i","slide":2,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/et8zmto7","slide":2,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/zuh0vypc","slide":2,"textChars":2,"textLines":1}
+{"kind":"shape","id":"sh/c76hk361","slide":2,"name":"直接连接符 53","bbox":[623.64,547.99,256.01,0]}
+{"kind":"textbox","id":"sh/r6x0rypg","slide":2,"textChars":4,"textLines":1}
+{"kind":"shape","id":"sh/ozy1ofad","slide":2,"name":"矩形 2","bbox":[0,93.33,58.62,122.67]}
+{"kind":"textbox","id":"sh/x4r21kru","slide":2,"textChars":3,"textLines":1}
+{"kind":"image","id":"im/zihwrqd8","slide":2,"name":"图片 6","bbox":[-6.32,-16.33,127.4,131.91]}
+{"kind":"image","id":"im/yh8fylcn","slide":2,"name":"图片 4","bbox":[984.32,552.97,281.16,202.96]}
+{"kind":"slide","id":"sl/ofy9wn61","slide":3,"title":"01","textShapes":4}
+{"kind":"shape","id":"sh/m1c3mlsn","slide":3,"name":"矩形: 圆角 10","bbox":[0,0,1280,720]}
+{"kind":"shape","id":"sh/n2l4fq98","slide":3,"name":"矩形: 圆角 9","bbox":[0,0,1280,720]}
+{"kind":"textbox","id":"sh/d0jax03i","slide":3,"textChars":2,"textLines":1}
+{"kind":"textbox","id":"sh/3ah8rqlg","slide":3,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/obq90bml","slide":3,"textChars":19,"textLines":1}
+{"kind":"shape","id":"sh/a5c3ql8z","slide":3,"name":"直接连接符 14","bbox":[573.37,550.67,581.62,0]}
+{"kind":"shape","id":"sh/x8nml0ra","slide":3,"name":"直接连接符 15","bbox":[573.37,498.95,581.62,0]}
+{"kind":"textbox","id":"sh/l4fi9cza","slide":3,"textChars":35,"textLines":1}
+{"kind":"image","id":"im/3ipsru1c","slide":3,"name":"图片 40","bbox":[42.3,140.24,373.79,458.36]}
+{"kind":"slide","id":"sl/jyx0ra1s","slide":4,"title":"ADD YOUR TITLE HERE","textShapes":12}
+{"kind":"shape","id":"sh/5cva1cfq","slide":4,"name":"矩形: 圆角 10","bbox":[0,0,1280,720]}
+{"kind":"textbox","id":"sh/rm1k7yt4","slide":4,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/ql8jytsj","slide":4,"textChars":4,"textLines":1}
+{"kind":"shape","id":"sh/ih8ju9sn","slide":4,"name":"直接连接符 8","bbox":[255.01,96.15,820.6,0.27]}
+{"kind":"shape","id":"sh/jadsz2xk","slide":4,"name":"矩形 12","bbox":[50.4,65.35,11,78.43]}
+{"kind":"shape","id":"sh/cnyp8jep","slide":4,"name":"椭圆 60","bbox":[717.18,189.43,69.79,69.79]}
+{"kind":"shape","id":"sh/qlg769wj","slide":4,"name":"任意多边形: 形状 62","bbox":[749.99,225.44,4.17,4.18]}
+{"kind":"shape","id":"sh/lcr658v6","slide":4,"name":"任意多边形: 形状 63","bbox":[735.34,210.77,33.48,33.49]}
+{"kind":"shape","id":"sh/0bipc3el","slide":4,"name":"任意多边形: 形状 64","bbox":[742.81,204.38,19.22,3.92]}
+{"kind":"shape","id":"sh/zq9o3ydg","slide":4,"name":"任意多边形: 形状 65","bbox":[758.13,210.61,9.47,9.46]}
+{"kind":"textbox","id":"sh/8v6983qh","slide":4,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/9wfah8rm","slide":4,"textChars":32,"textLines":1}
+{"kind":"shape","id":"sh/gna9gr25","slide":4,"name":"椭圆 53","bbox":[902.84,438.15,69.79,69.79]}
+{"kind":"shape","id":"sh/hoja9w3q","slide":4,"name":"任意多边形: 形状 54","bbox":[922.78,453.11,29.89,29.86]}
+{"kind":"shape","id":"sh/ulsrehkz","slide":4,"name":"任意多边形: 形状 55","bbox":[917.82,477.43,17.12,15.55]}
+{"kind":"shape","id":"sh/vm1s7mlk","slide":4,"name":"任意多边形: 形状 56","bbox":[940.54,477.42,17.11,15.57]}
+{"kind":"textbox","id":"sh/a14ryt83","slide":4,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/b2ds7e9o","slide":4,"textChars":32,"textLines":1}
+{"kind":"shape","id":"sh/yp07atwv","slide":4,"name":"椭圆 66","bbox":[496.15,189.43,69.79,69.79]}
+{"kind":"shape","id":"sh/9grq98vi","slide":4,"name":"任意多边形: 形状 67","bbox":[529.26,221.48,21.72,18.5]}
+{"kind":"shape","id":"sh/8fipg3ex","slide":4,"name":"任意多边形: 形状 68","bbox":[511.1,208.67,28.34,24.14]}
+{"kind":"textbox","id":"sh/qpc3ylwr","slide":4,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/1wnmx0fe","slide":4,"textChars":32,"textLines":1}
+{"kind":"shape","id":"sh/gfudkvq5","slide":4,"name":"椭圆 75","bbox":[310.5,438.15,69.79,69.79]}
+{"kind":"shape","id":"sh/hg3et07q","slide":4,"name":"任意多边形: 形状 76","bbox":[334.64,463.96,19.81,19.75]}
+{"kind":"shape","id":"sh/ihcvml8b","slide":4,"name":"任意多边形: 形状 77","bbox":[325.46,455.87,37,37.12]}
+{"kind":"shape","id":"sh/3ilwvqpw","slide":4,"name":"任意多边形: 形状 78","bbox":[345.3,453.11,20.03,20.04]}
+{"kind":"textbox","id":"sh/zul4vqx8","slide":4,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/etc32lw3","slide":4,"textChars":32,"textLines":1}
+{"kind":"textbox","id":"sh/18nu50nu","slide":4,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/0netcvm9","slide":4,"textChars":4,"textLines":1}
+{"kind":"image","id":"im/sb21ovml","slide":4,"name":"图片 167","bbox":[-3.36,-13.99,102.32,107.41]}
+{"kind":"image","id":"im/tcbix036","slide":4,"name":"图片 39","bbox":[449.1,291.27,381.8,468.13]}
+{"kind":"slide","id":"sl/i107q5of","slide":5,"title":"ADD YOUR TITLE HERE","textShapes":15}
+{"kind":"shape","id":"sh/x4vedgvm","slide":5,"name":"矩形: 圆角 10","bbox":[0,0,1280,720]}
+{"kind":"textbox","id":"sh/z2tcnm5s","slide":5,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/yhkbe1o7","slide":5,"textChars":4,"textLines":1}
+{"kind":"shape","id":"sh/m5kbi1oj","slide":5,"name":"直接连接符 8","bbox":[254.28,96.15,821.33,0.53]}
+{"kind":"shape","id":"sh/v2twb6dw","slide":5,"name":"矩形 12","bbox":[50.4,65.35,11,78.43]}
+{"kind":"shape","id":"sh/dgbulwnm","slide":5,"name":"矩形 1","bbox":[100.93,298.82,342,355.25]}
+{"kind":"shape","id":"sh/3md0bu94","slide":5,"name":"直接连接符 43","bbox":[148.81,358.8,246.13,0]}
+{"kind":"textbox","id":"sh/2l4zip8j","slide":5,"textChars":3,"textLines":1}
+{"kind":"textbox","id":"sh/povid4ra","slide":5,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/onmhkzqp","slide":5,"textChars":35,"textLines":1}
+{"kind":"shape","id":"sh/bqx0fe9g","slide":5,"name":"直接连接符 47","bbox":[148.81,600.13,246.13,0]}
+{"kind":"textbox","id":"sh/65cnahc7","slide":5,"textChars":18,"textLines":2}
+{"kind":"shape","id":"sh/gfi5grih","slide":5,"name":"矩形 20","bbox":[827.09,298.82,342,355.25]}
+{"kind":"shape","id":"sh/3i94r61s","slide":5,"name":"直接连接符 25","bbox":[874.96,358.8,246.13,0]}
+{"kind":"textbox","id":"sh/ud0ne10b","slide":5,"textChars":3,"textLines":1}
+{"kind":"textbox","id":"sh/5o7mhcju","slide":5,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/vu5kbihc","slide":5,"textChars":35,"textLines":1}
+{"kind":"shape","id":"sh/xwn2dszi","slide":5,"name":"直接连接符 32","bbox":[874.96,600.13,246.13,0]}
+{"kind":"shape","id":"sh/e1sjatgz","slide":5,"name":"矩形: 圆角 1","bbox":[991.2,177.18,179.82,44.78]}
+{"kind":"textbox","id":"sh/zmlk3yhk","slide":5,"textChars":6,"textLines":1}
+{"kind":"shape","id":"sh/9gfy5o7e","slide":5,"name":"矩形 50","bbox":[464.01,298.82,342,355.25]}
+{"kind":"shape","id":"sh/cf2tcr61","slide":5,"name":"直接连接符 2","bbox":[505.94,358.8,246.13,0]}
+{"kind":"textbox","id":"sh/l4bupwny","slide":5,"textChars":3,"textLines":1}
+{"kind":"textbox","id":"sh/w32dkbuh","slide":5,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/k7mxovud","slide":5,"textChars":35,"textLines":1}
+{"kind":"shape","id":"sh/hgrmpwj2","slide":5,"name":"直接连接符 19","bbox":[505.94,600.13,246.13,0]}
+{"kind":"shape","id":"sh/0r6h8z6x","slide":5,"name":"直接连接符 53","bbox":[515.46,359,246.13,0]}
+{"kind":"shape","id":"sh/lcfy147i","slide":5,"name":"直接连接符 54","bbox":[515.46,600.33,246.13,0]}
+{"kind":"textbox","id":"sh/kjelony9","slide":5,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/ehkzepsn","slide":5,"textChars":4,"textLines":1}
+{"kind":"image","id":"im/214zqp0n","slide":5,"name":"图片 39","bbox":[-3.36,-13.99,102.32,107.41]}
+{"kind":"slide","id":"sl/x8f69ofe","slide":6,"title":"ADD YOUR TITLE HERE","textShapes":12}
+{"kind":"shape","id":"sh/w32twb6l","slide":6,"name":"矩形: 圆角 10","bbox":[0,0,1280,720]}
+{"kind":"textbox","id":"sh/87ipkzal","slide":6,"textChars":19,"textLines":1}
+{"kind":"shape","id":"sh/u1kbu1ov","slide":6,"name":"矩形 12","bbox":[50.4,65.35,11,78.43]}
+{"kind":"shape","id":"sh/yhg7epsj","slide":6,"name":"矩形 1","bbox":[0,447.67,1280,208.17]}
+{"kind":"textbox","id":"sh/zi98nu94","slide":6,"textChars":48,"textLines":1}
+{"kind":"textbox","id":"sh/ml07i9sv","slide":6,"textChars":34,"textLines":1}
+{"kind":"shape","id":"sh/ep0b6lg7","slide":6,"name":"椭圆 43","bbox":[490.09,421.8,58.65,58.65]}
+{"kind":"shape","id":"sh/fq9cfqxc","slide":6,"name":"任意多边形: 形状 44","bbox":[515.81,434.37,19.43,28.68]}
+{"kind":"shape","id":"sh/0r2t8vyx","slide":6,"name":"任意多边形: 形状 45","bbox":[510.22,446.74,8.68,8.68]}
+{"kind":"shape","id":"sh/1sbuh0fi","slide":6,"name":"任意多边形: 形状 46","bbox":[503.58,439.87,21.96,28.02]}
+{"kind":"textbox","id":"sh/svmt4v6t","slide":6,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/cbe5g3ih","slide":6,"textChars":34,"textLines":1}
+{"kind":"shape","id":"sh/p4j6loby","slide":6,"name":"椭圆 60","bbox":[738.46,421.8,58.65,58.65]}
+{"kind":"shape","id":"sh/n21ojets","slide":6,"name":"任意多边形: 形状 62","bbox":[766.04,452.06,3.51,3.52]}
+{"kind":"shape","id":"sh/0zq58ju1","slide":6,"name":"任意多边形: 形状 63","bbox":[753.72,439.74,28.14,28.14]}
+{"kind":"shape","id":"sh/10z6hobm","slide":6,"name":"任意多边形: 形状 64","bbox":[760,434.37,16.15,3.29]}
+{"kind":"shape","id":"sh/ed8n69cb","slide":6,"name":"任意多边形: 形状 65","bbox":[772.87,439.6,7.95,7.95]}
+{"kind":"textbox","id":"sh/zep4byhs","slide":6,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/gju58ji9","slide":6,"textChars":34,"textLines":1}
+{"kind":"shape","id":"sh/fyhofetw","slide":6,"name":"椭圆 66","bbox":[986.84,421.8,58.65,58.65]}
+{"kind":"shape","id":"sh/kvu5k3ul","slide":6,"name":"任意多边形: 形状 67","bbox":[1014.67,448.73,18.26,15.55]}
+{"kind":"shape","id":"sh/lw36d8b6","slide":6,"name":"任意多边形: 形状 68","bbox":[999.41,437.97,23.82,20.29]}
+{"kind":"textbox","id":"sh/u907axkf","slide":6,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/hcrqlcj6","slide":6,"textChars":34,"textLines":1}
+{"kind":"textbox","id":"sh/7m98ru9g","slide":6,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/7698f214","slide":6,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/m5076xkj","slide":6,"textChars":4,"textLines":1}
+{"kind":"shape","id":"sh/2dkbalg3","slide":6,"name":"直接连接符 39","bbox":[262.81,96.15,812.8,1.33]}
+{"kind":"image","id":"im/gv65grud","slide":6,"name":"图片 80","bbox":[-3.36,-13.99,102.32,107.41]}
+{"kind":"slide","id":"sl/gnmp4jqx","slide":7,"title":"ADD YOUR TITLE HERE","textShapes":12}
+{"kind":"shape","id":"sh/a9ojq5kz","slide":7,"name":"矩形: 圆角 10","bbox":[0,0,1280,720]}
+{"kind":"textbox","id":"sh/ydkbm5sv","slide":7,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/zedcfa9g","slide":7,"textChars":4,"textLines":1}
+{"kind":"shape","id":"sh/fi9c369c","slide":7,"name":"直接连接符 8","bbox":[262.81,96.15,812.8,1.33]}
+{"kind":"shape","id":"sh/cbq1sv25","slide":7,"name":"矩形 12","bbox":[50.4,65.35,11,78.43]}
+{"kind":"shape","id":"sh/10b2dk7a","slide":7,"name":"矩形: 圆角 136","bbox":[987.99,226.85,221.34,434.96]}
+{"kind":"shape","id":"sh/8jupo3ad","slide":7,"name":"椭圆 43","bbox":[1048.69,187.69,87.95,87.95]}
+{"kind":"shape","id":"sh/9k3qx8ry","slide":7,"name":"任意多边形: 形状 44","bbox":[1087.27,206.53,29.14,43.01]}
+{"kind":"shape","id":"sh/mxc7mts7","slide":7,"name":"任意多边形: 形状 45","bbox":[1078.88,225.08,13.01,13.01]}
+{"kind":"shape","id":"sh/7yl8vy9s","slide":7,"name":"任意多边形: 形状 46","bbox":[1068.92,214.77,32.94,42.01]}
+{"kind":"textbox","id":"sh/wneps3ap","slide":7,"textChars":34,"textLines":1}
+{"kind":"shape","id":"sh/25ojml43","slide":7,"name":"矩形: 圆角 14","bbox":[70.67,353.02,221.34,290.95]}
+{"kind":"shape","id":"sh/o761ov2t","slide":7,"name":"矩形: 圆角 16","bbox":[70.67,583.73,221.34,60.23]}
+{"kind":"textbox","id":"sh/eh4jil4r","slide":7,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/jedkn654","slide":7,"textChars":34,"textLines":1}
+{"kind":"shape","id":"sh/y9crix0v","slide":7,"name":"椭圆 108","bbox":[131.36,311.34,87.95,87.95]}
+{"kind":"shape","id":"sh/ofa5s3yt","slide":7,"name":"任意多边形: 形状 109","bbox":[154.59,330.18,37.93,47.31]}
+{"kind":"shape","id":"sh/pgj6l8ze","slide":7,"name":"任意多边形: 形状 110","bbox":[177.8,362.2,18.28,18.23]}
+{"kind":"shape","id":"sh/0bq5ojyx","slide":7,"name":"矩形: 圆角 113","bbox":[346.74,353.02,221.34,290.95]}
+{"kind":"shape","id":"sh/1cz6hoz2","slide":7,"name":"矩形: 圆角 114","bbox":[346.74,583.73,221.34,60.23]}
+{"kind":"textbox","id":"sh/e98nm9gr","slide":7,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/fahofehc","slide":7,"textChars":34,"textLines":1}
+{"kind":"shape","id":"sh/1c3qdsj6","slide":7,"name":"椭圆 69","bbox":[407.43,311.34,87.95,87.95]}
+{"kind":"shape","id":"sh/0bupkn21","slide":7,"name":"任意多边形: 形状 70","bbox":[433.01,330.18,36.79,39.45]}
+{"kind":"shape","id":"sh/fal8bi1g","slide":7,"name":"任意多边形: 形状 71","bbox":[443.33,372.36,16.15,8.08]}
+{"kind":"shape","id":"sh/q903y5on","slide":7,"name":"矩形: 圆角 137","bbox":[987.99,583.73,221.34,60.23]}
+{"kind":"textbox","id":"sh/ra9k7ap8","slide":7,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/jmtgjqto","slide":7,"textChars":34,"textLines":1}
+{"kind":"textbox","id":"sh/uxkz61s7","slide":7,"textChars":34,"textLines":1}
+{"kind":"textbox","id":"sh/ulc7qdsj","slide":7,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/vm58zi94","slide":7,"textChars":4,"textLines":1}
+{"kind":"image","id":"im/w3m5gz2t","slide":7,"name":"图片 150","bbox":[-3.36,-13.99,102.32,107.41]}
+{"kind":"image","id":"im/x4v6p4je","slide":7,"name":"图片 38","bbox":[608.23,226.41,339.61,416.4]}
+{"kind":"slide","id":"sl/fu1gfa1s","slide":8,"title":"ADD YOUR TITLE HERE","textShapes":13}
+{"kind":"shape","id":"sh/98rehwve","slide":8,"name":"矩形: 圆角 10","bbox":[0,0,1280,720]}
+{"kind":"textbox","id":"sh/ri9g7uhw","slide":8,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/6h0fypgb","slide":8,"textChars":4,"textLines":1}
+{"kind":"shape","id":"sh/id0fu50z","slide":8,"name":"直接连接符 8","bbox":[251.88,96.15,823.73,1.8]}
+{"kind":"shape","id":"sh/n6pwfmd8","slide":8,"name":"矩形 12","bbox":[50.4,65.35,11,78.43]}
+{"kind":"shape","id":"sh/m5gvmhwn","slide":8,"name":"椭圆 11","bbox":[722.95,210.27,66.76,66.76]}
+{"kind":"shape","id":"sh/tkby9kzm","slide":8,"name":"椭圆 5","bbox":[722.95,442.92,66.76,66.76]}
+{"kind":"shape","id":"sh/0jydkreh","slide":8,"name":"等腰三角形 13","bbox":[744.91,235.46,22.84,16.37]}
+{"kind":"shape","id":"sh/1k7edwv2","slide":8,"name":"等腰三角形 14","bbox":[744.91,468.11,22.84,16.37]}
+{"kind":"shape","id":"sh/je9g3ahk","slide":8,"name":"直接连接符 7","bbox":[835.83,283.85,363.6,0]}
+{"kind":"textbox","id":"sh/na1sb2lg","slide":8,"textChars":2,"textLines":1}
+{"kind":"textbox","id":"sh/8bat47ml","slide":8,"textChars":10,"textLines":1}
+{"kind":"textbox","id":"sh/9w3uds36","slide":8,"textChars":34,"textLines":1}
+{"kind":"shape","id":"sh/z61s7il4","slide":8,"name":"直接连接符 34","bbox":[829.53,535.47,363.6,0]}
+{"kind":"textbox","id":"sh/07atgnmp","slide":8,"textChars":2,"textLines":1}
+{"kind":"textbox","id":"sh/l8ja9s3a","slide":8,"textChars":10,"textLines":1}
+{"kind":"textbox","id":"sh/q18bad4n","slide":8,"textChars":34,"textLines":1}
+{"kind":"textbox","id":"sh/3u18fepo","slide":8,"textChars":20,"textLines":3}
+{"kind":"textbox","id":"sh/2ts769o3","slide":8,"textChars":34,"textLines":1}
+{"kind":"textbox","id":"sh/pwjqho7u","slide":8,"textChars":6,"textLines":2}
+{"kind":"shape","id":"sh/fq1obeps","slide":8,"name":"椭圆 43","bbox":[152.17,580.26,37.24,37.24]}
+{"kind":"shape","id":"sh/grap4zqd","slide":8,"name":"椭圆 46","bbox":[89.77,580.26,37.24,37.24]}
+{"kind":"shape","id":"sh/cvmdsb2h","slide":8,"name":"椭圆 49","bbox":[214.57,580.26,37.24,37.24]}
+{"kind":"textbox","id":"sh/budwj61c","slide":8,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/kjmdwbit","slide":8,"textChars":4,"textLines":1}
+{"kind":"image","id":"im/qloni9oj","slide":8,"name":"图片 16","bbox":[-3.36,-13.99,102.32,107.41]}
+{"kind":"image","id":"im/d8f6d47a","slide":8,"name":"图片 9","geometry":"roundRect","bbox":[513.08,155.41,241.16,514.44]}
+{"kind":"image","id":"im/s76pkz6p","slide":8,"name":"图片 2","bbox":[353.68,129.4,567.09,566.45]}
+{"kind":"image","id":"im/b21onyp8","slide":8,"name":"图形 36","bbox":[160.79,585.87,23.53,24.08]}
+{"kind":"image","id":"im/a1s7uton","slide":8,"name":"图形 37","bbox":[99.39,587.82,20.49,20.98]}
+{"kind":"image","id":"im/mxcrmx8v","slide":8,"name":"图形 38","bbox":[222.54,588.07,20.56,21.04]}
+{"kind":"slide","id":"sl/udsvah03","slide":9,"title":"ADD YOUR TITLE HERE","textShapes":14}
+{"kind":"shape","id":"sh/p0ji9kf2","slide":9,"name":"矩形: 圆角 10","bbox":[0,0,1280,720]}
+{"kind":"textbox","id":"sh/nex4jq5k","slide":9,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/mdonql4z","slide":9,"textChars":4,"textLines":1}
+{"kind":"shape","id":"sh/ah8nu54b","slide":9,"name":"直接连接符 8","bbox":[262.75,95.62,812.87,0.53]}
+{"kind":"shape","id":"sh/3y107axw","slide":9,"name":"矩形 12","bbox":[50.4,65.35,11,78.43]}
+{"kind":"shape","id":"sh/87a18zqt","slide":9,"name":"矩形 20","bbox":[411.9,192,69,262.41]}
+{"kind":"textbox","id":"sh/wba1cjqp","slide":9,"textChars":34,"textLines":1}
+{"kind":"textbox","id":"sh/va103ep4","slide":9,"textChars":99,"textLines":4}
+{"kind":"textbox","id":"sh/u9sja98z","slide":9,"textChars":2,"textLines":1}
+{"kind":"shape","id":"sh/xgzitk76","slide":9,"name":"十字形 27","bbox":[764.52,520.44,21.6,21.6]}
+{"kind":"textbox","id":"sh/cf6h0fql","slide":9,"textChars":5,"textLines":1}
+{"kind":"shape","id":"sh/atkjypkn","slide":9,"name":"椭圆 66","bbox":[629.19,504.58,38.61,38.61]}
+{"kind":"shape","id":"sh/hsf25oji","slide":9,"name":"任意多边形: 形状 67","bbox":[647.51,522.31,12.02,10.24]}
+{"kind":"shape","id":"sh/gr61cj2x","slide":9,"name":"任意多边形: 形状 68","bbox":[637.47,515.22,15.68,13.36]}
+{"kind":"textbox","id":"sh/cr6xgv6l","slide":9,"textChars":2,"textLines":1}
+{"kind":"shape","id":"sh/xcfy90n6","slide":9,"name":"十字形 36","bbox":[976.17,520.44,21.6,21.6]}
+{"kind":"textbox","id":"sh/qtkf21ob","slide":9,"textChars":5,"textLines":1}
+{"kind":"shape","id":"sh/s7el4nax","slide":9,"name":"椭圆 53","bbox":[840.84,504.58,38.61,38.61]}
+{"kind":"shape","id":"sh/t8nmx8ri","slide":9,"name":"任意多边形: 形状 54","bbox":[851.87,512.85,16.54,16.52]}
+{"kind":"shape","id":"sh/65c32ds7","slide":9,"name":"任意多边形: 形状 55","bbox":[849.13,526.31,9.47,8.6]}
+{"kind":"shape","id":"sh/r654vi9c","slide":9,"name":"任意多边形: 形状 56","bbox":[861.7,526.31,9.47,8.61]}
+{"kind":"textbox","id":"sh/kbep4b6l","slide":9,"textChars":2,"textLines":1}
+{"kind":"shape","id":"sh/bm5o7m54","slide":9,"name":"十字形 83","bbox":[1187.81,520.44,21.6,21.6]}
+{"kind":"textbox","id":"sh/alw7yhoj","slide":9,"textChars":5,"textLines":1}
+{"kind":"shape","id":"sh/v2l4nitk","slide":9,"name":"椭圆 43","bbox":[1052.48,504.58,38.61,38.61]}
+{"kind":"shape","id":"sh/u1cnedcz","slide":9,"name":"任意多边形: 形状 44","bbox":[1069.42,512.85,12.79,18.88]}
+{"kind":"shape","id":"sh/h43mp8ba","slide":9,"name":"任意多边形: 形状 45","bbox":[1065.74,521,5.71,5.71]}
+{"kind":"shape","id":"sh/w3u5g3u5","slide":9,"name":"任意多边形: 形状 46","bbox":[1061.36,516.47,14.46,18.45]}
+{"kind":"textbox","id":"sh/dojmxs3q","slide":9,"textChars":2,"textLines":1}
+{"kind":"shape","id":"sh/ql832d4z","slide":9,"name":"十字形 91","bbox":[552.88,520.44,21.6,21.6]}
+{"kind":"textbox","id":"sh/rm14vilk","slide":9,"textChars":5,"textLines":1}
+{"kind":"shape","id":"sh/1sjm1s3m","slide":9,"name":"椭圆 94","bbox":[417.55,504.58,38.61,38.61]}
+{"kind":"shape","id":"sh/epsn6x4b","slide":9,"name":"任意多边形: 形状 95","bbox":[428.78,512.85,16.15,17.32]}
+{"kind":"shape","id":"sh/zq14zilw","slide":9,"name":"任意多边形: 形状 96","bbox":[433.31,531.37,7.09,3.55]}
+{"kind":"textbox","id":"sh/e9w36ds3","slide":9,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/fa54zi9o","slide":9,"textChars":4,"textLines":1}
+{"kind":"image","id":"im/3e14nm54","slide":9,"name":"图片 13","bbox":[-3.36,-13.99,102.32,107.41]}
+{"kind":"image","id":"im/2ds3e1oz","slide":9,"name":"图片 21","bbox":[410.24,204.68,147.37,249.29]}
+{"kind":"image","id":"im/j6h47q50","slide":9,"name":"图片 22","bbox":[387.79,228.96,130.66,252.46]}
+{"kind":"image","id":"im/i583elof","slide":9,"name":"图片 9","bbox":[58.65,191.77,309.46,464.18]}
+{"kind":"slide","id":"sl/m90b6t0r","slide":10,"title":"ADD YOUR TITLE HERE","textShapes":13}
+{"kind":"shape","id":"sh/d87uxg3m","slide":10,"name":"矩形: 圆角 10","bbox":[0,0,1280,720]}
+{"kind":"textbox","id":"sh/zelojyl8","slide":10,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/ydcnatkn","slide":10,"textChars":4,"textLines":1}
+{"kind":"shape","id":"sh/m1cnetkj","slide":10,"name":"直接连接符 8","bbox":[260.41,96.15,815.2,1.07]}
+{"kind":"shape","id":"sh/r6pcv6lw","slide":10,"name":"矩形 12","bbox":[50.4,65.35,11,78.43]}
+{"kind":"textbox","id":"sh/fapcz6ls","slide":10,"textChars":21,"textLines":1}
+{"kind":"textbox","id":"sh/p0ru503u","slide":10,"textChars":48,"textLines":1}
+{"kind":"shape","id":"sh/pkbep4fe","slide":10,"name":"椭圆 50","bbox":[98.46,206.71,67.13,67.13]}
+{"kind":"shape","id":"sh/2hkfu9w3","slide":10,"name":"任意多边形: 形状 51","bbox":[112.84,221.98,27.95,36.58]}
+{"kind":"shape","id":"sh/3itwnex8","slide":10,"name":"任意多边形: 形状 52","bbox":[134.22,221.99,16.98,36.57]}
+{"kind":"textbox","id":"sh/ru18r2to","slide":10,"textChars":3,"textLines":1}
+{"kind":"shape","id":"sh/jq9gvuh4","slide":10,"name":"椭圆 43","bbox":[302.91,206.71,67.13,67.13]}
+{"kind":"shape","id":"sh/ip0f2p0j","slide":10,"name":"任意多边形: 形状 44","bbox":[332.36,221.09,22.24,32.83]}
+{"kind":"shape","id":"sh/5cryx4za","slide":10,"name":"任意多边形: 形状 45","bbox":[325.96,235.25,9.93,9.93]}
+{"kind":"shape","id":"sh/kbix4zyp","slide":10,"name":"任意多边形: 形状 46","bbox":[318.35,227.38,25.14,32.07]}
+{"kind":"textbox","id":"sh/lwbih8bu","slide":10,"textChars":3,"textLines":1}
+{"kind":"shape","id":"sh/2l4rexof","slide":10,"name":"椭圆 69","bbox":[507.37,206.71,67.13,67.13]}
+{"kind":"shape","id":"sh/3mxsn25k","slide":10,"name":"任意多边形: 形状 70","bbox":[526.89,221.09,28.08,30.11]}
+{"kind":"shape","id":"sh/on69g765","slide":10,"name":"任意多边形: 形状 71","bbox":[534.77,253.29,12.33,6.16]}
+{"kind":"textbox","id":"sh/1w7yl4rq","slide":10,"textChars":3,"textLines":1}
+{"kind":"shape","id":"sh/algfy50n","slide":10,"name":"椭圆 40","bbox":[98.46,377.6,67.13,67.13]}
+{"kind":"shape","id":"sh/xo7ytkzy","slide":10,"name":"任意多边形: 形状 41","bbox":[116.19,391.99,28.95,36.11]}
+{"kind":"shape","id":"sh/wnyx0fit","slide":10,"name":"任意多边形: 形状 42","bbox":[133.9,416.43,13.95,13.92]}
+{"kind":"textbox","id":"sh/nip43qx0","slide":10,"textChars":3,"textLines":1}
+{"kind":"shape","id":"sh/87atcb6p","slide":10,"name":"椭圆 60","bbox":[302.91,377.6,67.13,67.13]}
+{"kind":"shape","id":"sh/mlsba18j","slide":10,"name":"任意多边形: 形状 62","bbox":[334.47,412.24,4.01,4.02]}
+{"kind":"shape","id":"sh/lkzuhw7y","slide":10,"name":"任意多边形: 形状 63","bbox":[320.37,398.13,32.21,32.21]}
+{"kind":"shape","id":"sh/0jqt8bqd","slide":10,"name":"任意多边形: 形状 64","bbox":[327.57,391.99,18.48,3.77]}
+{"kind":"shape","id":"sh/zihcf6ps","slide":10,"name":"任意多边形: 形状 65","bbox":[342.3,397.97,9.1,9.1]}
+{"kind":"textbox","id":"sh/je9ovuh8","slide":10,"textChars":3,"textLines":1}
+{"kind":"shape","id":"sh/sridofel","slide":10,"name":"椭圆 57","bbox":[507.37,377.6,67.13,67.13]}
+{"kind":"shape","id":"sh/tsrehkf6","slide":10,"name":"任意多边形: 形状 58","bbox":[525.18,391.99,31.5,30.13]}
+{"kind":"shape","id":"sh/98julg7a","slide":10,"name":"任意多边形: 形状 59","bbox":[534.86,424.45,11.85,5.9]}
+{"kind":"textbox","id":"sh/s32psji5","slide":10,"textChars":3,"textLines":1}
+{"kind":"shape","id":"sh/r2tozehk","slide":10,"name":"矩形: 圆角 115","bbox":[664.19,196.94,547.01,448.06]}
+{"kind":"textbox","id":"sh/9876pkz6","slide":10,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/gfixszex","slide":10,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/hgrel4fi","slide":10,"textChars":4,"textLines":1}
+{"kind":"image","id":"im/x03at8j2","slide":10,"name":"图片 13","bbox":[-3.36,-13.99,102.32,107.41]}
+{"kind":"slide","id":"sl/jetc3ut0","slide":11,"title":"ADD YOUR TITLE HERE","textShapes":11}
+{"kind":"textbox","id":"sh/n69grmpw","slide":11,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/250zy18b","slide":11,"textChars":4,"textLines":1}
+{"kind":"shape","id":"sh/61kzalof","slide":11,"name":"直接连接符 8","bbox":[259.61,96.15,816,1.07]}
+{"kind":"shape","id":"sh/nehs7iho","slide":11,"name":"矩形 12","bbox":[50.4,65.35,11,78.43]}
+{"kind":"shape","id":"sh/7650nq5s","slide":11,"name":"矩形 21","bbox":[445.14,310.04,224.92,64.17]}
+{"kind":"textbox","id":"sh/65wzelo7","slide":11,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/l43ilgn2","slide":11,"textChars":21,"textLines":1}
+{"kind":"shape","id":"sh/p07ixkn6","slide":11,"name":"矩形 27","bbox":[714.78,310.04,224.92,64.17]}
+{"kind":"textbox","id":"sh/4zyhofml","slide":11,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/m58fih43","slide":11,"textChars":21,"textLines":1}
+{"kind":"shape","id":"sh/n61wbmlo","slide":11,"name":"矩形 30","bbox":[984.41,310.04,224.92,64.17]}
+{"kind":"textbox","id":"sh/o7axk7m9","slide":11,"textChars":5,"textLines":1}
+{"kind":"textbox","id":"sh/98jedc3u","slide":11,"textChars":21,"textLines":1}
+{"kind":"textbox","id":"sh/jylwj6lw","slide":11,"textChars":34,"textLines":1}
+{"kind":"textbox","id":"sh/ydcfq1kb","slide":11,"textChars":4,"textLines":1}
+{"kind":"textbox","id":"sh/3qhsfypc","slide":11,"textChars":4,"textLines":1}
+{"kind":"image","id":"im/hgn69gbe","slide":11,"name":"图片 13","bbox":[-3.36,-13.99,102.32,107.41]}
+{"kind":"image","id":"im/udcne1cn","slide":11,"name":"图片 49","bbox":[63.19,200.84,307.21,460.81]}
+{"kind":"image","id":"im/velo76t8","slide":11,"name":"图片 6","bbox":[444.84,486.95,224.92,165.56]}
+{"kind":"image","id":"im/8bu5cbux","slide":11,"name":"图片 14","bbox":[714.78,486.95,224.85,168.64]}
+{"kind":"image","id":"im/9c365gbi","slide":11,"name":"图片 19","bbox":[984.48,486.95,224.85,168.64]}
+{"kind":"slide","id":"sl/8f2psfyx","slide":12,"title":"ADD YOUR TITLE HERE","textShapes":9}
+{"kind":"shape","id":"sh/xw3q94ne","slide":12,"name":"矩形: 圆角 10","bbox":[0,0,1280,720]}
+{"kind":"textbox","id":"sh/ra943il8","slide":12,"textChars":19,"textLines":1}
+{"kind":"textbox","id":"sh/q903ad4n","slide":12,"textChars":4,"textLines":1}
+{"kind":"shape","id":"sh/a543mx4r","slide":12,"name":"直接连接符 8","bbox":[260.41,96.15,815.2,1.07]}
+{"kind":"shape","id":"sh/bulo7u58","slide":12,"name":"矩形 12","bbox":[50.4,65.35,11,78.43]}
+{"kind":"notice","message":"Truncated: omitted 59 lines. Increase maxChars or narrow target."}
