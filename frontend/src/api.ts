@@ -7,6 +7,8 @@ import type {
   DraftSelection,
   ExpertAgentItem,
   FlowInfo,
+  GraphSelectionPayload,
+  KnowledgeGraphPayload,
   MessageItem,
   SessionDetail,
   SessionFileItem,
@@ -240,6 +242,7 @@ export type StreamChatPayload = {
   expert_id?: string;
   draft_request_kind?: "generate" | "edit";
   selection?: DraftSelection | null;
+  graph_selection?: GraphSelectionPayload | null;
 };
 
 export async function streamChat(
@@ -388,6 +391,47 @@ export async function cancelChat(sessionId: string, requestId: string): Promise<
     { method: "POST" },
   );
   return Boolean(payload.data?.cancelled);
+}
+
+export async function getKnowledgeGraphCandidates(
+  sessionId: string,
+  message: string,
+  expertId?: string,
+): Promise<KnowledgeGraphPayload> {
+  const payload = await readJson<ApiEnvelope<KnowledgeGraphPayload>>(`${API_BASE}/api/knowledge/graph/candidates`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session_id: sessionId,
+      message,
+      expert_id: expertId || undefined,
+    }),
+  });
+  return payload.data;
+}
+
+export async function getKnowledgeGraphAdmin(): Promise<KnowledgeGraphPayload> {
+  const payload = await readJson<ApiEnvelope<KnowledgeGraphPayload>>(`${API_BASE}/api/knowledge/graph`);
+  return payload.data;
+}
+
+export async function updateKnowledgeGraphEntityRagSources(entityId: string, sources: string[]): Promise<string[]> {
+  const payload = await readJson<ApiEnvelope<{ entity_id: string; sources: string[] }>>(
+    `${API_BASE}/api/knowledge/graph/entities/${encodeURIComponent(entityId)}/rag-sources`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sources }),
+    },
+  );
+  return payload.data.sources;
+}
+
+export async function getKnowledgeGraphNeighbors(entityId: string, hops = 1): Promise<KnowledgeGraphPayload> {
+  const payload = await readJson<ApiEnvelope<KnowledgeGraphPayload>>(
+    `${API_BASE}/api/knowledge/graph/entities/${encodeURIComponent(entityId)}/neighbors?hops=${hops}`,
+  );
+  return payload.data;
 }
 
 export function buildFileDownloadUrl(sessionName: string): string {

@@ -13,19 +13,6 @@ agents:
     prompt_file: prompts/main_tutor.md
     selectable: false
 
-  - id: insect_agent
-    kind: expert
-    name: 昆虫 Agent
-    role: 昆虫观察专家
-    description: 昆虫识别思路、习性解释、观察记录和非侵扰提醒。
-    capabilities:
-      - insect_observation
-      - identification_reasoning
-      - behavior_explanation
-      - non_intrusive_guidance
-    prompt_file: prompts/experts/insect.md
-    selectable: true
-
   - id: nature_agent
     kind: expert
     name: 自然 Agent

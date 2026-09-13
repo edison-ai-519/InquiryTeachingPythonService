@@ -93,7 +93,7 @@ function Stop-Listeners {
     $pids = @(Get-ListenerPids -Port $Port)
     foreach ($processId in $pids) {
         Write-Step "停止端口 $Port 上的进程 PID=$processId"
-        Stop-Process -Id $processId -Force -ErrorAction Stop
+        Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
     }
 
     for ($attempt = 0; $attempt -lt 15; $attempt++) {

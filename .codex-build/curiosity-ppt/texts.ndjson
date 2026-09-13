@@ -1,0 +1,169 @@
+{"kind":"slide","id":"sl/y90nupkv","slide":1,"title":"BUPTBUPTBUPT","textShapes":8}
+{"kind":"textbox","id":"sh/jm1kbuds","slide":1,"name":"文本框 188","text":"BUPTBUPTBUPT","textPreview":"BUPTBUPTBUPT","textChars":12,"textLines":1,"bbox":[879.68,339.8,704,40.4]}
+{"kind":"textbox","id":"sh/ul4vaxgb","slide":1,"name":"文本框 6","text":"北京邮电大学","textPreview":"北京邮电大学","textChars":6,"textLines":1,"bbox":[132.71,245.88,430.83,129.25]}
+{"kind":"textbox","id":"sh/vmdcj2xw","slide":1,"name":"文本框 13","text":"Beijing University of Posts and Telecommunications","textPreview":"Beijing University of Posts and Telecommunications","textChars":50,"textLines":1,"bbox":[129.8,205.19,709.22,25.85]}
+{"kind":"textbox","id":"sh/4r6dg7et","slide":1,"name":"文本框 14","text":"文艺风PPT模板","textPreview":"文艺风PPT模板","textChars":8,"textLines":1,"bbox":[132.71,362.99,423.77,38.6]}
+{"kind":"textbox","id":"sh/5sfepcfe","slide":1,"name":"文本框 15","text":"单击此处输入您的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入您的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。","textChars":48,"textLines":1,"bbox":[132.71,410.73,423.77,48.37]}
+{"kind":"textbox","id":"sh/3qxwn2x8","slide":1,"name":"文本框 21","text":"汇报人：XXX","textPreview":"汇报人：XXX","textChars":7,"textLines":1,"bbox":[136.86,503.17,178.08,25.85]}
+{"kind":"textbox","id":"sh/ozmd8r65","slide":1,"name":"文本框 7","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[-95.65,350.76,293.18,29.08]}
+{"kind":"textbox","id":"sh/ipovexwn","slide":1,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[360.11,607.78,178.08,58.16]}
+{"kind":"slide","id":"sl/hwbqtkby","slide":2,"title":"CONTENTS","textShapes":15}
+{"kind":"textbox","id":"sh/r65knqtk","slide":2,"name":"文本框 188","text":"CONTENTS","textPreview":"CONTENTS","textChars":8,"textLines":1,"bbox":[369.05,100.47,840.45,96.94]}
+{"kind":"textbox","id":"sh/u94fqp4n","slide":2,"name":"文本框 26","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[189.39,308.06,287.63,47.14]}
+{"kind":"textbox","id":"sh/p0vy54na","slide":2,"name":"矩形 27","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[189.39,366.35,173.33,22.62]}
+{"kind":"textbox","id":"sh/4zmxwzmp","slide":2,"name":"文本框 28","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[70.67,313.1,69.67,71.09]}
+{"kind":"textbox","id":"sh/69wbilcj","slide":2,"name":"文本框 40","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[623.64,308.06,287.63,47.14]}
+{"kind":"textbox","id":"sh/tw7ud0va","slide":2,"name":"矩形 41","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[623.64,366.35,173.33,22.62]}
+{"kind":"textbox","id":"sh/svedkvup","slide":2,"name":"文本框 42","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[504.91,313.1,69.67,71.09]}
+{"kind":"textbox","id":"sh/107uh0v6","slide":2,"name":"文本框 45","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[189.39,494.68,287.63,47.14]}
+{"kind":"textbox","id":"sh/gzydovul","slide":2,"name":"矩形 46","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[189.39,552.97,173.33,22.62]}
+{"kind":"textbox","id":"sh/v2lc36dw","slide":2,"name":"文本框 47","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[70.67,499.72,69.67,71.09]}
+{"kind":"textbox","id":"sh/1wzix87i","slide":2,"name":"文本框 50","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[623.64,494.68,287.63,47.14]}
+{"kind":"textbox","id":"sh/et8zmto7","slide":2,"name":"矩形 51","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[623.64,552.97,173.33,22.62]}
+{"kind":"textbox","id":"sh/zuh0vypc","slide":2,"name":"文本框 52","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[504.91,499.72,69.67,71.09]}
+{"kind":"textbox","id":"sh/r6x0rypg","slide":2,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[741.83,626.09,178.08,58.16]}
+{"kind":"textbox","id":"sh/x4r21kru","slide":2,"name":"文本框 188","text":"目 录","textPreview":"目 录","textChars":3,"textLines":1,"bbox":[77.02,100.47,272.31,96.94]}
+{"kind":"slide","id":"sl/ofy9wn61","slide":3,"title":"01","textShapes":4}
+{"kind":"textbox","id":"sh/d0jax03i","slide":3,"name":"文本框 2","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[573.37,150.91,271.63,268.19]}
+{"kind":"textbox","id":"sh/3ah8rqlg","slide":3,"name":"文本框 4","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[573.37,382.62,581.62,116.33]}
+{"kind":"textbox","id":"sh/obq90bml","slide":3,"name":"文本框 5","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[578.51,510.45,569.5,32.31]}
+{"kind":"textbox","id":"sh/l4fi9cza","slide":3,"name":"文本框 15","text":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果。","textChars":35,"textLines":1,"bbox":[813.58,276.51,224.42,73.57]}
+{"kind":"slide","id":"sl/jyx0ra1s","slide":4,"title":"ADD YOUR TITLE HERE","textShapes":12}
+{"kind":"textbox","id":"sh/rm1k7yt4","slide":4,"name":"矩形 3","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[70.67,125.99,193.25,19.39]}
+{"kind":"textbox","id":"sh/ql8jytsj","slide":4,"name":"文本框 4","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[70.67,70.32,338.51,51.67]}
+{"kind":"textbox","id":"sh/8v6983qh","slide":4,"name":"文本框 141","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[802.66,212.44,129.81,29.08]}
+{"kind":"textbox","id":"sh/9wfah8rm","slide":4,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，请言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请言简意赅的阐述观点。","textChars":32,"textLines":1,"bbox":[802.66,249.78,224.14,85.83]}
+{"kind":"textbox","id":"sh/a14ryt83","slide":4,"name":"文本框 147","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[988.32,461.16,129.81,29.08]}
+{"kind":"textbox","id":"sh/b2ds7e9o","slide":4,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，请言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请言简意赅的阐述观点。","textChars":32,"textLines":1,"bbox":[988.32,498.5,224.14,85.83]}
+{"kind":"textbox","id":"sh/qpc3ylwr","slide":4,"name":"文本框 152","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[350.65,212.44,129.81,29.08]}
+{"kind":"textbox","id":"sh/1wnmx0fe","slide":4,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，请言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请言简意赅的阐述观点。","textChars":32,"textLines":1,"bbox":[256.32,249.78,224.14,85.83]}
+{"kind":"textbox","id":"sh/zul4vqx8","slide":4,"name":"文本框 155","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[165,461.16,129.81,29.08]}
+{"kind":"textbox","id":"sh/etc32lw3","slide":4,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，请言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请言简意赅的阐述观点。","textChars":32,"textLines":1,"bbox":[70.67,498.5,224.14,85.83]}
+{"kind":"textbox","id":"sh/18nu50nu","slide":4,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[1031.25,56.64,178.08,58.13]}
+{"kind":"textbox","id":"sh/0netcvm9","slide":4,"name":"文本框 20","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[1052.29,105.49,178.08,16.16]}
+{"kind":"slide","id":"sl/i107q5of","slide":5,"title":"ADD YOUR TITLE HERE","textShapes":15}
+{"kind":"textbox","id":"sh/z2tcnm5s","slide":5,"name":"矩形 3","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[70.67,125.99,193.25,19.39]}
+{"kind":"textbox","id":"sh/yhkbe1o7","slide":5,"name":"文本框 4","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[70.67,70.32,338.51,51.67]}
+{"kind":"textbox","id":"sh/2l4zip8j","slide":5,"name":"文本框 44","text":"01.","textPreview":"01.","textChars":3,"textLines":1,"bbox":[148.94,394.54,152.29,54.8]}
+{"kind":"textbox","id":"sh/povid4ra","slide":5,"name":"文本框 45","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[224.86,402.62,179.62,38.67]}
+{"kind":"textbox","id":"sh/onmhkzqp","slide":5,"name":"文本框 15","text":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果。","textChars":35,"textLines":1,"bbox":[148.48,456.38,258.74,96.8]}
+{"kind":"textbox","id":"sh/65cnahc7","slide":5,"name":"矩形 62","text":"添加小标题\n请尽量言简意赅的阐述观点","textPreview":"添加小标题 | 请尽量言简意赅的阐述观点","textChars":18,"textLines":2,"bbox":[108.58,169.61,485.04,94.8]}
+{"kind":"textbox","id":"sh/ud0ne10b","slide":5,"name":"文本框 22","text":"03.","textPreview":"03.","textChars":3,"textLines":1,"bbox":[875.09,394.54,152.29,54.8]}
+{"kind":"textbox","id":"sh/5o7mhcju","slide":5,"name":"文本框 27","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[951.01,402.62,179.62,38.67]}
+{"kind":"textbox","id":"sh/vu5kbihc","slide":5,"name":"文本框 15","text":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果。","textChars":35,"textLines":1,"bbox":[874.64,456.38,258.74,96.8]}
+{"kind":"textbox","id":"sh/zmlk3yhk","slide":5,"name":"文本框 38","text":"单击输入文本","textPreview":"单击输入文本","textChars":6,"textLines":1,"bbox":[991.3,181.8,179.62,35.54]}
+{"kind":"textbox","id":"sh/l4bupwny","slide":5,"name":"文本框 5","text":"02.","textPreview":"02.","textChars":3,"textLines":1,"bbox":[506.07,394.54,152.29,54.8]}
+{"kind":"textbox","id":"sh/w32dkbuh","slide":5,"name":"文本框 9","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[581.99,402.62,179.62,38.67]}
+{"kind":"textbox","id":"sh/k7mxovud","slide":5,"name":"文本框 15","text":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果。","textChars":35,"textLines":1,"bbox":[505.62,456.38,258.74,96.8]}
+{"kind":"textbox","id":"sh/kjelony9","slide":5,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[1031.25,56.64,178.08,58.13]}
+{"kind":"textbox","id":"sh/ehkzepsn","slide":5,"name":"文本框 20","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[1052.29,105.49,178.08,16.16]}
+{"kind":"slide","id":"sl/x8f69ofe","slide":6,"title":"ADD YOUR TITLE HERE","textShapes":12}
+{"kind":"textbox","id":"sh/87ipkzal","slide":6,"name":"矩形 3","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[70.67,125.99,193.25,19.39]}
+{"kind":"textbox","id":"sh/zi98nu94","slide":6,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。","textChars":48,"textLines":1,"bbox":[110.45,330,719.41,56.43]}
+{"kind":"textbox","id":"sh/ml07i9sv","slide":6,"name":"文本框 5_1","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[110.45,230.13,719.41,80.53]}
+{"kind":"textbox","id":"sh/svmt4v6t","slide":6,"name":"文本框 18","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[486.69,489.8,183.52,29.08]}
+{"kind":"textbox","id":"sh/cbe5g3ih","slide":6,"name":"文本框 19","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[484.84,520.69,183.52,56.92]}
+{"kind":"textbox","id":"sh/zep4byhs","slide":6,"name":"文本框 26","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[735.07,489.8,183.52,29.08]}
+{"kind":"textbox","id":"sh/gju58ji9","slide":6,"name":"文本框 27","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[733.21,520.69,183.52,56.92]}
+{"kind":"textbox","id":"sh/u907axkf","slide":6,"name":"文本框 34","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[983.45,489.8,183.52,29.08]}
+{"kind":"textbox","id":"sh/hcrqlcj6","slide":6,"name":"文本框 35","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[981.59,520.69,183.52,56.92]}
+{"kind":"textbox","id":"sh/7m98ru9g","slide":6,"name":"文本框 6","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[70.67,70.32,338.51,51.67]}
+{"kind":"textbox","id":"sh/7698f214","slide":6,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[1031.25,56.64,178.08,58.13]}
+{"kind":"textbox","id":"sh/m5076xkj","slide":6,"name":"文本框 20","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[1052.29,105.49,178.08,16.16]}
+{"kind":"slide","id":"sl/gnmp4jqx","slide":7,"title":"ADD YOUR TITLE HERE","textShapes":12}
+{"kind":"textbox","id":"sh/ydkbm5sv","slide":7,"name":"矩形 3","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[70.67,125.99,193.25,19.39]}
+{"kind":"textbox","id":"sh/zedcfa9g","slide":7,"name":"文本框 4","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[70.67,70.32,338.51,51.67]}
+{"kind":"textbox","id":"sh/wneps3ap","slide":7,"name":"文本框 5_1","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[69.33,187.69,570.67,80.53]}
+{"kind":"textbox","id":"sh/eh4jil4r","slide":7,"name":"文本框 18","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[104.65,601.8,153.38,24.1]}
+{"kind":"textbox","id":"sh/jedkn654","slide":7,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[97.24,428.51,168.2,115.23]}
+{"kind":"textbox","id":"sh/e98nm9gr","slide":7,"name":"文本框 115","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[380.72,601.8,153.38,24.1]}
+{"kind":"textbox","id":"sh/fahofehc","slide":7,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[373.31,428.51,168.2,115.23]}
+{"kind":"textbox","id":"sh/ra9k7ap8","slide":7,"name":"文本框 138","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[1021.97,601.8,153.38,24.1]}
+{"kind":"textbox","id":"sh/jmtgjqto","slide":7,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[1014.57,300.49,168.2,115.23]}
+{"kind":"textbox","id":"sh/uxkz61s7","slide":7,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[1014.57,446.12,168.2,115.23]}
+{"kind":"textbox","id":"sh/ulc7qdsj","slide":7,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[1031.25,56.64,178.08,58.13]}
+{"kind":"textbox","id":"sh/vm58zi94","slide":7,"name":"文本框 20","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[1052.29,105.49,178.08,16.16]}
+{"kind":"slide","id":"sl/fu1gfa1s","slide":8,"title":"ADD YOUR TITLE HERE","textShapes":13}
+{"kind":"textbox","id":"sh/ri9g7uhw","slide":8,"name":"矩形 3","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[70.67,125.99,193.25,19.39]}
+{"kind":"textbox","id":"sh/6h0fypgb","slide":8,"name":"文本框 4","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[70.67,70.32,338.51,51.67]}
+{"kind":"textbox","id":"sh/na1sb2lg","slide":8,"name":"文本框 30","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[844.84,206.64,127.18,54.93]}
+{"kind":"textbox","id":"sh/8bat47ml","slide":8,"name":"文本框 15","text":"单击此处输入你的正文","textPreview":"单击此处输入你的正文","textChars":10,"textLines":1,"bbox":[921.9,213.39,292.6,40.04]}
+{"kind":"textbox","id":"sh/9w3uds36","slide":8,"name":"文本框 15","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[832.93,302.31,387.87,57.9]}
+{"kind":"textbox","id":"sh/07atgnmp","slide":8,"name":"文本框 35","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[838.54,458.26,127.18,54.93]}
+{"kind":"textbox","id":"sh/l8ja9s3a","slide":8,"name":"文本框 15","text":"单击此处输入你的正文","textPreview":"单击此处输入你的正文","textChars":10,"textLines":1,"bbox":[911.03,463.48,292.6,40.04]}
+{"kind":"textbox","id":"sh/q18bad4n","slide":8,"name":"文本框 15","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[826.63,553.93,387.87,57.9]}
+{"kind":"textbox","id":"sh/3u18fepo","slide":8,"name":"文本框 39","text":"请在此处\n添加小标题\n文字是您思想的提炼","textPreview":"请在此处 | 添加小标题 | 文字是您思想的提炼","textChars":20,"textLines":3,"bbox":[70.68,330.01,320.04,106.53]}
+{"kind":"textbox","id":"sh/2ts769o3","slide":8,"name":"文本框 15","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[70.68,447.76,342.88,57.9]}
+{"kind":"textbox","id":"sh/pwjqho7u","slide":8,"name":"文本框 41","text":"添加\n关键词","textPreview":"添加 | 关键词","textChars":6,"textLines":2,"bbox":[75.13,181.2,221.6,113]}
+{"kind":"textbox","id":"sh/budwj61c","slide":8,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[1031.25,56.64,178.08,58.13]}
+{"kind":"textbox","id":"sh/kjmdwbit","slide":8,"name":"文本框 20","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[1052.29,105.49,178.08,16.16]}
+{"kind":"slide","id":"sl/udsvah03","slide":9,"title":"ADD YOUR TITLE HERE","textShapes":14}
+{"kind":"textbox","id":"sh/nex4jq5k","slide":9,"name":"矩形 3","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[70.67,125.99,193.25,19.39]}
+{"kind":"textbox","id":"sh/mdonql4z","slide":9,"name":"文本框 4","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[70.67,70.32,338.51,51.67]}
+{"kind":"textbox","id":"sh/wba1cjqp","slide":9,"name":"文本框 5_1","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[580.05,238.93,626.84,80.53]}
+{"kind":"textbox","id":"sh/va103ep4","slide":9,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。\n\n单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。\n","textPreview":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。 |  | 单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。 |","textChars":99,"textLines":4,"bbox":[580.05,336.05,626.84,168.16]}
+{"kind":"textbox","id":"sh/u9sja98z","slide":9,"name":"文本框 55","text":"XX","textPreview":"XX","textChars":2,"textLines":1,"bbox":[658.4,514.86,114.31,86.74]}
+{"kind":"textbox","id":"sh/cf6h0fql","slide":9,"name":"文本框 28","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[652.65,600.8,129.81,29.08]}
+{"kind":"textbox","id":"sh/cr6xgv6l","slide":9,"name":"文本框 55","text":"XX","textPreview":"XX","textChars":2,"textLines":1,"bbox":[870.04,514.86,114.31,86.74]}
+{"kind":"textbox","id":"sh/qtkf21ob","slide":9,"name":"文本框 37","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[864.29,600.8,129.81,29.08]}
+{"kind":"textbox","id":"sh/kbep4b6l","slide":9,"name":"文本框 55","text":"XX","textPreview":"XX","textChars":2,"textLines":1,"bbox":[1081.69,514.86,114.31,86.74]}
+{"kind":"textbox","id":"sh/alw7yhoj","slide":9,"name":"文本框 84","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[1075.94,600.8,129.81,29.08]}
+{"kind":"textbox","id":"sh/dojmxs3q","slide":9,"name":"文本框 55","text":"XX","textPreview":"XX","textChars":2,"textLines":1,"bbox":[446.76,514.86,114.31,86.74]}
+{"kind":"textbox","id":"sh/rm14vilk","slide":9,"name":"文本框 92","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[441.01,600.8,129.81,29.08]}
+{"kind":"textbox","id":"sh/e9w36ds3","slide":9,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[1031.25,56.64,178.08,58.13]}
+{"kind":"textbox","id":"sh/fa54zi9o","slide":9,"name":"文本框 20","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[1052.29,105.49,178.08,16.16]}
+{"kind":"slide","id":"sl/m90b6t0r","slide":10,"title":"ADD YOUR TITLE HERE","textShapes":13}
+{"kind":"textbox","id":"sh/zelojyl8","slide":10,"name":"矩形 3","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[70.67,125.99,193.25,19.39]}
+{"kind":"textbox","id":"sh/ydcnatkn","slide":10,"name":"文本框 4","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[70.67,70.32,338.51,51.67]}
+{"kind":"textbox","id":"sh/fapcz6ls","slide":10,"name":"文本框 5_1","text":"单击此处输入你的正文，文字是您思想的提炼。","textPreview":"单击此处输入你的正文，文字是您思想的提炼。","textChars":21,"textLines":1,"bbox":[69.33,546.73,534.29,34.47]}
+{"kind":"textbox","id":"sh/p0ru503u","slide":10,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。","textChars":48,"textLines":1,"bbox":[70.67,592.4,533.95,56.81]}
+{"kind":"textbox","id":"sh/ru18r2to","slide":10,"name":"文本框 30","text":"关键词","textPreview":"关键词","textChars":3,"textLines":1,"bbox":[69.35,291.07,125.33,21.05]}
+{"kind":"textbox","id":"sh/lwbih8bu","slide":10,"name":"文本框 85","text":"关键词","textPreview":"关键词","textChars":3,"textLines":1,"bbox":[273.81,291.07,125.33,21.05]}
+{"kind":"textbox","id":"sh/1w7yl4rq","slide":10,"name":"文本框 90","text":"关键词","textPreview":"关键词","textChars":3,"textLines":1,"bbox":[478.26,291.07,125.33,21.05]}
+{"kind":"textbox","id":"sh/nip43qx0","slide":10,"name":"文本框 104","text":"关键词","textPreview":"关键词","textChars":3,"textLines":1,"bbox":[69.35,461.97,125.33,21.05]}
+{"kind":"textbox","id":"sh/je9ovuh8","slide":10,"name":"文本框 111","text":"关键词","textPreview":"关键词","textChars":3,"textLines":1,"bbox":[273.81,461.97,125.33,21.05]}
+{"kind":"textbox","id":"sh/s32psji5","slide":10,"name":"文本框 114","text":"关键词","textPreview":"关键词","textChars":3,"textLines":1,"bbox":[478.26,461.97,125.33,21.05]}
+{"kind":"textbox","id":"sh/9876pkz6","slide":10,"name":"文本框 95","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[842.23,236.6,190.93,29.08]}
+{"kind":"textbox","id":"sh/gfixszex","slide":10,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[1031.25,56.64,178.08,58.13]}
+{"kind":"textbox","id":"sh/hgrel4fi","slide":10,"name":"文本框 20","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[1052.29,105.49,178.08,16.16]}
+{"kind":"slide","id":"sl/jetc3ut0","slide":11,"title":"ADD YOUR TITLE HERE","textShapes":11}
+{"kind":"textbox","id":"sh/n69grmpw","slide":11,"name":"矩形 3","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[70.67,125.99,193.25,19.39]}
+{"kind":"textbox","id":"sh/250zy18b","slide":11,"name":"文本框 4","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[70.67,70.32,338.51,51.67]}
+{"kind":"textbox","id":"sh/65wzelo7","slide":11,"name":"文本框 22","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[445.14,329.11,224.92,29.08]}
+{"kind":"textbox","id":"sh/l43ilgn2","slide":11,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼。","textPreview":"单击此处输入你的正文，文字是您思想的提炼。","textChars":21,"textLines":1,"bbox":[445.14,389.81,224.92,56.43]}
+{"kind":"textbox","id":"sh/4zyhofml","slide":11,"name":"文本框 28","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[714.78,329.11,224.92,29.08]}
+{"kind":"textbox","id":"sh/m58fih43","slide":11,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼。","textPreview":"单击此处输入你的正文，文字是您思想的提炼。","textChars":21,"textLines":1,"bbox":[714.78,389.81,224.92,56.43]}
+{"kind":"textbox","id":"sh/o7axk7m9","slide":11,"name":"文本框 31","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[984.41,329.11,224.92,29.08]}
+{"kind":"textbox","id":"sh/98jedc3u","slide":11,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼。","textPreview":"单击此处输入你的正文，文字是您思想的提炼。","textChars":21,"textLines":1,"bbox":[984.41,389.81,224.92,56.43]}
+{"kind":"textbox","id":"sh/jylwj6lw","slide":11,"name":"文本框 5_1","text":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":34,"textLines":1,"bbox":[445.14,189,764.19,80.53]}
+{"kind":"textbox","id":"sh/ydcfq1kb","slide":11,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[1031.25,56.64,178.08,58.13]}
+{"kind":"textbox","id":"sh/3qhsfypc","slide":11,"name":"文本框 20","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[1052.29,105.49,178.08,16.16]}
+{"kind":"slide","id":"sl/8f2psfyx","slide":12,"title":"ADD YOUR TITLE HERE","textShapes":9}
+{"kind":"textbox","id":"sh/ra943il8","slide":12,"name":"矩形 3","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[70.67,125.99,193.25,19.39]}
+{"kind":"textbox","id":"sh/q903ad4n","slide":12,"name":"文本框 4","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[70.67,70.32,338.51,51.67]}
+{"kind":"textbox","id":"sh/7u94zmhs","slide":12,"name":"文本框 25","text":"单击此处输入你的文本，文字是您思想的提炼，请尽量言简意赅的阐述观点。\n\n单击此处输入你的文本，文字是您思想的提炼，请尽量言简意赅的阐述观点。\n\n单击此处输入你的文本，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的文本，文字是您思想的提炼，请尽量言简意赅的阐述观点。 |  | 单击此处输入你的文本，文字是您思想的提炼，请尽量言简意赅的阐述观点。 |  | 单击此处输入你的文本，文字是您思想的提炼，请尽量言简意赅的阐述观点。","textChars":106,"textLines":5,"bbox":[124.37,327.98,1057.1,172.66]}
+{"kind":"textbox","id":"sh/wnetkjat","slide":12,"name":"文本框 31","text":"小标题","textPreview":"小标题","textChars":3,"textLines":1,"bbox":[142.38,239.38,132.65,24.1]}
+{"kind":"textbox","id":"sh/7epczitg","slide":12,"name":"文本框 38","text":"小标题","textPreview":"小标题","textChars":3,"textLines":1,"bbox":[441.91,239.38,132.65,24.1]}
+{"kind":"textbox","id":"sh/vuds7exo","slide":12,"name":"文本框 87","text":"小标题","textPreview":"小标题","textChars":3,"textLines":1,"bbox":[741.43,239.38,132.65,24.1]}
+{"kind":"textbox","id":"sh/hsva94ve","slide":12,"name":"文本框 96","text":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。","textChars":48,"textLines":1,"bbox":[556.57,558.07,652.76,56.43]}
+{"kind":"textbox","id":"sh/nilsnetc","slide":12,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[1031.25,56.64,178.08,58.13]}
+{"kind":"textbox","id":"sh/ojutgjah","slide":12,"name":"文本框 20","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[1052.29,105.49,178.08,16.16]}
+{"kind":"slide","id":"sl/hgzapcr6","slide":13,"title":"ADD YOUR TITLE HERE","textShapes":9}
+{"kind":"textbox","id":"sh/o3i5w3ad","slide":13,"name":"矩形 3","text":"ADD YOUR TITLE HERE","textPreview":"ADD YOUR TITLE HERE","textChars":19,"textLines":1,"bbox":[70.67,125.99,193.25,19.39]}
+{"kind":"textbox","id":"sh/p4r6p8by","slide":13,"name":"文本框 4","text":"输入标题","textPreview":"输入标题","textChars":4,"textLines":1,"bbox":[70.67,70.32,338.51,51.67]}
+{"kind":"textbox","id":"sh/8vahgzu5","slide":13,"name":"文本框 27","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[498.92,585.04,140.68,29.08]}
+{"kind":"textbox","id":"sh/4re1o3ed","slide":13,"name":"文本框 5_1","text":"单击此处输入你的正文，文字是您思想的提炼。","textPreview":"单击此处输入你的正文，文字是您思想的提炼。","textChars":21,"textLines":1,"bbox":[477.98,221.48,648.04,34.47]}
+{"kind":"textbox","id":"sh/re5kjydo","slide":13,"name":"文本框 33","text":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。","textPreview":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点。","textChars":48,"textLines":1,"bbox":[477.98,269.85,720.57,56.92]}
+{"kind":"textbox","id":"sh/lgzm94n2","slide":13,"name":"文本框 107","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[768.22,585.04,140.68,29.08]}
+{"kind":"textbox","id":"sh/xof2l0jq","slide":13,"name":"文本框 112","text":"添加小标题","textPreview":"添加小标题","textChars":5,"textLines":1,"bbox":[1037.52,585.04,140.68,29.08]}
+{"kind":"textbox","id":"sh/7mdg3als","slide":13,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[1031.25,56.64,178.08,58.13]}
+{"kind":"textbox","id":"sh/jqlkfyds","slide":13,"name":"文本框 20","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[1052.29,105.49,178.08,16.16]}
+{"kind":"slide","id":"sl/6lsnupw7","slide":14,"title":"谢谢聆听","textShapes":8}
+{"kind":"textbox","id":"sh/a1wze9g7","slide":14,"name":"文本框 6","text":"谢谢聆听","textPreview":"谢谢聆听","textChars":4,"textLines":1,"bbox":[132.71,245.88,430.83,129.25]}
+{"kind":"textbox","id":"sh/kre1k3y9","slide":14,"name":"文本框 14","text":"感谢您的观看","textPreview":"感谢您的观看","textChars":6,"textLines":1,"bbox":[132.71,371.57,423.77,38.6]}
+{"kind":"textbox","id":"sh/ls7idofu","slide":14,"name":"文本框 15","text":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果","textPreview":"单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果","textChars":34,"textLines":1,"bbox":[132.71,420.89,333.29,48.37]}
+{"kind":"textbox","id":"sh/y5wjitgj","slide":14,"name":"文本框 20","text":"2024","textPreview":"2024","textChars":4,"textLines":1,"bbox":[360.11,607.78,178.08,58.16]}
+{"kind":"textbox","id":"sh/z650byxo","slide":14,"name":"文本框 21","text":"汇报人：XXX","textPreview":"汇报人：XXX","textChars":7,"textLines":1,"bbox":[136.86,503.17,178.08,25.85]}
+{"kind":"textbox","id":"sh/z29oz6do","slide":14,"name":"文本框 188","text":"BUPTBUPTBUPT","textPreview":"BUPTBUPTBUPT","textChars":12,"textLines":1,"bbox":[879.68,339.8,704,40.4]}
+{"kind":"textbox","id":"sh/idgvmx8r","slide":14,"name":"文本框 13","text":"Beijing University of Posts and Telecommunications","textPreview":"Beijing University of Posts and Telecommunications","textChars":50,"textLines":1,"bbox":[129.8,189.4,510.2,33.89]}
+{"kind":"textbox","id":"sh/grmxwvqt","slide":14,"name":"文本框 7","text":"BUPT","textPreview":"BUPT","textChars":4,"textLines":1,"bbox":[-95.65,350.76,293.18,29.08]}

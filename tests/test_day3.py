@@ -42,6 +42,9 @@ from app.db.models import (
     CurriculumSourceModel,
     CurriculumSourceAgentPermissionModel,
     DraftProposalModel,
+    KnowledgeEntityModel,
+    KnowledgeEntitySourceModel,
+    KnowledgeRelationModel,
     MessageModel,
     RagRecordModel,
     SessionFileModel,
@@ -58,13 +61,14 @@ from app.services.curriculum_knowledge_service import (
 )
 from app.services.curriculum_vector_service import CurriculumVectorHit
 from app.services.curriculum_permission_service import CurriculumPermissionService
+from app.services.graph_rag_service import GraphRagService
+from app.services.knowledge_graph_service import KnowledgeGraphService
 from app.services.prompt_service import PromptService
 from app.services.session_file_service import SessionFileService
 from app.workflow.flows import get_flow
 
 
 EXPECTED_EXPERT_IDS = [
-    "insect_agent",
     "nature_agent",
     "mathematics_teacher_agent",
     "safety_agent",
@@ -1877,6 +1881,558 @@ class AgentArchitectureApiTests(unittest.TestCase):
         finally:
             if session_id:
                 self.delete_session(session_id)
+
+    def test_knowledge_graph_candidates_neighbors_and_graph_rag_chat(self):
+        session_id, _ = self.create_session(topic="校园月季昆虫观察")
+        try:
+            with SessionLocal() as db:
+                service = KnowledgeGraphService(db)
+                service.load_seed_graph()
+                service.import_graph_json(
+                    {
+                        "entities": [
+                            {
+                                "id": "plant_pine",
+                                "name": "松树",
+                                "entity_type": "plant",
+                                "aliases": [],
+                                "description": "与昆虫 Agent 默认图谱无关的测试植物。",
+                                "source": "test",
+                            },
+                            {
+                                "id": "concept_photosynthesis",
+                                "name": "光合作用",
+                                "entity_type": "concept",
+                                "aliases": [],
+                                "description": "植物合成有机物的过程。",
+                                "source": "test",
+                            },
+                        ],
+                        "relations": [
+                            {
+                                "id": "rel_pine_photosynthesis",
+                                "subject_entity_id": "plant_pine",
+                                "predicate": "performs",
+                                "object_entity_id": "concept_photosynthesis",
+                                "description": "松树可进行光合作用。",
+                                "evidence_source": "test",
+                                "confidence": "high",
+                            }
+                        ],
+                    }
+                )
+                db.commit()
+
+            candidate_response = self.client.post(
+                "/api/knowledge/graph/candidates",
+                json={
+                    "session_id": session_id,
+                    "message": "月季旁边为什么经常看到蚜虫和七星瓢虫？",
+                    "expert_id": "insect_agent",
+                },
+            )
+            self.assertEqual(candidate_response.status_code, 200)
+            candidate_data = candidate_response.json()["data"]
+            entity_names = {item["name"] for item in candidate_data["entities"]}
+            self.assertTrue({"月季", "蚜虫", "七星瓢虫"}.issubset(entity_names))
+            self.assertTrue(candidate_data["recommended_path_ids"])
+
+            relation_ids = {
+                relation["id"]
+                for relation in candidate_data["relations"]
+                if relation["predicate"] in {"feeds_on", "predator_of"}
+            }
+            self.assertTrue(relation_ids)
+            aphid_id = next(
+                item["id"] for item in candidate_data["entities"] if item["name"] == "蚜虫"
+            )
+            neighbor_response = self.client.get(
+                f"/api/knowledge/graph/entities/{aphid_id}/neighbors?hops=1"
+            )
+            self.assertEqual(neighbor_response.status_code, 200)
+            neighbor_data = neighbor_response.json()["data"]
+            self.assertLessEqual(len(neighbor_data["entities"]), 20)
+            self.assertLessEqual(len(neighbor_data["relations"]), 40)
+
+            chat_response = self.client.post(
+                f"/api/sessions/{session_id}/chat",
+                json={
+                    "type": "chat",
+                    "message": "月季旁边为什么经常看到蚜虫和七星瓢虫？",
+                    "expert_id": "insect_agent",
+                    "graph_selection": {
+                        "entity_ids": [aphid_id],
+                        "relation_ids": list(relation_ids),
+                        "path_ids": candidate_data["recommended_path_ids"],
+                    },
+                },
+            )
+            self.assertEqual(chat_response.status_code, 200)
+            events = parse_sse(chat_response.text)
+            self.assertFalse([event for event in events if event[0] == "warning"])
+
+            with SessionLocal() as db:
+                record = (
+                    db.query(RagRecordModel)
+                    .filter(RagRecordModel.session_id == session_id)
+                    .order_by(RagRecordModel.created_at.desc())
+                    .first()
+                )
+                self.assertIsNotNone(record)
+                source = json.loads(record.source_json)
+                graph = source.get("graph") or {}
+                self.assertEqual(graph["selected_entity_ids"], [aphid_id])
+                self.assertIn("蚜虫", "\n".join(graph["rag_node_queries"]))
+                self.assertTrue(graph["paths"])
+        finally:
+            self.delete_session(session_id)
+
+    def test_knowledge_entity_rag_sources_are_persisted(self):
+        with SessionLocal() as db:
+            entity = KnowledgeEntityModel(
+                id="entity_rag",
+                name="节点",
+                entity_type="concept",
+                aliases_json="[]",
+                description="",
+                source="test",
+                created_at="now",
+                updated_at="now",
+            )
+            source = CurriculumSourceModel(
+                source="node-rag.txt",
+                updated_at="now",
+            )
+            db.add_all([entity, source])
+            db.flush()
+            db.add(
+                KnowledgeEntitySourceModel(
+                    entity_id=entity.id,
+                    source=source.source,
+                    created_at="now",
+                )
+            )
+            db.commit()
+            rows = (
+                db.query(KnowledgeEntitySourceModel)
+                .filter(KnowledgeEntitySourceModel.entity_id == entity.id)
+                .all()
+            )
+            self.assertEqual([row.source for row in rows], ["node-rag.txt"])
+
+    def test_graph_import_rejects_unknown_rag_source(self):
+        with SessionLocal() as db:
+            service = KnowledgeGraphService(db)
+            with self.assertRaises(ValueError):
+                service.import_graph_json(
+                    {
+                        "entities": [
+                            {
+                                "id": "entity_missing_source",
+                                "name": "节点",
+                                "entity_type": "concept",
+                                "rag_sources": ["missing.txt"],
+                            }
+                        ]
+                    }
+                )
+
+    def test_graph_import_rejects_malformed_entities_and_relations(self):
+        with SessionLocal() as db:
+            service = KnowledgeGraphService(db)
+            with self.assertRaises(ValueError):
+                service.import_graph_json(
+                    {"entities": [{"id": "malformed", "name": "", "entity_type": "concept"}]}
+                )
+            with self.assertRaises(ValueError):
+                service.import_graph_json(
+                    {
+                        "entities": [
+                            {
+                                "id": "valid_entity",
+                                "name": "节点",
+                                "entity_type": "concept",
+                            }
+                        ],
+                        "relations": [
+                            {
+                                "id": "bad_relation",
+                                "subject_entity_id": "valid_entity",
+                                "predicate": "关联",
+                                "object_entity_id": "missing_entity",
+                            }
+                        ],
+                    }
+                )
+
+    def test_graph_entity_serialization_includes_rag_sources(self):
+        with SessionLocal() as db:
+            db.add(
+                CurriculumSourceModel(
+                    source="serialized-rag.txt",
+                    updated_at="now",
+                )
+            )
+            db.commit()
+            service = KnowledgeGraphService(db)
+            service.import_graph_json(
+                {
+                    "entities": [
+                        {
+                            "id": "entity_serialized",
+                            "name": "节点",
+                            "entity_type": "concept",
+                            "rag_sources": ["serialized-rag.txt"],
+                        }
+                    ]
+                }
+            )
+            db.commit()
+            entity = db.get(KnowledgeEntityModel, "entity_serialized")
+            self.assertEqual(
+                service.serialize_entity(entity)["rag_sources"],
+                ["serialized-rag.txt"],
+            )
+
+    def test_graph_import_without_rag_sources_preserves_existing_binding(self):
+        with SessionLocal() as db:
+            db.add(CurriculumSourceModel(source="preserved-rag.txt", updated_at="now"))
+            db.flush()
+            service = KnowledgeGraphService(db)
+            service.import_graph_json(
+                {
+                    "entities": [
+                        {
+                            "id": "entity_preserved",
+                            "name": "节点",
+                            "entity_type": "concept",
+                            "rag_sources": ["preserved-rag.txt"],
+                        }
+                    ]
+                }
+            )
+            db.commit()
+            service.import_graph_json(
+                {
+                    "entities": [
+                        {
+                            "id": "entity_preserved",
+                            "name": "更新后的节点",
+                            "entity_type": "concept",
+                        }
+                    ]
+                }
+            )
+            db.commit()
+            entity = db.get(KnowledgeEntityModel, "entity_preserved")
+            self.assertEqual(
+                service.serialize_entity(entity)["rag_sources"],
+                ["preserved-rag.txt"],
+            )
+
+    def test_graph_rag_uses_node_sources_intersected_with_expert_permissions(self):
+        with SessionLocal() as db:
+            entity = KnowledgeEntityModel(
+                id="entity_source_resolution",
+                name="节点",
+                entity_type="concept",
+                aliases_json="[]",
+                description="",
+                source="test",
+                created_at="now",
+                updated_at="now",
+            )
+            for source_name in ["allowed.txt", "other.txt", "fallback.txt"]:
+                db.add(CurriculumSourceModel(source=source_name, updated_at="now"))
+            db.add(entity)
+            db.flush()
+            db.add_all(
+                [
+                    KnowledgeEntitySourceModel(
+                        entity_id=entity.id,
+                        source="allowed.txt",
+                        created_at="now",
+                    ),
+                    KnowledgeEntitySourceModel(
+                        entity_id=entity.id,
+                        source="other.txt",
+                        created_at="now",
+                    ),
+                ]
+            )
+            db.commit()
+            service = GraphRagService(db)
+            resolved = service.resolve_sources(
+                selected_entity_ids=[entity.id],
+                allowed_sources=["allowed.txt", "fallback.txt"],
+            )
+            self.assertEqual(resolved["effective_sources"], ["allowed.txt"])
+            self.assertEqual(resolved["source_resolution"], "node_configured")
+
+            db.query(KnowledgeEntitySourceModel).delete(synchronize_session=False)
+            db.commit()
+            resolved = service.resolve_sources(
+                selected_entity_ids=[entity.id],
+                allowed_sources=["allowed.txt", "fallback.txt"],
+            )
+            self.assertEqual(resolved["effective_sources"], ["allowed.txt", "fallback.txt"])
+            self.assertEqual(resolved["source_resolution"], "expert_fallback")
+
+            db.add(
+                KnowledgeEntitySourceModel(
+                    entity_id=entity.id,
+                    source="other.txt",
+                    created_at="now",
+                )
+            )
+            db.commit()
+            resolved = service.resolve_sources(
+                selected_entity_ids=[entity.id],
+                allowed_sources=["allowed.txt", "fallback.txt"],
+            )
+            self.assertEqual(resolved["effective_sources"], [])
+            self.assertEqual(resolved["source_resolution"], "configured_but_not_allowed")
+
+    def test_graph_selection_uses_only_manually_selected_nodes(self):
+        with SessionLocal() as db:
+            timestamp = "now"
+            for entity_id, name in [("entity_a", "节点 A"), ("entity_b", "节点 B"), ("entity_c", "节点 C")]:
+                db.add(
+                    KnowledgeEntityModel(
+                        id=entity_id,
+                        name=name,
+                        entity_type="concept",
+                        aliases_json="[]",
+                        description="",
+                        source="test",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    )
+                )
+            db.flush()
+            db.add_all(
+                [
+                    KnowledgeRelationModel(
+                        id="rel_a_b",
+                        subject_entity_id="entity_a",
+                        predicate="关联",
+                        object_entity_id="entity_b",
+                        description="",
+                        evidence_source="test",
+                        confidence="high",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    ),
+                    KnowledgeRelationModel(
+                        id="rel_b_c",
+                        subject_entity_id="entity_b",
+                        predicate="关联",
+                        object_entity_id="entity_c",
+                        description="",
+                        evidence_source="test",
+                        confidence="high",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    ),
+                ]
+            )
+            db.commit()
+            service = KnowledgeGraphService(db)
+            selected = service.selected_graph_payload(
+                selected_path_ids=[],
+                selected_relation_ids=[],
+                selected_entity_ids=["entity_a", "entity_b"],
+            )
+            self.assertEqual(
+                {row["id"] for row in selected["entities"]},
+                {"entity_a", "entity_b"},
+            )
+            self.assertEqual(
+                [row["id"] for row in selected["relations"]],
+                ["rel_a_b"],
+            )
+            self.assertTrue(
+                service.validate_selection(
+                    message="节点 A 和节点 B",
+                    selected_path_ids=[],
+                    selected_relation_ids=[],
+                    selected_entity_ids=["entity_a", "entity_b"],
+                ).valid
+            )
+
+    def test_graph_selection_supports_arbitrary_node_subgraphs(self):
+        with SessionLocal() as db:
+            timestamp = "now"
+            for entity_id in ["chain_a", "chain_b", "chain_c"]:
+                db.add(
+                    KnowledgeEntityModel(
+                        id=entity_id,
+                        name=entity_id,
+                        entity_type="concept",
+                        aliases_json="[]",
+                        description="",
+                        source="test",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    )
+                )
+            db.flush()
+            db.add_all(
+                [
+                    KnowledgeRelationModel(
+                        id="chain_rel_a_b",
+                        subject_entity_id="chain_a",
+                        predicate="连接",
+                        object_entity_id="chain_b",
+                        description="",
+                        evidence_source="test",
+                        confidence="high",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    ),
+                    KnowledgeRelationModel(
+                        id="chain_rel_b_c",
+                        subject_entity_id="chain_b",
+                        predicate="连接",
+                        object_entity_id="chain_c",
+                        description="",
+                        evidence_source="test",
+                        confidence="high",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    ),
+                ]
+            )
+            db.commit()
+            service = KnowledgeGraphService(db)
+            self.assertTrue(
+                service.validate_selection(
+                    message="",
+                    selected_path_ids=[],
+                    selected_relation_ids=[],
+                    selected_entity_ids=["chain_a", "chain_c"],
+                ).valid
+            )
+            selected = service.selected_graph_payload(
+                selected_path_ids=[],
+                selected_relation_ids=[],
+                selected_entity_ids=["chain_a", "chain_b", "chain_c"],
+            )
+            self.assertEqual(
+                [row["id"] for row in selected["relations"]],
+                ["chain_rel_a_b", "chain_rel_b_c"],
+            )
+
+    def test_graph_rag_respects_global_disable_switch(self):
+        with SessionLocal() as db:
+            entity = KnowledgeEntityModel(
+                id="entity_disabled_graph_rag",
+                name="节点",
+                entity_type="concept",
+                aliases_json="[]",
+                description="",
+                source="test",
+                created_at="now",
+                updated_at="now",
+            )
+            db.add(entity)
+            db.commit()
+            service = GraphRagService(db)
+            with patch.object(service.settings, "curriculum_rag_enabled", False):
+                context, source = service.retrieve_for_selection(
+                    message="节点背景",
+                    selected_entity_ids=[entity.id],
+                    allowed_sources=["source.txt"],
+                )
+            self.assertEqual(context, "")
+            self.assertEqual(source["mode"], "disabled")
+
+    def test_graph_rag_retrieval_errors_degrade_without_raising(self):
+        with SessionLocal() as db:
+            entity = KnowledgeEntityModel(
+                id="entity_error_graph_rag",
+                name="异常节点",
+                entity_type="concept",
+                aliases_json="[]",
+                description="",
+                source="test",
+                created_at="now",
+                updated_at="now",
+            )
+            db.add(entity)
+            db.commit()
+            service = GraphRagService(db)
+            with patch(
+                "app.services.graph_rag_service.CurriculumKnowledgeService.retrieve",
+                side_effect=RuntimeError("retrieval failed"),
+            ):
+                context, source = service.retrieve_for_selection(
+                    message="异常节点背景",
+                    selected_entity_ids=[entity.id],
+                    allowed_sources=["source.txt"],
+                )
+            self.assertEqual(context, "")
+            self.assertEqual(source["mode"], "local_bm25_error")
+            self.assertIn("retrieval failed", source["error"])
+
+    def test_knowledge_graph_empty_message_uses_selected_agent_defaults(self):
+        session_id, _ = self.create_session(topic="光的折射")
+        try:
+            with SessionLocal() as db:
+                service = KnowledgeGraphService(db)
+                service.load_seed_graph()
+                service.import_graph_json(
+                    {
+                        "entities": [
+                            {
+                                "id": "plant_pine",
+                                "name": "松树",
+                                "entity_type": "plant",
+                                "aliases": [],
+                                "description": "与昆虫 Agent 默认图谱无关的测试植物。",
+                                "source": "test",
+                            },
+                            {
+                                "id": "concept_photosynthesis",
+                                "name": "光合作用",
+                                "entity_type": "concept",
+                                "aliases": [],
+                                "description": "植物合成有机物的过程。",
+                                "source": "test",
+                            },
+                        ],
+                        "relations": [
+                            {
+                                "id": "rel_pine_photosynthesis",
+                                "subject_entity_id": "plant_pine",
+                                "predicate": "performs",
+                                "object_entity_id": "concept_photosynthesis",
+                                "description": "松树可进行光合作用。",
+                                "evidence_source": "test",
+                                "confidence": "high",
+                            }
+                        ],
+                    }
+                )
+                db.commit()
+
+            response = self.client.post(
+                "/api/knowledge/graph/candidates",
+                json={
+                    "session_id": session_id,
+                    "message": "",
+                    "expert_id": "insect_agent",
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            data = response.json()["data"]
+            names = {entity["name"] for entity in data["entities"]}
+            self.assertIn("蚜虫", names)
+            self.assertIn("七星瓢虫", names)
+            self.assertNotIn("松树", names)
+            self.assertNotEqual(data["recommended_path_ids"], [])
+        finally:
+            self.delete_session(session_id)
 
 
 if __name__ == "__main__":

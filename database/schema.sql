@@ -117,6 +117,69 @@ CREATE TABLE IF NOT EXISTS curriculum_source_agent_permissions (
         FOREIGN KEY (source) REFERENCES curriculum_sources (source) ON DELETE CASCADE
 );
 
+-- Knowledge graph nodes and their optional RAG knowledge-base bindings.
+CREATE TABLE IF NOT EXISTS knowledge_entities (
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    entity_type  TEXT NOT NULL,
+    aliases_json TEXT NOT NULL DEFAULT '[]',
+    description  TEXT NOT NULL DEFAULT '',
+    source       TEXT NOT NULL DEFAULT '',
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_entity_sources (
+    entity_id  TEXT NOT NULL,
+    source     TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (entity_id, source),
+    CONSTRAINT fk_knowledge_entity_sources_entity
+        FOREIGN KEY (entity_id) REFERENCES knowledge_entities (id) ON DELETE CASCADE,
+    CONSTRAINT fk_knowledge_entity_sources_source
+        FOREIGN KEY (source) REFERENCES curriculum_sources (source) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ix_knowledge_entity_sources_source
+    ON knowledge_entity_sources (source);
+
+CREATE TABLE IF NOT EXISTS knowledge_relations (
+    id                 TEXT PRIMARY KEY,
+    subject_entity_id  TEXT NOT NULL,
+    predicate          TEXT NOT NULL,
+    object_entity_id   TEXT NOT NULL,
+    description        TEXT NOT NULL DEFAULT '',
+    evidence_source    TEXT NOT NULL DEFAULT '',
+    confidence         TEXT NOT NULL DEFAULT 'medium',
+    created_at         TEXT NOT NULL,
+    updated_at         TEXT NOT NULL,
+    CONSTRAINT fk_knowledge_relations_subject
+        FOREIGN KEY (subject_entity_id) REFERENCES knowledge_entities (id) ON DELETE CASCADE,
+    CONSTRAINT fk_knowledge_relations_object
+        FOREIGN KEY (object_entity_id) REFERENCES knowledge_entities (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ix_knowledge_relations_subject_entity_id
+    ON knowledge_relations (subject_entity_id);
+CREATE INDEX IF NOT EXISTS ix_knowledge_relations_object_entity_id
+    ON knowledge_relations (object_entity_id);
+CREATE INDEX IF NOT EXISTS ix_knowledge_relations_predicate
+    ON knowledge_relations (predicate);
+
+CREATE TABLE IF NOT EXISTS knowledge_entity_mentions (
+    entity_id  TEXT NOT NULL,
+    chunk_id   INTEGER NOT NULL,
+    source     TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (entity_id, chunk_id),
+    CONSTRAINT fk_knowledge_mentions_entity
+        FOREIGN KEY (entity_id) REFERENCES knowledge_entities (id) ON DELETE CASCADE,
+    CONSTRAINT fk_knowledge_mentions_chunk
+        FOREIGN KEY (chunk_id) REFERENCES curriculum_chunks (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ix_knowledge_mentions_source
+    ON knowledge_entity_mentions (source);
+
 -- One rollback unit per chat round. Message IDs are application-managed
 -- references because rollback currently deletes messages before this row.
 CREATE TABLE IF NOT EXISTS chat_turns (
