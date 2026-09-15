@@ -4,7 +4,7 @@
       <p class="eyebrow">AI 教师探究式教学指导平台</p>
       <h1>{{ accountType === "admin" ? (mode === "login" ? "管理员登录" : "注册管理员") : (mode === "login" ? "登录工作台" : "创建账号") }}</h1>
       <p class="auth-subtitle">
-        {{ accountType === "admin" ? "管理员可维护全局课标知识库。" : (mode === "login" ? "登录后查看和管理自己的教案会话。" : "注册后即可开始创建属于自己的教案会话。") }}
+        {{ accountType === "admin" ? "管理员可维护全局知识库与生态关系图谱。" : (mode === "login" ? "登录后查看和管理自己的教案会话。" : "注册后即可开始创建属于自己的教案会话。") }}
       </p>
 
       <div class="auth-account-tabs" role="tablist" aria-label="登录身份">

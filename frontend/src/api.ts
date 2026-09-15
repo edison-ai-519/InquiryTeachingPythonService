@@ -7,6 +7,16 @@ import type {
   DraftSelection,
   ExpertAgentItem,
   FlowInfo,
+  GraphSelectionPayload,
+  KnowledgeEntity,
+  KnowledgeEntityInput,
+  KnowledgeEvidence,
+  KnowledgeCategory,
+  KnowledgeGraphPayload,
+  KnowledgeRelation,
+  KnowledgeRelationInput,
+  KnowledgeSourceChunk,
+  KnowledgeSourceDetail,
   MessageItem,
   SessionDetail,
   SessionFileItem,
@@ -240,6 +250,7 @@ export type StreamChatPayload = {
   expert_id?: string;
   draft_request_kind?: "generate" | "edit";
   selection?: DraftSelection | null;
+  graph_selection?: GraphSelectionPayload | null;
 };
 
 export async function streamChat(
@@ -306,14 +317,112 @@ export async function streamChat(
   }
 }
 
-export async function getCurriculumFiles(): Promise<CurriculumFileItem[]> {
-  const payload = await readJson<ApiEnvelope<CurriculumFileItem[]>>(`${API_BASE}/api/curriculum/files`);
+export async function getCurriculumFiles(category?: KnowledgeCategory): Promise<CurriculumFileItem[]> {
+  const suffix = category ? `?category=${encodeURIComponent(category)}` : "";
+  const payload = await readJson<ApiEnvelope<CurriculumFileItem[]>>(`${API_BASE}/api/curriculum/files${suffix}`);
   return payload.data || [];
 }
 
-export async function uploadCurriculumFile(file: File): Promise<CurriculumFileItem> {
+export async function getKnowledgeSources(category?: KnowledgeCategory): Promise<CurriculumFileItem[]> {
+  const suffix = category ? `?category=${encodeURIComponent(category)}` : "";
+  const payload = await readJson<ApiEnvelope<CurriculumFileItem[]>>(`${API_BASE}/api/knowledge/sources${suffix}`);
+  return payload.data || [];
+}
+
+export async function getKnowledgeSource(sourceId: string): Promise<KnowledgeSourceDetail> {
+  const payload = await readJson<ApiEnvelope<KnowledgeSourceDetail>>(
+    `${API_BASE}/api/knowledge/sources/${encodeURIComponent(sourceId)}`,
+  );
+  return payload.data;
+}
+
+export async function getKnowledgeSourceChunks(sourceId: string): Promise<KnowledgeSourceChunk[]> {
+  const payload = await readJson<ApiEnvelope<KnowledgeSourceChunk[]>>(
+    `${API_BASE}/api/knowledge/sources/${encodeURIComponent(sourceId)}/chunks`,
+  );
+  return payload.data || [];
+}
+
+export async function uploadKnowledgeSource(
+  file: File,
+  category: KnowledgeCategory = "curriculum",
+  metadata: Record<string, unknown> = {},
+): Promise<CurriculumFileItem> {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("category", category);
+  formData.append("metadata_json", JSON.stringify(metadata));
+  const payload = await readJson<ApiEnvelope<CurriculumFileItem>>(`${API_BASE}/api/knowledge/sources`, {
+    method: "POST",
+    body: formData,
+  });
+  return payload.data;
+}
+
+export async function updateKnowledgeSource(
+  sourceId: string,
+  metadata: Record<string, unknown>,
+  file?: File,
+): Promise<CurriculumFileItem> {
+  const formData = new FormData();
+  formData.append("metadata_json", JSON.stringify(metadata));
+  if (file) formData.append("file", file);
+  const payload = await readJson<ApiEnvelope<CurriculumFileItem>>(
+    `${API_BASE}/api/knowledge/sources/${encodeURIComponent(sourceId)}`,
+    { method: "PATCH", body: formData },
+  );
+  return payload.data;
+}
+
+export async function reviewKnowledgeSource(
+  sourceId: string,
+  action: "submit" | "return" | "publish" | "archive",
+  note = "",
+): Promise<CurriculumFileItem> {
+  const payload = await readJson<ApiEnvelope<CurriculumFileItem>>(
+    `${API_BASE}/api/knowledge/sources/${encodeURIComponent(sourceId)}/review`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, note }),
+    },
+  );
+  return payload.data;
+}
+
+export async function deleteKnowledgeSource(sourceId: string): Promise<void> {
+  await readJson<ApiEnvelope<null>>(
+    `${API_BASE}/api/knowledge/sources/${encodeURIComponent(sourceId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function downloadKnowledgeBundle(category?: KnowledgeCategory): Promise<Blob> {
+  const suffix = category ? `?category=${encodeURIComponent(category)}` : "";
+  const response = await fetch(`${API_BASE}/api/knowledge/sources/export${suffix}`, {
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.blob();
+}
+
+export async function importKnowledgeBundle(file: File): Promise<{ source_count: number; chunk_count: number }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const payload = await readJson<ApiEnvelope<{ source_count: number; chunk_count: number }>>(
+    `${API_BASE}/api/knowledge/sources/import`,
+    { method: "POST", body: formData },
+  );
+  return payload.data;
+}
+
+export async function uploadCurriculumFile(
+  file: File,
+  category: KnowledgeCategory = "curriculum",
+): Promise<CurriculumFileItem> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("category", category);
   const payload = await readJson<ApiEnvelope<CurriculumFileItem>>(`${API_BASE}/api/curriculum/files`, {
     method: "POST",
     body: formData,
@@ -362,8 +471,11 @@ export async function getCurriculumRetrievals(limit = 20): Promise<CurriculumRet
   return payload.data || [];
 }
 
-export async function downloadCurriculumBundle(): Promise<Blob> {
-  const response = await fetch(`${API_BASE}/api/curriculum/export`, {
+export async function downloadCurriculumBundle(
+  category?: KnowledgeCategory,
+): Promise<Blob> {
+  const suffix = category ? `?category=${encodeURIComponent(category)}` : "";
+  const response = await fetch(`${API_BASE}/api/curriculum/export${suffix}`, {
     credentials: "include",
   });
   if (!response.ok) {
@@ -388,6 +500,130 @@ export async function cancelChat(sessionId: string, requestId: string): Promise<
     { method: "POST" },
   );
   return Boolean(payload.data?.cancelled);
+}
+
+export async function getKnowledgeGraphCandidates(
+  sessionId: string,
+  message: string,
+  expertId?: string,
+): Promise<KnowledgeGraphPayload> {
+  const payload = await readJson<ApiEnvelope<KnowledgeGraphPayload>>(`${API_BASE}/api/knowledge/graph/candidates`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session_id: sessionId,
+      message,
+      expert_id: expertId || undefined,
+    }),
+  });
+  return payload.data;
+}
+
+export async function getKnowledgeGraphAdmin(): Promise<KnowledgeGraphPayload> {
+  const payload = await readJson<ApiEnvelope<KnowledgeGraphPayload>>(`${API_BASE}/api/knowledge/graph`);
+  return payload.data;
+}
+
+export async function updateKnowledgeGraphEntityRagSources(entityId: string, sources: string[]): Promise<string[]> {
+  const payload = await readJson<ApiEnvelope<{ entity_id: string; sources: string[] }>>(
+    `${API_BASE}/api/knowledge/graph/entities/${encodeURIComponent(entityId)}/rag-sources`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sources }),
+    },
+  );
+  return payload.data.sources;
+}
+
+export async function createKnowledgeGraphEntity(input: KnowledgeEntityInput): Promise<KnowledgeEntity> {
+  const payload = await readJson<ApiEnvelope<KnowledgeEntity>>(`${API_BASE}/api/knowledge/graph/entities`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return payload.data;
+}
+
+export async function updateKnowledgeGraphEntity(
+  entityId: string,
+  input: KnowledgeEntityInput,
+): Promise<KnowledgeEntity> {
+  const payload = await readJson<ApiEnvelope<KnowledgeEntity>>(
+    `${API_BASE}/api/knowledge/graph/entities/${encodeURIComponent(entityId)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+  return payload.data;
+}
+
+export async function deleteKnowledgeGraphEntity(entityId: string): Promise<void> {
+  await readJson<ApiEnvelope<null>>(
+    `${API_BASE}/api/knowledge/graph/entities/${encodeURIComponent(entityId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function createKnowledgeGraphRelation(input: KnowledgeRelationInput): Promise<KnowledgeRelation> {
+  const payload = await readJson<ApiEnvelope<KnowledgeRelation>>(`${API_BASE}/api/knowledge/graph/relations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return payload.data;
+}
+
+export async function updateKnowledgeGraphRelation(
+  relationId: string,
+  input: KnowledgeRelationInput,
+): Promise<KnowledgeRelation> {
+  const payload = await readJson<ApiEnvelope<KnowledgeRelation>>(
+    `${API_BASE}/api/knowledge/graph/relations/${encodeURIComponent(relationId)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+  return payload.data;
+}
+
+export async function deleteKnowledgeGraphRelation(relationId: string): Promise<void> {
+  await readJson<ApiEnvelope<null>>(
+    `${API_BASE}/api/knowledge/graph/relations/${encodeURIComponent(relationId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function getKnowledgeEvidenceChunks(
+  relationId = "",
+  source = "",
+): Promise<KnowledgeEvidence[]> {
+  const params = new URLSearchParams();
+  if (relationId) params.set("relation_id", relationId);
+  if (source) params.set("source", source);
+  const payload = await readJson<ApiEnvelope<KnowledgeEvidence[]>>(
+    `${API_BASE}/api/knowledge/graph/evidence-chunks?${params.toString()}`,
+  );
+  return payload.data || [];
+}
+
+export async function rebuildKnowledgeMentions(): Promise<number> {
+  const payload = await readJson<ApiEnvelope<{ mention_count: number }>>(
+    `${API_BASE}/api/knowledge/graph/rebuild-mentions`,
+    { method: "POST" },
+  );
+  return payload.data.mention_count;
+}
+
+export async function getKnowledgeGraphNeighbors(entityId: string, hops = 1): Promise<KnowledgeGraphPayload> {
+  const payload = await readJson<ApiEnvelope<KnowledgeGraphPayload>>(
+    `${API_BASE}/api/knowledge/graph/entities/${encodeURIComponent(entityId)}/neighbors?hops=${hops}`,
+  );
+  return payload.data;
 }
 
 export function buildFileDownloadUrl(sessionName: string): string {

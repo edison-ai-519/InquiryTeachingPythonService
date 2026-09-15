@@ -35,6 +35,55 @@ class DraftSelection(BaseModel):
     block_id: str | None = None
 
 
+class GraphSelection(BaseModel):
+    entity_ids: list[str] = Field(default_factory=list)
+    relation_ids: list[str] = Field(default_factory=list)
+    path_ids: list[str] = Field(default_factory=list)
+
+
+class KnowledgeEntityRagSourcesRequest(BaseModel):
+    sources: list[str] = Field(default_factory=list)
+
+
+KnowledgeEntityType = Literal[
+    "insect",
+    "plant",
+    "habitat",
+    "season",
+    "concept",
+]
+
+KnowledgePredicate = Literal[
+    "feeds_on",
+    "visits",
+    "pollinates",
+    "lives_on",
+    "lays_eggs_on",
+    "damages",
+    "predator_of",
+    "parasite_of",
+    "attracted_by",
+    "associated_with",
+]
+
+
+class KnowledgeEntityUpsertRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    entity_type: KnowledgeEntityType
+    aliases: list[str] = Field(default_factory=list, max_length=32)
+    description: str = Field(default="", max_length=2000)
+    source: str = Field(default="manual", max_length=255)
+
+
+class KnowledgeRelationUpsertRequest(BaseModel):
+    subject_entity_id: str = Field(min_length=1, max_length=128)
+    predicate: KnowledgePredicate
+    object_entity_id: str = Field(min_length=1, max_length=128)
+    description: str = Field(default="", max_length=2000)
+    confidence: Literal["high", "medium", "low"] = "medium"
+    evidence_chunk_ids: list[int] = Field(default_factory=list, max_length=20)
+
+
 class ChatRequest(BaseModel):
     type: Literal["chat", "sys_action"] = "chat"
     request_id: str | None = Field(default=None, min_length=1, max_length=128)
@@ -44,6 +93,7 @@ class ChatRequest(BaseModel):
     expert_id: str | None = Field(default=None, min_length=1, max_length=128)
     draft_request_kind: Literal["generate", "edit"] | None = None
     selection: DraftSelection | None = None
+    graph_selection: GraphSelection | None = None
 
 
 class RollbackRequest(BaseModel):

@@ -24,6 +24,12 @@ class Settings:
     curriculum_dir: Path = Path(
         os.getenv("CURRICULUM_DIR", str(BASE_DIR / "data" / "curriculum"))
     ).resolve()
+    knowledge_source_dir: Path = Path(
+        os.getenv(
+            "KNOWLEDGE_SOURCE_DIR",
+            str(BASE_DIR / "data" / "knowledge_sources"),
+        )
+    ).resolve()
     curriculum_rag_enabled: bool = os.getenv(
         "CURRICULUM_RAG_ENABLED",
         "true",

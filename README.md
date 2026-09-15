@@ -86,6 +86,16 @@ POST /api/curriculum/vector/rebuild
 GET  /api/curriculum/retrievals
 GET  /api/curriculum/export
 POST /api/curriculum/import
+
+GET    /api/knowledge/sources
+GET    /api/knowledge/sources/{id}
+GET    /api/knowledge/sources/{id}/chunks
+POST   /api/knowledge/sources
+PATCH  /api/knowledge/sources/{id}
+POST   /api/knowledge/sources/{id}/review
+DELETE /api/knowledge/sources/{id}
+GET    /api/knowledge/sources/export
+POST   /api/knowledge/sources/import
 POST /api/sessions
 GET  /api/sessions/{session_id}
 GET  /api/sessions/{session_id}/messages
@@ -147,6 +157,18 @@ CURRICULUM_HYBRID_BM25_WEIGHT=0.35
 ```
 
 `app.db` 中的 `curriculum_chunks` 是课标正文事实来源，`data/curriculum_vector/` 仅保存可重建的 Chroma 向量索引。模型、索引、快照、`.venv` 和 `.env` 均不提交到 Git。Embedding 或 Chroma 不可用时会自动退回 BM25；仅当 `CURRICULUM_VECTOR_REQUIRED=true` 时才把向量失败视为必须处理的错误。
+
+## 北京乡村振兴四层知识库
+
+`rural_revitalization` 资料按基础法规、年度任务、乡村 CEO 与人才、基层合规四层管理。乡村资料上传后默认进入草稿，补齐来源、地域、效力、资料性质和主题等元数据，经提交审核和发布后才对普通用户可见。法规和任务文件按章、条、编号任务切片，条款内部可继续拆分，但不会跨条款拼接召回上下文。
+
+首批可导入包位于 `data/knowledge_seeds/rural_revitalization-v1.zip`，内含 `knowledge.json`、`review-manifest.json` 和 19 份官网原文或官网正文快照。重新核验并构建种子包可运行：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_rural_revitalization_seed.py
+```
+
+新接口导出 v4、导入兼容 v1—v4；旧 `/api/curriculum` 接口继续导出 v3，并保留旧客户端响应结构。
 
 ## 快速请求示例
 

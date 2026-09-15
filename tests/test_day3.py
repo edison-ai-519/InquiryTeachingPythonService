@@ -9,7 +9,7 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 
@@ -17,6 +17,7 @@ TEST_DIR = Path(tempfile.mkdtemp(prefix="inquiry-agent-architecture-"))
 TEST_DB = TEST_DIR / "agents.db"
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB.as_posix()}"
 os.environ["UPLOAD_DIR"] = str(TEST_DIR / "uploads")
+os.environ["KNOWLEDGE_SOURCE_DIR"] = str(TEST_DIR / "knowledge_sources")
 os.environ["LLM_API_KEY"] = ""
 os.environ["AGENT_CONFIG_PATH"] = "app/agents/config/agents.yaml"
 os.environ["CURRICULUM_VECTOR_ENABLED"] = "false"
@@ -42,6 +43,11 @@ from app.db.models import (
     CurriculumSourceModel,
     CurriculumSourceAgentPermissionModel,
     DraftProposalModel,
+    KnowledgeEntityModel,
+    KnowledgeEntityMentionModel,
+    KnowledgeEntitySourceModel,
+    KnowledgeRelationEvidenceModel,
+    KnowledgeRelationModel,
     MessageModel,
     RagRecordModel,
     SessionFileModel,
@@ -54,10 +60,14 @@ from app.services.context_service import ContextService
 from app.services.curriculum_knowledge_service import (
     CurriculumKnowledgeService,
     bm25_scores,
+    chunk_policy_text,
     detect_subjects,
+    policy_structural_units,
 )
 from app.services.curriculum_vector_service import CurriculumVectorHit
 from app.services.curriculum_permission_service import CurriculumPermissionService
+from app.services.graph_rag_service import GraphRagService
+from app.services.knowledge_graph_service import KnowledgeGraphService
 from app.services.prompt_service import PromptService
 from app.services.session_file_service import SessionFileService
 from app.workflow.flows import get_flow
@@ -372,6 +382,74 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     CurriculumPermissionService.allowed_expert_ids(db, physics_source),
                     [],
                 )
+        finally:
+            local_engine.dispose()
+
+    def test_v3_database_migrates_to_v4_idempotently(self):
+        database_path = TEST_DIR / f"v3-migration-{uuid.uuid4().hex}.db"
+        local_engine = create_engine(f"sqlite:///{database_path.as_posix()}")
+        try:
+            with local_engine.begin() as connection:
+                connection.execute(text("""
+                    CREATE TABLE curriculum_sources (
+                        source VARCHAR PRIMARY KEY,
+                        category VARCHAR NOT NULL DEFAULT 'curriculum',
+                        checksum VARCHAR NOT NULL DEFAULT '',
+                        chunk_count INTEGER NOT NULL DEFAULT 0,
+                        vector_chunk_count INTEGER NOT NULL DEFAULT 0,
+                        vector_status VARCHAR NOT NULL DEFAULT 'pending',
+                        embedding_model VARCHAR NOT NULL DEFAULT '',
+                        last_error TEXT NOT NULL DEFAULT '',
+                        updated_at VARCHAR NOT NULL
+                    )
+                """))
+                connection.execute(text("""
+                    CREATE TABLE curriculum_chunks (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source VARCHAR NOT NULL,
+                        source_index INTEGER NOT NULL,
+                        content TEXT NOT NULL,
+                        created_at VARCHAR NOT NULL,
+                        UNIQUE(source, source_index)
+                    )
+                """))
+                connection.execute(
+                    text("""
+                        INSERT INTO curriculum_sources
+                        (source, category, checksum, chunk_count, vector_chunk_count,
+                         vector_status, embedding_model, last_error, updated_at)
+                        VALUES (:source, 'rural_revitalization', 'sum', 1, 0,
+                                'disabled', '', '', '2026-01-01')
+                    """),
+                    {"source": "legacy-rural.txt"},
+                )
+                connection.execute(
+                    text("""
+                        INSERT INTO curriculum_chunks
+                        (source, source_index, content, created_at)
+                        VALUES ('legacy-rural.txt', 0, '第一条 旧资料', '2026-01-01')
+                    """),
+                )
+            with patch("app.db.migrations.engine", local_engine):
+                ensure_schema_compatibility()
+                ensure_schema_compatibility()
+            migrated = inspect(local_engine)
+            source_columns = {column["name"] for column in migrated.get_columns("curriculum_sources")}
+            chunk_columns = {column["name"] for column in migrated.get_columns("curriculum_chunks")}
+            self.assertTrue({"id", "policy_layer", "validity_status", "review_status"} <= source_columns)
+            self.assertTrue({"heading_path", "article_number", "chunk_type"} <= chunk_columns)
+            self.assertIn("knowledge_source_topics", migrated.get_table_names())
+            self.assertIn("knowledge_source_review_events", migrated.get_table_names())
+            with local_engine.connect() as connection:
+                row = connection.execute(
+                    text("SELECT id, review_status, policy_layer FROM curriculum_sources WHERE source='legacy-rural.txt'")
+                ).mappings().one()
+            self.assertEqual(
+                row["id"],
+                uuid.uuid5(uuid.NAMESPACE_URL, "knowledge-source:legacy-rural.txt").hex,
+            )
+            self.assertEqual(row["review_status"], "draft")
+            self.assertIsNone(row["policy_layer"])
         finally:
             local_engine.dispose()
 
@@ -1142,6 +1220,8 @@ class AgentArchitectureApiTests(unittest.TestCase):
 
     def test_curriculum_admin_export_import_and_permissions(self):
         source = f"export_{uuid.uuid4().hex}.md"
+        ecology_source = f"export_ecology_{uuid.uuid4().hex}.md"
+        rural_source = f"export_rural_{uuid.uuid4().hex}.md"
         admin_client = TestClient(app)
         ordinary_client = TestClient(app)
         try:
@@ -1160,6 +1240,35 @@ class AgentArchitectureApiTests(unittest.TestCase):
             )
             self.assertEqual(uploaded.status_code, 200, uploaded.text)
             self.assertEqual(uploaded.json()["data"]["allowed_expert_ids"], [])
+            ecology_uploaded = admin_client.post(
+                "/api/curriculum/files",
+                data={"category": "ecology"},
+                files={
+                    "file": (
+                        ecology_source,
+                        "月季吸引访花昆虫。".encode("utf-8"),
+                        "text/markdown",
+                    )
+                },
+            )
+            self.assertEqual(ecology_uploaded.status_code, 200, ecology_uploaded.text)
+            self.assertEqual(ecology_uploaded.json()["data"]["category"], "ecology")
+            rural_uploaded = admin_client.post(
+                "/api/curriculum/files",
+                data={"category": "rural_revitalization"},
+                files={
+                    "file": (
+                        rural_source,
+                        "乡村产业发展需要人才与生态资源协同。".encode("utf-8"),
+                        "text/markdown",
+                    )
+                },
+            )
+            self.assertEqual(rural_uploaded.status_code, 200, rural_uploaded.text)
+            self.assertEqual(
+                rural_uploaded.json()["data"]["category"],
+                "rural_revitalization",
+            )
             permission_response = admin_client.put(
                 "/api/curriculum/files/permissions",
                 json={
@@ -1194,7 +1303,12 @@ class AgentArchitectureApiTests(unittest.TestCase):
             self.assertEqual(exported.status_code, 200)
             with zipfile.ZipFile(BytesIO(exported.content)) as archive:
                 payload = json.loads(archive.read("curriculum.json").decode("utf-8"))
-            self.assertEqual(payload["version"], 2)
+            self.assertEqual(payload["version"], 3)
+            self.assertEqual(payload["category_filter"], "all")
+            self.assertIn(
+                rural_source,
+                [item["source"] for item in payload["sources"]],
+            )
             exported_source = next(item for item in payload["sources"] if item["source"] == source)
             self.assertEqual(
                 exported_source["allowed_expert_ids"],
@@ -1204,6 +1318,50 @@ class AgentArchitectureApiTests(unittest.TestCase):
             self.assertIn("初中实验应记录证据", serialized)
             self.assertNotIn("password_hash", serialized)
             self.assertNotIn("auth_sessions", serialized)
+
+            ecology_export = admin_client.get(
+                "/api/curriculum/export", params={"category": "ecology"}
+            )
+            self.assertEqual(ecology_export.status_code, 200, ecology_export.text)
+            self.assertIn(
+                "ecology-knowledge-base.zip",
+                ecology_export.headers.get("content-disposition", ""),
+            )
+            with zipfile.ZipFile(BytesIO(ecology_export.content)) as archive:
+                ecology_payload = json.loads(
+                    archive.read("curriculum.json").decode("utf-8")
+                )
+            self.assertEqual(ecology_payload["category_filter"], "ecology")
+            self.assertEqual(
+                [item["source"] for item in ecology_payload["sources"]],
+                [ecology_source],
+            )
+            rural_export = admin_client.get(
+                "/api/curriculum/export",
+                params={"category": "rural_revitalization"},
+            )
+            self.assertEqual(rural_export.status_code, 200, rural_export.text)
+            self.assertIn(
+                "rural_revitalization-knowledge-base.zip",
+                rural_export.headers.get("content-disposition", ""),
+            )
+            with zipfile.ZipFile(BytesIO(rural_export.content)) as archive:
+                rural_payload = json.loads(
+                    archive.read("curriculum.json").decode("utf-8")
+                )
+            self.assertEqual(
+                rural_payload["category_filter"], "rural_revitalization"
+            )
+            self.assertEqual(
+                [item["source"] for item in rural_payload["sources"]],
+                [rural_source],
+            )
+            self.assertEqual(
+                admin_client.get(
+                    "/api/curriculum/export", params={"category": "unknown"}
+                ).status_code,
+                400,
+            )
 
             self.assertEqual(
                 admin_client.delete("/api/curriculum/files", params={"source": source}).status_code,
@@ -1230,6 +1388,8 @@ class AgentArchitectureApiTests(unittest.TestCase):
         finally:
             with SessionLocal() as db:
                 CurriculumKnowledgeService(db).delete_source(source)
+                CurriculumKnowledgeService(db).delete_source(ecology_source)
+                CurriculumKnowledgeService(db).delete_source(rural_source)
                 db.commit()
             admin_client.close()
             ordinary_client.close()
@@ -1877,6 +2037,947 @@ class AgentArchitectureApiTests(unittest.TestCase):
         finally:
             if session_id:
                 self.delete_session(session_id)
+
+    def test_knowledge_graph_candidates_neighbors_and_graph_rag_chat(self):
+        session_id, _ = self.create_session(topic="校园月季昆虫观察")
+        try:
+            with SessionLocal() as db:
+                service = KnowledgeGraphService(db)
+                service.load_seed_graph()
+                service.import_graph_json(
+                    {
+                        "entities": [
+                            {
+                                "id": "plant_pine",
+                                "name": "松树",
+                                "entity_type": "plant",
+                                "aliases": [],
+                                "description": "与昆虫 Agent 默认图谱无关的测试植物。",
+                                "source": "test",
+                            },
+                            {
+                                "id": "concept_photosynthesis",
+                                "name": "光合作用",
+                                "entity_type": "concept",
+                                "aliases": [],
+                                "description": "植物合成有机物的过程。",
+                                "source": "test",
+                            },
+                        ],
+                        "relations": [
+                            {
+                                "id": "rel_pine_photosynthesis",
+                                "subject_entity_id": "plant_pine",
+                                "predicate": "performs",
+                                "object_entity_id": "concept_photosynthesis",
+                                "description": "松树可进行光合作用。",
+                                "evidence_source": "test",
+                                "confidence": "high",
+                            }
+                        ],
+                    }
+                )
+                db.commit()
+
+            candidate_response = self.client.post(
+                "/api/knowledge/graph/candidates",
+                json={
+                    "session_id": session_id,
+                    "message": "月季旁边为什么经常看到蚜虫和七星瓢虫？",
+                    "expert_id": "insect_agent",
+                },
+            )
+            self.assertEqual(candidate_response.status_code, 200)
+            candidate_data = candidate_response.json()["data"]
+            entity_names = {item["name"] for item in candidate_data["entities"]}
+            self.assertTrue({"月季", "蚜虫", "七星瓢虫"}.issubset(entity_names))
+            self.assertTrue(candidate_data["recommended_path_ids"])
+
+            relation_ids = {
+                relation["id"]
+                for relation in candidate_data["relations"]
+                if relation["predicate"] in {"feeds_on", "predator_of"}
+            }
+            self.assertTrue(relation_ids)
+            aphid_id = next(
+                item["id"] for item in candidate_data["entities"] if item["name"] == "蚜虫"
+            )
+            neighbor_response = self.client.get(
+                f"/api/knowledge/graph/entities/{aphid_id}/neighbors?hops=1"
+            )
+            self.assertEqual(neighbor_response.status_code, 200)
+            neighbor_data = neighbor_response.json()["data"]
+            self.assertLessEqual(len(neighbor_data["entities"]), 20)
+            self.assertLessEqual(len(neighbor_data["relations"]), 40)
+
+            chat_response = self.client.post(
+                f"/api/sessions/{session_id}/chat",
+                json={
+                    "type": "chat",
+                    "message": "月季旁边为什么经常看到蚜虫和七星瓢虫？",
+                    "expert_id": "insect_agent",
+                    "graph_selection": {
+                        "entity_ids": [aphid_id],
+                        "relation_ids": list(relation_ids),
+                        "path_ids": candidate_data["recommended_path_ids"],
+                    },
+                },
+            )
+            self.assertEqual(chat_response.status_code, 200)
+            events = parse_sse(chat_response.text)
+            self.assertFalse([event for event in events if event[0] == "warning"])
+
+            with SessionLocal() as db:
+                record = (
+                    db.query(RagRecordModel)
+                    .filter(RagRecordModel.session_id == session_id)
+                    .order_by(RagRecordModel.created_at.desc())
+                    .first()
+                )
+                self.assertIsNotNone(record)
+                source = json.loads(record.source_json)
+                graph = source.get("graph") or {}
+                self.assertEqual(graph["selected_entity_ids"], [aphid_id])
+                self.assertIn("蚜虫", "\n".join(graph["rag_node_queries"]))
+                self.assertTrue(graph["paths"])
+        finally:
+            self.delete_session(session_id)
+
+    def test_knowledge_entity_rag_sources_are_persisted(self):
+        with SessionLocal() as db:
+            entity = KnowledgeEntityModel(
+                id="entity_rag",
+                name="节点",
+                entity_type="concept",
+                aliases_json="[]",
+                description="",
+                source="test",
+                created_at="now",
+                updated_at="now",
+            )
+            source = CurriculumSourceModel(
+                source="node-rag.txt",
+                updated_at="now",
+            )
+            db.add_all([entity, source])
+            db.flush()
+            db.add(
+                KnowledgeEntitySourceModel(
+                    entity_id=entity.id,
+                    source=source.source,
+                    created_at="now",
+                )
+            )
+            db.commit()
+            rows = (
+                db.query(KnowledgeEntitySourceModel)
+                .filter(KnowledgeEntitySourceModel.entity_id == entity.id)
+                .all()
+            )
+            self.assertEqual([row.source for row in rows], ["node-rag.txt"])
+
+    def test_graph_import_rejects_unknown_rag_source(self):
+        with SessionLocal() as db:
+            service = KnowledgeGraphService(db)
+            with self.assertRaises(ValueError):
+                service.import_graph_json(
+                    {
+                        "entities": [
+                            {
+                                "id": "entity_missing_source",
+                                "name": "节点",
+                                "entity_type": "concept",
+                                "rag_sources": ["missing.txt"],
+                            }
+                        ]
+                    }
+                )
+
+    def test_graph_import_rejects_malformed_entities_and_relations(self):
+        with SessionLocal() as db:
+            service = KnowledgeGraphService(db)
+            with self.assertRaises(ValueError):
+                service.import_graph_json(
+                    {"entities": [{"id": "malformed", "name": "", "entity_type": "concept"}]}
+                )
+            with self.assertRaises(ValueError):
+                service.import_graph_json(
+                    {
+                        "entities": [
+                            {
+                                "id": "valid_entity",
+                                "name": "节点",
+                                "entity_type": "concept",
+                            }
+                        ],
+                        "relations": [
+                            {
+                                "id": "bad_relation",
+                                "subject_entity_id": "valid_entity",
+                                "predicate": "关联",
+                                "object_entity_id": "missing_entity",
+                            }
+                        ],
+                    }
+                )
+
+    def test_graph_entity_serialization_includes_rag_sources(self):
+        with SessionLocal() as db:
+            db.add(
+                CurriculumSourceModel(
+                    source="serialized-rag.txt",
+                    updated_at="now",
+                )
+            )
+            db.commit()
+            service = KnowledgeGraphService(db)
+            service.import_graph_json(
+                {
+                    "entities": [
+                        {
+                            "id": "entity_serialized",
+                            "name": "节点",
+                            "entity_type": "concept",
+                            "rag_sources": ["serialized-rag.txt"],
+                        }
+                    ]
+                }
+            )
+            db.commit()
+            entity = db.get(KnowledgeEntityModel, "entity_serialized")
+            self.assertEqual(
+                service.serialize_entity(entity)["rag_sources"],
+                ["serialized-rag.txt"],
+            )
+
+    def test_graph_import_without_rag_sources_preserves_existing_binding(self):
+        with SessionLocal() as db:
+            db.add(CurriculumSourceModel(source="preserved-rag.txt", updated_at="now"))
+            db.flush()
+            service = KnowledgeGraphService(db)
+            service.import_graph_json(
+                {
+                    "entities": [
+                        {
+                            "id": "entity_preserved",
+                            "name": "节点",
+                            "entity_type": "concept",
+                            "rag_sources": ["preserved-rag.txt"],
+                        }
+                    ]
+                }
+            )
+            db.commit()
+            service.import_graph_json(
+                {
+                    "entities": [
+                        {
+                            "id": "entity_preserved",
+                            "name": "更新后的节点",
+                            "entity_type": "concept",
+                        }
+                    ]
+                }
+            )
+            db.commit()
+            entity = db.get(KnowledgeEntityModel, "entity_preserved")
+            self.assertEqual(
+                service.serialize_entity(entity)["rag_sources"],
+                ["preserved-rag.txt"],
+            )
+
+    def test_graph_rag_uses_node_sources_intersected_with_expert_permissions(self):
+        with SessionLocal() as db:
+            entity = KnowledgeEntityModel(
+                id="entity_source_resolution",
+                name="节点",
+                entity_type="concept",
+                aliases_json="[]",
+                description="",
+                source="test",
+                created_at="now",
+                updated_at="now",
+            )
+            for source_name in ["allowed.txt", "other.txt", "fallback.txt"]:
+                db.add(CurriculumSourceModel(source=source_name, updated_at="now"))
+            db.add(entity)
+            db.flush()
+            db.add_all(
+                [
+                    KnowledgeEntitySourceModel(
+                        entity_id=entity.id,
+                        source="allowed.txt",
+                        created_at="now",
+                    ),
+                    KnowledgeEntitySourceModel(
+                        entity_id=entity.id,
+                        source="other.txt",
+                        created_at="now",
+                    ),
+                ]
+            )
+            db.commit()
+            service = GraphRagService(db)
+            resolved = service.resolve_sources(
+                selected_entity_ids=[entity.id],
+                allowed_sources=["allowed.txt", "fallback.txt"],
+            )
+            self.assertEqual(resolved["effective_sources"], ["allowed.txt"])
+            self.assertEqual(resolved["source_resolution"], "node_configured")
+
+            db.query(KnowledgeEntitySourceModel).delete(synchronize_session=False)
+            db.commit()
+            resolved = service.resolve_sources(
+                selected_entity_ids=[entity.id],
+                allowed_sources=["allowed.txt", "fallback.txt"],
+            )
+            self.assertEqual(resolved["effective_sources"], ["allowed.txt", "fallback.txt"])
+            self.assertEqual(resolved["source_resolution"], "expert_fallback")
+
+            db.add(
+                KnowledgeEntitySourceModel(
+                    entity_id=entity.id,
+                    source="other.txt",
+                    created_at="now",
+                )
+            )
+            db.commit()
+            resolved = service.resolve_sources(
+                selected_entity_ids=[entity.id],
+                allowed_sources=["allowed.txt", "fallback.txt"],
+            )
+            self.assertEqual(resolved["effective_sources"], [])
+            self.assertEqual(resolved["source_resolution"], "configured_but_not_allowed")
+
+    def test_graph_selection_uses_only_manually_selected_nodes(self):
+        with SessionLocal() as db:
+            timestamp = "now"
+            for entity_id, name in [("entity_a", "节点 A"), ("entity_b", "节点 B"), ("entity_c", "节点 C")]:
+                db.add(
+                    KnowledgeEntityModel(
+                        id=entity_id,
+                        name=name,
+                        entity_type="concept",
+                        aliases_json="[]",
+                        description="",
+                        source="test",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    )
+                )
+            db.flush()
+            db.add_all(
+                [
+                    KnowledgeRelationModel(
+                        id="rel_a_b",
+                        subject_entity_id="entity_a",
+                        predicate="关联",
+                        object_entity_id="entity_b",
+                        description="",
+                        evidence_source="test",
+                        confidence="high",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    ),
+                    KnowledgeRelationModel(
+                        id="rel_b_c",
+                        subject_entity_id="entity_b",
+                        predicate="关联",
+                        object_entity_id="entity_c",
+                        description="",
+                        evidence_source="test",
+                        confidence="high",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    ),
+                ]
+            )
+            db.commit()
+            service = KnowledgeGraphService(db)
+            selected = service.selected_graph_payload(
+                selected_path_ids=[],
+                selected_relation_ids=[],
+                selected_entity_ids=["entity_a", "entity_b"],
+            )
+            self.assertEqual(
+                {row["id"] for row in selected["entities"]},
+                {"entity_a", "entity_b"},
+            )
+            self.assertEqual(
+                [row["id"] for row in selected["relations"]],
+                [],
+            )
+            self.assertTrue(
+                service.validate_selection(
+                    message="节点 A 和节点 B",
+                    selected_path_ids=[],
+                    selected_relation_ids=[],
+                    selected_entity_ids=["entity_a", "entity_b"],
+                ).valid
+            )
+
+    def test_graph_selection_supports_arbitrary_node_subgraphs(self):
+        with SessionLocal() as db:
+            timestamp = "now"
+            for entity_id in ["chain_a", "chain_b", "chain_c"]:
+                db.add(
+                    KnowledgeEntityModel(
+                        id=entity_id,
+                        name=entity_id,
+                        entity_type="concept",
+                        aliases_json="[]",
+                        description="",
+                        source="test",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    )
+                )
+            db.flush()
+            db.add_all(
+                [
+                    KnowledgeRelationModel(
+                        id="chain_rel_a_b",
+                        subject_entity_id="chain_a",
+                        predicate="连接",
+                        object_entity_id="chain_b",
+                        description="",
+                        evidence_source="test",
+                        confidence="high",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    ),
+                    KnowledgeRelationModel(
+                        id="chain_rel_b_c",
+                        subject_entity_id="chain_b",
+                        predicate="连接",
+                        object_entity_id="chain_c",
+                        description="",
+                        evidence_source="test",
+                        confidence="high",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    ),
+                ]
+            )
+            db.commit()
+            service = KnowledgeGraphService(db)
+            self.assertTrue(
+                service.validate_selection(
+                    message="",
+                    selected_path_ids=[],
+                    selected_relation_ids=[],
+                    selected_entity_ids=["chain_a", "chain_c"],
+                ).valid
+            )
+            selected = service.selected_graph_payload(
+                selected_path_ids=[],
+                selected_relation_ids=["chain_rel_a_b", "chain_rel_b_c"],
+                selected_entity_ids=["chain_a", "chain_b", "chain_c"],
+            )
+            self.assertEqual(
+                [row["id"] for row in selected["relations"]],
+                ["chain_rel_a_b", "chain_rel_b_c"],
+            )
+
+    def test_ecology_alias_mentions_backfill_and_source_replacement_cleanup(self):
+        source = f"ecology_alias_{uuid.uuid4().hex}.md"
+        alias = f"试验腻虫{uuid.uuid4().hex[:6]}"
+        with SessionLocal() as db:
+            knowledge = CurriculumKnowledgeService(db)
+            knowledge.ingest_chunks(
+                source,
+                [f"观察记录：月季叶背发现{alias}。"],
+                category="ecology",
+            )
+            graph = KnowledgeGraphService(db)
+            entity = graph.create_entity(
+                name=f"测试蚜虫{uuid.uuid4().hex[:6]}",
+                entity_type="insect",
+                aliases=[alias],
+                description="别名回填测试节点",
+            )
+            db.commit()
+
+            state = db.get(CurriculumSourceModel, source)
+            self.assertEqual(state.category, "ecology")
+            mentions = (
+                db.query(KnowledgeEntityMentionModel)
+                .filter(KnowledgeEntityMentionModel.entity_id == entity["id"])
+                .all()
+            )
+            self.assertEqual(len(mentions), 1)
+            stale_chunk_id = mentions[0].chunk_id
+
+            knowledge.ingest_chunks(
+                source,
+                ["替换后的资料不再包含原实体。"],
+                category="ecology",
+            )
+            db.commit()
+            replacement = db.get(CurriculumChunkModel, stale_chunk_id)
+            if replacement is not None:
+                self.assertEqual(replacement.content, "替换后的资料不再包含原实体。")
+            self.assertEqual(
+                db.query(KnowledgeEntityMentionModel)
+                .filter(KnowledgeEntityMentionModel.entity_id == entity["id"])
+                .count(),
+                0,
+            )
+            knowledge.delete_source(source)
+            db.commit()
+
+    def test_insect_plant_insect_path_prefers_chunk_evidence(self):
+        suffix = uuid.uuid4().hex[:8]
+        source = f"ecology_path_{suffix}.md"
+        with SessionLocal() as db:
+            knowledge = CurriculumKnowledgeService(db)
+            knowledge.ingest_chunks(
+                source,
+                [f"昆虫甲{suffix}取食共享植物{suffix}；昆虫乙{suffix}访问共享植物{suffix}。"],
+                category="ecology",
+            )
+            chunk = (
+                db.query(CurriculumChunkModel)
+                .filter(CurriculumChunkModel.source == source)
+                .one()
+            )
+            graph = KnowledgeGraphService(db)
+            insect_a = graph.create_entity(
+                name=f"昆虫甲{suffix}", entity_type="insect", aliases=[]
+            )
+            plant = graph.create_entity(
+                name=f"共享植物{suffix}", entity_type="plant", aliases=[]
+            )
+            insect_b = graph.create_entity(
+                name=f"昆虫乙{suffix}", entity_type="insect", aliases=[]
+            )
+            relation_a = graph.create_relation(
+                subject_entity_id=insect_a["id"],
+                predicate="feeds_on",
+                object_entity_id=plant["id"],
+                confidence="high",
+                evidence_chunk_ids=[chunk.id],
+            )
+            relation_b = graph.create_relation(
+                subject_entity_id=insect_b["id"],
+                predicate="visits",
+                object_entity_id=plant["id"],
+                confidence="high",
+                evidence_chunk_ids=[chunk.id],
+            )
+            db.commit()
+
+            payload = graph.find_candidate_graph(message=insect_a["name"])
+            expected_relations = {relation_a["id"], relation_b["id"]}
+            bridge = next(
+                path
+                for path in payload["paths"]
+                if set(path["relation_ids"]) == expected_relations
+            )
+            self.assertEqual(
+                bridge["entity_ids"],
+                [insect_a["id"], plant["id"], insect_b["id"]],
+            )
+            self.assertEqual(bridge["evidence_status"], "verified")
+            self.assertIn("同一植物", bridge["reason"])
+            self.assertIn(bridge["id"], payload["recommended_path_ids"])
+
+            selected = graph.selected_graph_payload(
+                selected_path_ids=[bridge["id"]],
+                selected_relation_ids=bridge["relation_ids"],
+                selected_entity_ids=bridge["entity_ids"],
+            )
+            context = graph.format_selected_graph_context(selected)
+            self.assertIn("已关联证据", context)
+            self.assertIn(source, context)
+            self.assertIn("不代表两种昆虫之间存在直接作用", context)
+
+            knowledge.delete_source(source)
+            db.commit()
+            self.assertEqual(
+                db.query(KnowledgeRelationEvidenceModel)
+                .filter(KnowledgeRelationEvidenceModel.relation_id.in_(bridge["relation_ids"]))
+                .count(),
+                0,
+            )
+            self.assertEqual(
+                graph.serialize_relation(db.get(KnowledgeRelationModel, relation_a["id"]))[
+                    "evidence_status"
+                ],
+                "unverified",
+            )
+
+    def test_graph_rag_queries_linked_chunks_before_source_fallback(self):
+        suffix = uuid.uuid4().hex[:8]
+        source = f"linked_first_{suffix}.md"
+        with SessionLocal() as db:
+            knowledge = CurriculumKnowledgeService(db)
+            knowledge.ingest_chunks(source, [f"链路昆虫{suffix}生活在叶片上。"], category="ecology")
+            graph = KnowledgeGraphService(db)
+            entity = graph.create_entity(
+                name=f"链路昆虫{suffix}", entity_type="insect", aliases=[]
+            )
+            db.commit()
+            linked_ids = graph.linked_chunk_ids(
+                entity_ids=[entity["id"]], relation_ids=[], allowed_sources=[source]
+            )["linked_chunk_ids"]
+            self.assertTrue(linked_ids)
+
+            service = GraphRagService(db)
+            with patch(
+                "app.services.graph_rag_service.CurriculumKnowledgeService.retrieve",
+                return_value=[],
+            ) as retrieve:
+                _, metadata = service.retrieve_for_selection(
+                    message="它在哪里生活？",
+                    selected_entity_ids=[entity["id"]],
+                    allowed_sources=[source],
+                )
+            self.assertGreaterEqual(retrieve.call_count, 2)
+            self.assertEqual(retrieve.call_args_list[0].args[3], linked_ids)
+            self.assertIsNone(retrieve.call_args_list[1].args[3])
+            self.assertEqual(metadata["retrieval_strategy"], "knowledge_fallback")
+            knowledge.delete_source(source)
+            db.commit()
+
+    def test_chunk_scoped_retrieval_includes_adjacent_chunks(self):
+        suffix = uuid.uuid4().hex[:8]
+        source = f"adjacent_chunks_{suffix}.md"
+        with SessionLocal() as db:
+            knowledge = CurriculumKnowledgeService(db)
+            knowledge.ingest_chunks(
+                source,
+                [
+                    f"相邻证据关键词{suffix}",
+                    "实体命中的中心片段",
+                    "另一个相邻片段",
+                ],
+                category="ecology",
+            )
+            chunks = (
+                db.query(CurriculumChunkModel)
+                .filter(CurriculumChunkModel.source == source)
+                .order_by(CurriculumChunkModel.source_index.asc())
+                .all()
+            )
+            results = knowledge.retrieve(
+                f"相邻证据关键词{suffix}",
+                top_k=1,
+                allowed_sources=[source],
+                allowed_chunk_ids=[chunks[1].id],
+            )
+            self.assertEqual(len(results), 1)
+            self.assertIn(f"相邻证据关键词{suffix}", results[0].content)
+            knowledge.delete_source(source)
+            db.commit()
+
+    def test_graph_rag_respects_global_disable_switch(self):
+        with SessionLocal() as db:
+            entity = KnowledgeEntityModel(
+                id="entity_disabled_graph_rag",
+                name="节点",
+                entity_type="concept",
+                aliases_json="[]",
+                description="",
+                source="test",
+                created_at="now",
+                updated_at="now",
+            )
+            db.add(entity)
+            db.commit()
+            service = GraphRagService(db)
+            with patch.object(service.settings, "curriculum_rag_enabled", False):
+                context, source = service.retrieve_for_selection(
+                    message="节点背景",
+                    selected_entity_ids=[entity.id],
+                    allowed_sources=["source.txt"],
+                )
+            self.assertEqual(context, "")
+            self.assertEqual(source["mode"], "disabled")
+
+    def test_graph_rag_retrieval_errors_degrade_without_raising(self):
+        with SessionLocal() as db:
+            entity = KnowledgeEntityModel(
+                id="entity_error_graph_rag",
+                name="异常节点",
+                entity_type="concept",
+                aliases_json="[]",
+                description="",
+                source="test",
+                created_at="now",
+                updated_at="now",
+            )
+            db.add(entity)
+            db.commit()
+            service = GraphRagService(db)
+            with patch(
+                "app.services.graph_rag_service.CurriculumKnowledgeService.retrieve",
+                side_effect=RuntimeError("retrieval failed"),
+            ):
+                context, source = service.retrieve_for_selection(
+                    message="异常节点背景",
+                    selected_entity_ids=[entity.id],
+                    allowed_sources=["source.txt"],
+                )
+            self.assertEqual(context, "")
+            self.assertEqual(source["mode"], "local_bm25_error")
+            self.assertIn("retrieval failed", source["error"])
+
+    def test_knowledge_graph_empty_message_uses_selected_agent_defaults(self):
+        session_id, _ = self.create_session(topic="光的折射")
+        try:
+            with SessionLocal() as db:
+                service = KnowledgeGraphService(db)
+                service.load_seed_graph()
+                service.import_graph_json(
+                    {
+                        "entities": [
+                            {
+                                "id": "plant_pine",
+                                "name": "松树",
+                                "entity_type": "plant",
+                                "aliases": [],
+                                "description": "与昆虫 Agent 默认图谱无关的测试植物。",
+                                "source": "test",
+                            },
+                            {
+                                "id": "concept_photosynthesis",
+                                "name": "光合作用",
+                                "entity_type": "concept",
+                                "aliases": [],
+                                "description": "植物合成有机物的过程。",
+                                "source": "test",
+                            },
+                        ],
+                        "relations": [
+                            {
+                                "id": "rel_pine_photosynthesis",
+                                "subject_entity_id": "plant_pine",
+                                "predicate": "performs",
+                                "object_entity_id": "concept_photosynthesis",
+                                "description": "松树可进行光合作用。",
+                                "evidence_source": "test",
+                                "confidence": "high",
+                            }
+                        ],
+                    }
+                )
+                db.commit()
+
+            response = self.client.post(
+                "/api/knowledge/graph/candidates",
+                json={
+                    "session_id": session_id,
+                    "message": "",
+                    "expert_id": "insect_agent",
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            data = response.json()["data"]
+            names = {entity["name"] for entity in data["entities"]}
+            self.assertIn("蚜虫", names)
+            self.assertIn("七星瓢虫", names)
+            self.assertNotIn("松树", names)
+            self.assertNotEqual(data["recommended_path_ids"], [])
+        finally:
+            self.delete_session(session_id)
+
+    def test_rural_policy_parser_matches_existing_corpus_structure(self):
+        corpus_dir = Path(__file__).resolve().parents[1] / "docs" / "乡村振兴知识库"
+        regulation = corpus_dir / "北京市乡村振兴促进条例.docx"
+        action_plan = corpus_dir / "关于锚定农业农村现代化扎实做好2026年乡村全面振兴重点工作的实施方案.docx"
+
+        regulation_units = policy_structural_units(
+            CurriculumKnowledgeService.extract_text(regulation)
+        )
+        articles = [unit for unit in regulation_units if unit.chunk_type == "article"]
+        self.assertEqual(len(articles), 62)
+        self.assertEqual(len({unit.heading_path for unit in articles}), 9)
+        self.assertEqual(articles[0].article_number, "第一条")
+        self.assertEqual(articles[-1].article_number, "第六十二条")
+
+        action_units = policy_structural_units(
+            CurriculumKnowledgeService.extract_text(action_plan)
+        )
+        tasks = [unit for unit in action_units if unit.chunk_type == "item"]
+        self.assertEqual(len(tasks), 24)
+        self.assertEqual(len({unit.heading_path for unit in tasks}), 6)
+
+        long_policy = "第一章 总则\n第一条 " + "甲。" * 300 + "\n第二条 乙。"
+        chunks = chunk_policy_text(long_policy, size=128, overlap=20)
+        self.assertGreater(len(chunks), 2)
+        self.assertTrue(all(chunk.article_number in {"第一条", "第二条"} for chunk in chunks))
+        self.assertFalse(any("第二条" in chunk.content for chunk in chunks if chunk.article_number == "第一条"))
+
+    def test_knowledge_source_review_filters_and_v4_roundtrip(self):
+        admin_client = TestClient(app)
+        ordinary_client = TestClient(app)
+        password = "valid-password-123"
+        source_name = f"rural-policy-{uuid.uuid4().hex[:8]}.txt"
+        try:
+            self.assertEqual(
+                admin_client.post(
+                    "/api/auth/admin/register",
+                    json={"username": f"knowledge_admin_{uuid.uuid4().hex[:8]}", "password": password},
+                ).status_code,
+                200,
+            )
+            self.assertEqual(
+                ordinary_client.post(
+                    "/api/auth/register",
+                    json={"username": f"knowledge_user_{uuid.uuid4().hex[:8]}", "password": password},
+                ).status_code,
+                200,
+            )
+            metadata = {
+                "title": "北京市乡村测试条例",
+                "policy_layer": "foundation",
+                "document_type": "local_regulation",
+                "authority_scope": "beijing",
+                "region_code": "110000",
+                "issuing_authority": "北京市人民代表大会常务委员会",
+                "document_number": "测试〔2026〕1号",
+                "source_url": "https://www.beijing.gov.cn/test/rural-policy",
+                "publish_date": "2026-01-01",
+                "effective_date": "2026-02-01",
+                "validity_status": "current",
+                "last_verified_at": "2026-09-15",
+                "topics": ["organization_governance", "industry_development"],
+            }
+            uploaded = admin_client.post(
+                "/api/knowledge/sources",
+                files={"file": (source_name, "第一章 总则\n第一条 测试职责。\n第二条 测试程序。".encode(), "text/plain")},
+                data={"category": "rural_revitalization", "metadata_json": json.dumps(metadata, ensure_ascii=False)},
+            )
+            self.assertEqual(uploaded.status_code, 200, uploaded.text)
+            item = uploaded.json()["data"]
+            source_id = item["id"]
+            self.assertEqual(item["review_status"], "draft")
+            self.assertEqual(item["topics"], ["industry_development", "organization_governance"])
+            chunk_ids_before = [
+                chunk["id"]
+                for chunk in admin_client.get(
+                    f"/api/knowledge/sources/{source_id}/chunks"
+                ).json()["data"]
+            ]
+            metadata_only = admin_client.patch(
+                f"/api/knowledge/sources/{source_id}",
+                data={"metadata_json": json.dumps({"title": "北京市乡村测试条例（核对稿）"}, ensure_ascii=False)},
+            )
+            self.assertEqual(metadata_only.status_code, 200, metadata_only.text)
+            self.assertEqual(
+                chunk_ids_before,
+                [
+                    chunk["id"]
+                    for chunk in admin_client.get(
+                        f"/api/knowledge/sources/{source_id}/chunks"
+                    ).json()["data"]
+                ],
+            )
+
+            ordinary_list = ordinary_client.get(
+                "/api/knowledge/sources", params={"category": "rural_revitalization"}
+            )
+            self.assertFalse(any(row["id"] == source_id for row in ordinary_list.json()["data"]))
+            legacy_list = ordinary_client.get(
+                "/api/curriculum/files", params={"category": "rural_revitalization"}
+            )
+            self.assertFalse(any(row["source"] == source_name for row in legacy_list.json()["data"]))
+            self.assertEqual(
+                admin_client.post(f"/api/knowledge/sources/{source_id}/review", json={"action": "submit"}).status_code,
+                200,
+            )
+            published = admin_client.post(
+                f"/api/knowledge/sources/{source_id}/review", json={"action": "publish", "note": "结构抽查通过"}
+            )
+            self.assertEqual(published.status_code, 200, published.text)
+            self.assertEqual(published.json()["data"]["review_status"], "published")
+
+            filtered = ordinary_client.get(
+                "/api/knowledge/sources",
+                params={"policy_layer": "foundation", "topic": "organization_governance", "review_status": "draft"},
+            )
+            self.assertTrue(any(row["id"] == source_id for row in filtered.json()["data"]))
+            invalid_topic = ordinary_client.get(
+                "/api/knowledge/sources", params={"topic": "unknown_topic"}
+            )
+            self.assertEqual(invalid_topic.status_code, 400)
+            detail = admin_client.get(f"/api/knowledge/sources/{source_id}").json()["data"]
+            self.assertEqual([event["action"] for event in detail["review_events"]], ["submit", "publish"])
+            chunks = admin_client.get(f"/api/knowledge/sources/{source_id}/chunks").json()["data"]
+            self.assertEqual([chunk["article_number"] for chunk in chunks], ["第一条", "第二条"])
+
+            body_updated = admin_client.patch(
+                f"/api/knowledge/sources/{source_id}",
+                files={"file": (source_name, "第一章 总则\n第一条 更新后职责。\n第二条 更新后程序。".encode(), "text/plain")},
+                data={"metadata_json": "{}"},
+            )
+            self.assertEqual(body_updated.status_code, 200, body_updated.text)
+            self.assertEqual(body_updated.json()["data"]["review_status"], "draft")
+            updated_chunks = admin_client.get(
+                f"/api/knowledge/sources/{source_id}/chunks"
+            ).json()["data"]
+            self.assertTrue(all("测试职责" not in chunk["content"] for chunk in updated_chunks))
+            self.assertTrue(any("更新后职责" in chunk["content"] for chunk in updated_chunks))
+            updated_detail = admin_client.get(f"/api/knowledge/sources/{source_id}").json()["data"]
+            self.assertEqual(updated_detail["review_events"][-1]["action"], "content_update")
+            self.assertEqual(
+                admin_client.post(f"/api/knowledge/sources/{source_id}/review", json={"action": "submit"}).status_code,
+                200,
+            )
+            self.assertEqual(
+                admin_client.post(f"/api/knowledge/sources/{source_id}/review", json={"action": "publish"}).status_code,
+                200,
+            )
+
+            exported = admin_client.get(
+                "/api/knowledge/sources/export", params={"category": "rural_revitalization"}
+            )
+            self.assertEqual(exported.status_code, 200, exported.text)
+            with zipfile.ZipFile(BytesIO(exported.content)) as archive:
+                self.assertIn("knowledge.json", archive.namelist())
+                self.assertIn("review-manifest.json", archive.namelist())
+                payload = json.loads(archive.read("knowledge.json"))
+                exported_item = next(row for row in payload["sources"] if row["id"] == source_id)
+                self.assertEqual(exported_item["policy_layer"], "foundation")
+                self.assertEqual(len(exported_item["review_events"]), 5)
+
+            self.assertEqual(admin_client.delete(f"/api/knowledge/sources/{source_id}").status_code, 200)
+            bad_bundle = BytesIO()
+            with zipfile.ZipFile(BytesIO(exported.content)) as source_archive:
+                bad_payload = json.loads(source_archive.read("knowledge.json"))
+                bad_payload["sources"][0]["checksum"] = "invalid-checksum"
+                with zipfile.ZipFile(bad_bundle, "w", compression=zipfile.ZIP_DEFLATED) as target_archive:
+                    for name in source_archive.namelist():
+                        target_archive.writestr(
+                            name,
+                            json.dumps(bad_payload, ensure_ascii=False).encode("utf-8")
+                            if name == "knowledge.json"
+                            else source_archive.read(name),
+                        )
+            rejected = admin_client.post(
+                "/api/knowledge/sources/import",
+                files={"file": ("invalid-v4.zip", bad_bundle.getvalue(), "application/zip")},
+            )
+            self.assertEqual(rejected.status_code, 400, rejected.text)
+            self.assertEqual(admin_client.get(f"/api/knowledge/sources/{source_id}").status_code, 404)
+            imported = admin_client.post(
+                "/api/knowledge/sources/import",
+                files={"file": ("knowledge-v4.zip", exported.content, "application/zip")},
+            )
+            self.assertEqual(imported.status_code, 200, imported.text)
+            restored = admin_client.get(f"/api/knowledge/sources/{source_id}")
+            self.assertEqual(restored.status_code, 200, restored.text)
+            self.assertEqual(restored.json()["data"]["topics"], item["topics"])
+            self.assertEqual(len(restored.json()["data"]["review_events"]), 5)
+        finally:
+            with SessionLocal() as db:
+                row = db.get(CurriculumSourceModel, source_name)
+                if row:
+                    CurriculumKnowledgeService(db).delete_source(source_name)
+                    db.commit()
+            admin_client.close()
+            ordinary_client.close()
 
 
 if __name__ == "__main__":

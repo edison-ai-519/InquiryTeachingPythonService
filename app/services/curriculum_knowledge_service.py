@@ -4,6 +4,7 @@ import datetime as dt
 import hashlib
 import math
 import re
+import uuid
 from collections import Counter
 from dataclasses import dataclass
 from io import BytesIO
@@ -22,6 +23,11 @@ from app.services.curriculum_vector_service import (
 
 
 SUPPORTED_CURRICULUM_EXTENSIONS = {".md", ".txt", ".pdf", ".docx"}
+KNOWLEDGE_SOURCE_CATEGORIES = {
+    "curriculum",
+    "ecology",
+    "rural_revitalization",
+}
 TOKEN_STOPWORDS = {
     "的",
     "了",
@@ -92,6 +98,14 @@ class CurriculumSearchResult:
     retrieval_mode: str = "local_bm25"
 
 
+@dataclass(frozen=True)
+class StructuredKnowledgeChunk:
+    content: str
+    heading_path: str = ""
+    article_number: str = ""
+    chunk_type: str = "content"
+
+
 class CurriculumKnowledgeService:
     def __init__(
         self,
@@ -107,7 +121,13 @@ class CurriculumKnowledgeService:
             "vector_error": self.vector_store.error,
         }
 
-    def ingest_file(self, path: Path, *, source: str | None = None) -> int:
+    def ingest_file(
+        self,
+        path: Path,
+        *,
+        source: str | None = None,
+        category: str | None = None,
+    ) -> int:
         path = path.resolve()
         extension = path.suffix.lower()
         if extension not in SUPPORTED_CURRICULUM_EXTENSIONS:
@@ -117,14 +137,26 @@ class CurriculumKnowledgeService:
             raise CurriculumFileError(f"课标文件不存在：{path}")
 
         content = self.extract_text(path)
-        return self.ingest(source or path.name, content)
+        return self.ingest(source or path.name, content, category=category)
 
-    def ingest_bytes(self, filename: str, data: bytes) -> int:
+    def ingest_bytes(
+        self,
+        filename: str,
+        data: bytes,
+        *,
+        category: str | None = None,
+    ) -> int:
         source = self.safe_source_name(filename)
         content = self.extract_bytes(source, data)
-        return self.ingest(source, content)
+        return self.ingest(source, content, category=category)
 
-    def ingest(self, source: str, content: str) -> int:
+    def ingest(
+        self,
+        source: str,
+        content: str,
+        *,
+        category: str | None = None,
+    ) -> int:
         normalized_source = source.replace("\\", "/").strip()
         if not normalized_source:
             raise CurriculumFileError("课标来源名称不能为空")
@@ -133,30 +165,59 @@ class CurriculumKnowledgeService:
         if not normalized_content:
             raise CurriculumFileError("课标文件中未提取到可用文字；扫描版 PDF 暂不支持 OCR")
 
+        normalized_category = normalize_knowledge_category(category)
         overlap = min(
             self.settings.curriculum_chunk_overlap,
             self.settings.curriculum_chunk_size - 1,
         )
-        chunks = chunk_text(
-            normalized_content,
-            size=self.settings.curriculum_chunk_size,
-            overlap=overlap,
-        )
+        if normalized_category == "rural_revitalization":
+            chunks: list[str | StructuredKnowledgeChunk] = chunk_policy_text(
+                normalized_content,
+                size=self.settings.curriculum_chunk_size,
+                overlap=overlap,
+            )
+        else:
+            chunks = chunk_text(
+                normalized_content,
+                size=self.settings.curriculum_chunk_size,
+                overlap=overlap,
+            )
         if not chunks:
             raise CurriculumFileError("课标文件无法切分出有效内容")
 
-        return self.ingest_chunks(normalized_source, chunks)
+        return self.ingest_chunks(
+            normalized_source,
+            chunks,
+            category=normalized_category,
+        )
 
     def ingest_chunks(
         self,
         source: str,
-        chunks: list[str],
+        chunks: list[str | StructuredKnowledgeChunk],
         *,
         checksum: str | None = None,
+        category: str | None = None,
     ) -> int:
         normalized_source = normalize_source(source)
-        normalized_chunks = [normalize_text(chunk) for chunk in chunks]
-        normalized_chunks = [chunk for chunk in normalized_chunks if chunk]
+        normalized_category = normalize_knowledge_category(category)
+        normalized_chunks: list[StructuredKnowledgeChunk] = []
+        for chunk in chunks:
+            structured = (
+                chunk
+                if isinstance(chunk, StructuredKnowledgeChunk)
+                else StructuredKnowledgeChunk(content=str(chunk))
+            )
+            content = normalize_text(structured.content)
+            if content:
+                normalized_chunks.append(
+                    StructuredKnowledgeChunk(
+                        content=content,
+                        heading_path=normalize_text(structured.heading_path),
+                        article_number=structured.article_number.strip(),
+                        chunk_type=structured.chunk_type.strip() or "content",
+                    )
+                )
         if not normalized_chunks:
             raise CurriculumFileError("课标文件无法切分出有效内容")
 
@@ -173,7 +234,10 @@ class CurriculumKnowledgeService:
             CurriculumChunkModel(
                 source=normalized_source,
                 source_index=index,
-                content=chunk,
+                content=chunk.content,
+                heading_path=chunk.heading_path,
+                article_number=chunk.article_number,
+                chunk_type=chunk.chunk_type,
                 created_at=timestamp,
             )
             for index, chunk in enumerate(normalized_chunks)
@@ -199,10 +263,24 @@ class CurriculumKnowledgeService:
         if source_state is None:
             source_state = CurriculumSourceModel(
                 source=normalized_source,
+                id=new_source_id(),
+                category=normalized_category or "curriculum",
+                title=Path(normalized_source).stem,
+                review_status=(
+                    "draft"
+                    if normalized_category == "rural_revitalization"
+                    else "published"
+                ),
                 updated_at=timestamp,
             )
             self.db.add(source_state)
-        source_state.checksum = checksum or checksum_chunks(normalized_chunks)
+        elif normalized_category:
+            source_state.category = normalized_category
+        source_state.id = source_state.id or new_source_id()
+        source_state.title = source_state.title or Path(normalized_source).stem
+        source_state.checksum = checksum or checksum_chunks(
+            [chunk.content for chunk in normalized_chunks]
+        )
         source_state.chunk_count = len(rows)
         source_state.vector_chunk_count = vector_count
         source_state.vector_status = vector_status
@@ -214,6 +292,13 @@ class CurriculumKnowledgeService:
         source_state.last_error = vector_error
         source_state.updated_at = timestamp
         self.db.flush()
+        # 图谱实体与知识片段使用同一事实库；每次替换文件后重建当前来源的提及映射。
+        from app.services.knowledge_graph_service import KnowledgeGraphService
+
+        KnowledgeGraphService(self.db).rebuild_mentions_for_source(
+            normalized_source,
+            chunks=rows,
+        )
         return len(rows)
 
     def ensure_source_records(self) -> None:
@@ -229,12 +314,21 @@ class CurriculumKnowledgeService:
         for source, rows in grouped.items():
             state = self.db.get(CurriculumSourceModel, source)
             if state is None:
-                state = CurriculumSourceModel(source=source, updated_at=timestamp)
+                state = CurriculumSourceModel(
+                    source=source,
+                    id=new_source_id(source),
+                    category="curriculum",
+                    title=Path(source).stem,
+                    review_status="published",
+                    updated_at=timestamp,
+                )
                 self.db.add(state)
                 state.vector_status = (
                     "pending" if self.settings.curriculum_vector_enabled else "disabled"
                 )
             state.chunk_count = len(rows)
+            state.id = state.id or new_source_id(source)
+            state.title = state.title or Path(source).stem
             if not state.checksum:
                 state.checksum = checksum_chunks([row.content for row in rows])
             if not state.embedding_model and self.settings.curriculum_vector_enabled:
@@ -260,6 +354,19 @@ class CurriculumKnowledgeService:
             .filter(CurriculumChunkModel.source == normalized_source)
             .delete(synchronize_session=False)
         )
+        state = self.db.get(CurriculumSourceModel, normalized_source)
+        if state and state.id:
+            from app.db.models import (
+                KnowledgeSourceReviewEventModel,
+                KnowledgeSourceTopicModel,
+            )
+
+            self.db.query(KnowledgeSourceTopicModel).filter(
+                KnowledgeSourceTopicModel.source_id == state.id
+            ).delete(synchronize_session=False)
+            self.db.query(KnowledgeSourceReviewEventModel).filter(
+                KnowledgeSourceReviewEventModel.source_id == state.id
+            ).delete(synchronize_session=False)
         self.db.query(CurriculumSourceModel).filter(
             CurriculumSourceModel.source == normalized_source
         ).delete(synchronize_session=False)
@@ -322,6 +429,7 @@ class CurriculumKnowledgeService:
         query: str,
         top_k: int | None = None,
         allowed_sources: list[str] | None = None,
+        allowed_chunk_ids: list[int] | None = None,
     ) -> list[CurriculumSearchResult]:
         query = query.strip()
         if not query:
@@ -333,12 +441,46 @@ class CurriculumKnowledgeService:
             if not normalized_sources:
                 return []
             chunk_query = chunk_query.filter(CurriculumChunkModel.source.in_(normalized_sources))
+        requested_chunk_ids: set[int] | None = None
+        if allowed_chunk_ids is not None:
+            requested_chunk_ids = {
+                int(value) for value in allowed_chunk_ids
+            }
+            if not requested_chunk_ids:
+                return []
         chunks = chunk_query.order_by(
             CurriculumChunkModel.source,
             CurriculumChunkModel.source_index,
         ).all()
+        if requested_chunk_ids is not None:
+            anchor_chunks = {
+                (chunk.source, chunk.source_index): chunk
+                for chunk in chunks
+                if int(chunk.id) in requested_chunk_ids
+            }
+            neighbor_keys = {
+                (source, source_index + offset)
+                for source, source_index in anchor_chunks
+                for offset in (-1, 0, 1)
+            }
+            chunks = [
+                chunk
+                for chunk in chunks
+                if (chunk.source, chunk.source_index) in neighbor_keys
+                and any(
+                    policy_neighbors_compatible(anchor, chunk)
+                    for anchor in anchor_chunks.values()
+                    if anchor.source == chunk.source
+                    and abs(anchor.source_index - chunk.source_index) <= 1
+                )
+            ]
         if not chunks:
             return []
+        vector_chunk_ids = (
+            [int(chunk.id) for chunk in chunks]
+            if requested_chunk_ids is not None
+            else None
+        )
 
         bm25_raw = bm25_scores(query, chunks)
         bm25_maximum = max(bm25_raw.values(), default=0.0) or 1.0
@@ -350,16 +492,18 @@ class CurriculumKnowledgeService:
         vector_used = False
         if self.settings.curriculum_vector_enabled and self.vector_store.available:
             try:
-                if allowed_sources is None:
+                if vector_chunk_ids is None:
                     vector_hits = self.vector_store.query(
                         query,
                         self.settings.curriculum_candidate_k,
+                        allowed_sources,
                     )
                 else:
                     vector_hits = self.vector_store.query(
                         query,
                         self.settings.curriculum_candidate_k,
                         allowed_sources,
+                        vector_chunk_ids,
                     )
                 valid_ids = {chunk.id for chunk in chunks}
                 vector_raw = {
@@ -452,7 +596,11 @@ class CurriculumKnowledgeService:
                 chunk_map.get((anchor.source, index))
                 for index in range(anchor.source_index - 1, anchor.source_index + 2)
             ]
-            neighbors = [item for item in neighbors if item is not None]
+            neighbors = [
+                item
+                for item in neighbors
+                if item is not None and policy_neighbors_compatible(anchor, item)
+            ]
             results.append(
                 CurriculumSearchResult(
                     chunk_id=anchor.id,
@@ -507,6 +655,12 @@ def now_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).astimezone().isoformat()
 
 
+def new_source_id(source: str | None = None) -> str:
+    if source:
+        return uuid.uuid5(uuid.NAMESPACE_URL, f"knowledge-source:{source}").hex
+    return uuid.uuid4().hex
+
+
 def normalize_source(source: str) -> str:
     normalized = (source or "").replace("\\", "/").strip()
     if not normalized or normalized.startswith("/"):
@@ -517,9 +671,122 @@ def normalize_source(source: str) -> str:
     return "/".join(parts)[:255]
 
 
+def normalize_knowledge_category(category: str | None) -> str | None:
+    if category is None:
+        return None
+    normalized = category.strip().lower()
+    if normalized not in KNOWLEDGE_SOURCE_CATEGORIES:
+        raise CurriculumFileError(
+            "知识文件分类必须是 curriculum、ecology 或 rural_revitalization"
+        )
+    return normalized
+
+
 def checksum_chunks(chunks: list[str]) -> str:
     payload = "\n\n".join(chunks).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+POLICY_CHAPTER_RE = re.compile(r"^第[一二三四五六七八九十百零〇0-9]+章(?:\s|　|\u2003)*")
+POLICY_ARTICLE_RE = re.compile(r"^(第[一二三四五六七八九十百零〇0-9]+条)(?:\s|　|\u2003)*")
+POLICY_SECTION_RE = re.compile(r"^[一二三四五六七八九十]+、")
+POLICY_ITEM_RE = re.compile(r"^(（[一二三四五六七八九十]+）)")
+
+
+def policy_structural_units(content: str) -> list[StructuredKnowledgeChunk]:
+    """Split Chinese policy text into article/task units without trusting DOCX styles."""
+    text = normalize_text(content)
+    text = text.replace("\u2002", " ").replace("\u2003", " ").replace("\xa0", " ")
+    # Some official DOCX files place a whole chapter in one paragraph. Article markers
+    # are separated by whitespace; cross-references such as “本法第二条” are untouched.
+    text = re.sub(
+        r"[ \t]+(?=第[一二三四五六七八九十百零〇0-9]+条(?:\s|[\u4e00-\u9fff]))",
+        "\n",
+        text,
+    )
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    units: list[StructuredKnowledgeChunk] = []
+    heading = ""
+    for line in lines:
+        if POLICY_CHAPTER_RE.match(line) or POLICY_SECTION_RE.match(line):
+            heading = line
+            continue
+        article = POLICY_ARTICLE_RE.match(line)
+        item = POLICY_ITEM_RE.match(line)
+        if article:
+            units.append(
+                StructuredKnowledgeChunk(
+                    content=line,
+                    heading_path=heading,
+                    article_number=article.group(1),
+                    chunk_type="article",
+                )
+            )
+        elif item and units and units[-1].chunk_type == "article":
+            previous = units[-1]
+            units[-1] = StructuredKnowledgeChunk(
+                content=f"{previous.content}\n{line}",
+                heading_path=previous.heading_path,
+                article_number=previous.article_number,
+                chunk_type=previous.chunk_type,
+            )
+        elif item:
+            units.append(
+                StructuredKnowledgeChunk(
+                    content=line,
+                    heading_path=heading,
+                    article_number=item.group(1),
+                    chunk_type="item",
+                )
+            )
+        elif units and units[-1].chunk_type in {"article", "item"}:
+            previous = units[-1]
+            units[-1] = StructuredKnowledgeChunk(
+                content=f"{previous.content}\n{line}",
+                heading_path=previous.heading_path,
+                article_number=previous.article_number,
+                chunk_type=previous.chunk_type,
+            )
+        else:
+            units.append(
+                StructuredKnowledgeChunk(
+                    content=line,
+                    heading_path=heading,
+                    chunk_type="preamble" if not heading else "content",
+                )
+            )
+    return units
+
+
+def chunk_policy_text(content: str, *, size: int, overlap: int) -> list[StructuredKnowledgeChunk]:
+    chunks: list[StructuredKnowledgeChunk] = []
+    for unit in policy_structural_units(content):
+        pieces = chunk_text(unit.content, size=size, overlap=overlap)
+        for piece in pieces:
+            chunks.append(
+                StructuredKnowledgeChunk(
+                    content=piece,
+                    heading_path=unit.heading_path,
+                    article_number=unit.article_number,
+                    chunk_type=unit.chunk_type,
+                )
+            )
+    return chunks
+
+
+def policy_neighbors_compatible(
+    anchor: CurriculumChunkModel,
+    neighbor: CurriculumChunkModel,
+) -> bool:
+    """Keep retrieval context inside one policy article or numbered task."""
+    anchor_number = (getattr(anchor, "article_number", "") or "").strip()
+    if not anchor_number:
+        return True
+    return (
+        (getattr(neighbor, "article_number", "") or "").strip() == anchor_number
+        and (getattr(neighbor, "chunk_type", "") or "content")
+        == (getattr(anchor, "chunk_type", "") or "content")
+    )
 
 
 def chunk_text(content: str, *, size: int, overlap: int) -> list[str]:

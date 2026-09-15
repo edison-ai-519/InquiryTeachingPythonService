@@ -145,6 +145,9 @@ class CurriculumChunkModel(Base):
     source = Column(String, nullable=False, index=True)
     source_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
+    heading_path = Column(Text, nullable=False, default="")
+    article_number = Column(String, nullable=False, default="")
+    chunk_type = Column(String, nullable=False, default="content")
     created_at = Column(String, nullable=False)
 
     __table_args__ = (
@@ -156,6 +159,26 @@ class CurriculumSourceModel(Base):
     __tablename__ = "curriculum_sources"
 
     source = Column(String, primary_key=True)
+    id = Column(String, nullable=True, unique=True, index=True)
+    category = Column(String, nullable=False, default="curriculum", index=True)
+    title = Column(String, nullable=False, default="")
+    policy_layer = Column(String, nullable=True, index=True)
+    document_type = Column(String, nullable=False, default="reference", index=True)
+    authority_scope = Column(String, nullable=False, default="", index=True)
+    region_code = Column(String, nullable=False, default="", index=True)
+    issuing_authority = Column(String, nullable=False, default="")
+    document_number = Column(String, nullable=False, default="")
+    source_url = Column(Text, nullable=False, default="")
+    publish_date = Column(String, nullable=False, default="")
+    effective_date = Column(String, nullable=False, default="")
+    expiry_date = Column(String, nullable=False, default="")
+    validity_status = Column(String, nullable=False, default="unknown", index=True)
+    review_status = Column(String, nullable=False, default="draft", index=True)
+    review_note = Column(Text, nullable=False, default="")
+    reviewed_by_user_id = Column(String, nullable=False, default="")
+    reviewed_at = Column(String, nullable=False, default="")
+    last_verified_at = Column(String, nullable=False, default="")
+    replaces_source_id = Column(String, nullable=False, default="", index=True)
     checksum = Column(String, nullable=False, default="")
     chunk_count = Column(Integer, nullable=False, default=0)
     vector_chunk_count = Column(Integer, nullable=False, default=0)
@@ -163,6 +186,39 @@ class CurriculumSourceModel(Base):
     embedding_model = Column(String, nullable=False, default="")
     last_error = Column(Text, nullable=False, default="")
     updated_at = Column(String, nullable=False)
+
+    __table_args__ = (
+        Index(
+            "ix_curriculum_sources_policy_filters",
+            "category",
+            "policy_layer",
+            "region_code",
+            "validity_status",
+            "review_status",
+        ),
+    )
+
+
+class KnowledgeSourceTopicModel(Base):
+    __tablename__ = "knowledge_source_topics"
+
+    source_id = Column(String, primary_key=True)
+    topic_code = Column(String, primary_key=True)
+
+    __table_args__ = (Index("ix_knowledge_source_topics_topic", "topic_code"),)
+
+
+class KnowledgeSourceReviewEventModel(Base):
+    __tablename__ = "knowledge_source_review_events"
+
+    id = Column(String, primary_key=True)
+    source_id = Column(String, nullable=False, index=True)
+    action = Column(String, nullable=False)
+    from_status = Column(String, nullable=False, default="")
+    to_status = Column(String, nullable=False)
+    note = Column(Text, nullable=False, default="")
+    actor_user_id = Column(String, nullable=False)
+    created_at = Column(String, nullable=False)
 
 
 class CurriculumSourceAgentPermissionModel(Base):
@@ -177,3 +233,96 @@ class CurriculumSourceAgentPermissionModel(Base):
     created_at = Column(String, nullable=False)
 
     __table_args__ = (Index("ix_curriculum_permissions_agent_id", "agent_id"),)
+
+
+class KnowledgeEntitySourceModel(Base):
+    __tablename__ = "knowledge_entity_sources"
+
+    entity_id = Column(
+        String,
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    source = Column(
+        String,
+        ForeignKey("curriculum_sources.source", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at = Column(String, nullable=False)
+
+    __table_args__ = (Index("ix_knowledge_entity_sources_source", "source"),)
+
+
+class KnowledgeEntityModel(Base):
+    __tablename__ = "knowledge_entities"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False, index=True)
+    entity_type = Column(String, nullable=False, index=True)
+    aliases_json = Column(Text, nullable=False, default="[]")
+    description = Column(Text, nullable=False, default="")
+    source = Column(String, nullable=False, default="")
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+
+class KnowledgeRelationModel(Base):
+    __tablename__ = "knowledge_relations"
+
+    id = Column(String, primary_key=True)
+    subject_entity_id = Column(
+        String,
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    predicate = Column(String, nullable=False, index=True)
+    object_entity_id = Column(
+        String,
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    description = Column(Text, nullable=False, default="")
+    evidence_source = Column(Text, nullable=False, default="")
+    confidence = Column(String, nullable=False, default="medium")
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+
+class KnowledgeEntityMentionModel(Base):
+    __tablename__ = "knowledge_entity_mentions"
+
+    entity_id = Column(
+        String,
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    chunk_id = Column(
+        Integer,
+        ForeignKey("curriculum_chunks.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    source = Column(String, nullable=False, default="")
+
+    __table_args__ = (Index("ix_knowledge_mentions_source", "source"),)
+
+
+class KnowledgeRelationEvidenceModel(Base):
+    __tablename__ = "knowledge_relation_evidence"
+
+    relation_id = Column(
+        String,
+        ForeignKey("knowledge_relations.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    chunk_id = Column(
+        Integer,
+        ForeignKey("curriculum_chunks.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    source = Column(String, nullable=False, default="")
+    evidence_text = Column(Text, nullable=False, default="")
+    created_at = Column(String, nullable=False)
+
+    __table_args__ = (Index("ix_knowledge_relation_evidence_source", "source"),)

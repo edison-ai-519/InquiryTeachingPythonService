@@ -17,6 +17,7 @@ app/
 │   ├── auth.py
 │   ├── chat.py                     # 主导师、单次专家咨询和草案能力
 │   ├── curriculum.py               # 知识文件、权限、检索审计、导入导出
+│   ├── knowledge_sources.py        # v4 知识来源、元数据、审核与版本关系
 │   ├── flows.py
 │   ├── session_files.py
 │   └── sessions.py
@@ -28,6 +29,7 @@ app/
 │   ├── curriculum_knowledge_service.py
 │   ├── curriculum_permission_service.py
 │   ├── curriculum_vector_service.py
+│   ├── knowledge_source_service.py
 │   ├── rag_service.py
 │   ├── prompt_service.py
 │   └── draft_*.py
@@ -82,6 +84,8 @@ expert_id
 | `curriculum_sources` | 课程知识文件与向量状态 |
 | `curriculum_chunks` | 本地知识片段 |
 | `curriculum_source_agent_permissions` | 文件级专家检索授权 |
+| `knowledge_source_topics` | 知识来源多选主题标签 |
+| `knowledge_source_review_events` | 知识来源审核与归档事件 |
 | `rag_records` | 专家、授权来源、命中来源和评分审计 |
 
 旧数据库中的 `users.chat_mode`、`app_settings` 和 `agent_conversations` 可以继续保留，但运行时不再读取或写入；新数据库不会创建这些旧结构。历史 `stage_expert` 消息仍兼容显示。
@@ -96,6 +100,9 @@ expert_id
 | GET/POST/DELETE | `/api/curriculum/files` | 查看、上传和删除知识文件 |
 | PUT | `/api/curriculum/files/permissions` | 整体替换文件的专家权限 |
 | GET | `/api/curriculum/retrievals` | 查看隔离检索审计 |
-| GET/POST | `/api/curriculum/export`、`/api/curriculum/import` | v2 权限化导出与 v1/v2 导入 |
+| GET/POST | `/api/curriculum/export`、`/api/curriculum/import` | 兼容 v3 导出与 v1—v3 导入 |
+| GET/POST/PATCH/DELETE | `/api/knowledge/sources` | v4 来源元数据、筛选、上传、更新与删除 |
+| POST | `/api/knowledge/sources/{id}/review` | 提交、退回、发布和归档 |
+| GET/POST | `/api/knowledge/sources/export`、`/api/knowledge/sources/import` | v4 导出与 v1—v4 导入 |
 
 Agent 注册表默认路径是 `app/agents/config/agents.yaml`，可通过 `AGENT_CONFIG_PATH` 覆盖。

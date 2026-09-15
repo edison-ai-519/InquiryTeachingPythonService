@@ -19,9 +19,37 @@ export type ExpertAgentItem = {
   capabilities: string[];
 };
 
+export type KnowledgeCategory = "curriculum" | "ecology" | "rural_revitalization";
+export type PolicyLayer = "foundation" | "annual_action" | "ceo_talent" | "grassroots_compliance";
+export type KnowledgeReviewStatus = "draft" | "in_review" | "published" | "archived";
+export type KnowledgeValidityStatus = "current" | "expired" | "repealed" | "unknown" | "not_applicable";
+
 export type CurriculumFileItem = {
+  id: string;
   source: string;
+  category: KnowledgeCategory;
   extension: string;
+  title: string;
+  policy_layer: PolicyLayer | null;
+  document_type: string;
+  authority_scope: "" | "national" | "beijing" | "district";
+  region_code: string;
+  issuing_authority: string;
+  document_number: string;
+  source_url: string;
+  publish_date: string;
+  effective_date: string;
+  expiry_date: string;
+  validity_status: KnowledgeValidityStatus;
+  review_status: KnowledgeReviewStatus;
+  review_note: string;
+  reviewed_by_user_id: string;
+  reviewed_at: string;
+  last_verified_at: string;
+  replaces_source_id: string;
+  topics: string[];
+  publish_errors: string[];
+  checksum: string;
   chunk_count: number;
   vector_chunk_count: number;
   vector_status: "ready" | "pending" | "error" | "disabled";
@@ -29,6 +57,31 @@ export type CurriculumFileItem = {
   last_error: string;
   updated_at: string;
   allowed_expert_ids: string[];
+};
+
+export type KnowledgeSourceChunk = {
+  id: number;
+  source_index: number;
+  content: string;
+  heading_path: string;
+  article_number: string;
+  chunk_type: string;
+};
+
+export type KnowledgeReviewEvent = {
+  id: string;
+  action: string;
+  from_status: string;
+  to_status: string;
+  note: string;
+  actor_user_id: string;
+  created_at: string;
+};
+
+export type KnowledgeSourceDetail = CurriculumFileItem & {
+  review_events: KnowledgeReviewEvent[];
+  replaces_source: { id: string; title: string; source: string } | null;
+  replaced_by: { id: string; title: string; source: string }[];
 };
 
 export type CurriculumVectorStatus = {
@@ -77,6 +130,76 @@ export type CurriculumRetrievalRecord = {
   vector_error: string;
   records: CurriculumRetrievalHit[];
   created_at: string;
+};
+
+export type KnowledgeEntity = {
+  id: string;
+  name: string;
+  entity_type: "insect" | "plant" | "habitat" | "season" | "behavior" | "concept" | string;
+  aliases: string[];
+  description: string;
+  source: string;
+  rag_sources: string[];
+  mention_count: number;
+};
+
+export type KnowledgeEvidence = {
+  chunk_id: number;
+  source: string;
+  source_index: number;
+  content: string;
+};
+
+export type KnowledgeRelation = {
+  id: string;
+  subject_entity_id: string;
+  predicate: string;
+  predicate_label?: string;
+  object_entity_id: string;
+  description: string;
+  evidence_source: string;
+  confidence: "high" | "medium" | "low" | string;
+  evidence_status: "verified" | "unverified";
+  evidence: KnowledgeEvidence[];
+};
+
+export type KnowledgePath = {
+  id: string;
+  entity_ids: string[];
+  relation_ids: string[];
+  score: number;
+  evidence_status: "verified" | "partial" | "unverified";
+  reason: string;
+};
+
+export type KnowledgeEntityInput = {
+  name: string;
+  entity_type: "insect" | "plant" | "habitat" | "season" | "concept";
+  aliases: string[];
+  description: string;
+  source: string;
+};
+
+export type KnowledgeRelationInput = {
+  subject_entity_id: string;
+  predicate: string;
+  object_entity_id: string;
+  description: string;
+  confidence: "high" | "medium" | "low";
+  evidence_chunk_ids: number[];
+};
+
+export type KnowledgeGraphPayload = {
+  entities: KnowledgeEntity[];
+  relations: KnowledgeRelation[];
+  paths: KnowledgePath[];
+  recommended_path_ids: string[];
+};
+
+export type GraphSelectionPayload = {
+  entity_ids: string[];
+  relation_ids: string[];
+  path_ids: string[];
 };
 
 export type FlowInfo = {

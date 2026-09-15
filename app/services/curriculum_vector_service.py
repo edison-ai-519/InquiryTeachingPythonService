@@ -258,22 +258,39 @@ class CurriculumVectorStore:
         query: str,
         top_k: int,
         allowed_sources: list[str] | None = None,
+        allowed_chunk_ids: list[int] | None = None,
     ) -> list[CurriculumVectorHit]:
         if not self.available:
             raise CurriculumVectorUnavailable(self.error or "向量检索不可用")
         query_vectors = self.embed_texts([query])
         if not query_vectors:
             return []
-        where = None
+        filters: list[dict] = []
         if allowed_sources is not None:
             normalized_sources = list(dict.fromkeys(allowed_sources))
             if not normalized_sources:
                 return []
-            where = (
+            filters.append(
                 {"source": normalized_sources[0]}
                 if len(normalized_sources) == 1
                 else {"source": {"$in": normalized_sources}}
             )
+        if allowed_chunk_ids is not None:
+            normalized_chunk_ids = list(
+                dict.fromkeys(int(value) for value in allowed_chunk_ids)
+            )
+            if not normalized_chunk_ids:
+                return []
+            filters.append(
+                {"db_id": normalized_chunk_ids[0]}
+                if len(normalized_chunk_ids) == 1
+                else {"db_id": {"$in": normalized_chunk_ids}}
+            )
+        where = None
+        if len(filters) == 1:
+            where = filters[0]
+        elif filters:
+            where = {"$and": filters}
         query_args = {
             "query_embeddings": query_vectors,
             "n_results": max(1, top_k),

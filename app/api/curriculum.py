@@ -4,9 +4,10 @@ import json
 import zipfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_admin_user, get_current_user
@@ -22,6 +23,7 @@ from app.services.curriculum_knowledge_service import (
     CurriculumFileError,
     CurriculumKnowledgeService,
     checksum_chunks,
+    normalize_knowledge_category,
     normalize_source,
     now_iso,
 )
@@ -31,7 +33,7 @@ from app.services.curriculum_vector_service import CurriculumVectorUnavailable
 
 router = APIRouter(prefix="/api/curriculum", tags=["curriculum"])
 EXPORT_ENTRY = "curriculum.json"
-EXPORT_VERSION = 2
+EXPORT_VERSION = 3
 
 
 class CurriculumPermissionRequest(BaseModel):
@@ -42,6 +44,7 @@ class CurriculumPermissionRequest(BaseModel):
 def serialize_source(row: CurriculumSourceModel, allowed_expert_ids: list[str]) -> dict:
     return {
         "source": row.source,
+        "category": row.category or "curriculum",
         "extension": Path(row.source).suffix.lower(),
         "chunk_count": int(row.chunk_count or 0),
         "vector_chunk_count": int(row.vector_chunk_count or 0),
@@ -65,17 +68,30 @@ def get_source_summary(db: Session, source: str) -> dict:
 
 @router.get("/files")
 def list_curriculum_files(
+    category: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    _user: UserModel = Depends(get_current_user),
+    user: UserModel = Depends(get_current_user),
 ):
     service = CurriculumKnowledgeService(db)
     service.ensure_source_records()
     db.commit()
-    rows = (
-        db.query(CurriculumSourceModel)
-        .order_by(CurriculumSourceModel.updated_at.desc())
-        .all()
-    )
+    source_query = db.query(CurriculumSourceModel)
+    if not bool(user.is_admin):
+        source_query = source_query.filter(
+            or_(
+                CurriculumSourceModel.category != "rural_revitalization",
+                CurriculumSourceModel.review_status == "published",
+            )
+        )
+    if category is not None:
+        try:
+            normalized_category = normalize_knowledge_category(category)
+        except CurriculumFileError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        source_query = source_query.filter(
+            CurriculumSourceModel.category == normalized_category
+        )
+    rows = source_query.order_by(CurriculumSourceModel.updated_at.desc()).all()
     permissions = CurriculumPermissionService.permissions_by_source(db)
     return {
         "code": 0,
@@ -87,12 +103,14 @@ def list_curriculum_files(
 @router.post("/files")
 async def upload_curriculum_file(
     file: UploadFile = File(...),
+    category: str = Form(default="curriculum"),
     db: Session = Depends(get_db),
     _admin: UserModel = Depends(get_admin_user),
 ):
     settings = get_settings()
     try:
         source = CurriculumKnowledgeService.safe_source_name(file.filename or "")
+        normalized_category = normalize_knowledge_category(category) or "curriculum"
     except CurriculumFileError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -112,8 +130,17 @@ async def upload_curriculum_file(
             source,
             data,
         )
-        CurriculumKnowledgeService(db, settings).ingest(source, content)
-        CurriculumPermissionService.replace_permissions(db, source, [])
+        CurriculumKnowledgeService(db, settings).ingest(
+            source,
+            content,
+            category=normalized_category,
+        )
+        default_experts = (
+            ["insect_agent", "nature_agent"]
+            if normalized_category == "ecology"
+            else []
+        )
+        CurriculumPermissionService.replace_permissions(db, source, default_experts)
         db.commit()
     except CurriculumFileError as exc:
         db.rollback()
@@ -249,19 +276,25 @@ def list_curriculum_retrievals(
 
 @router.get("/export")
 def export_curriculum_bundle(
+    category: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _admin: UserModel = Depends(get_admin_user),
 ):
     service = CurriculumKnowledgeService(db)
     service.ensure_source_records()
     db.commit()
+    try:
+        normalized_category = normalize_knowledge_category(category)
+    except CurriculumFileError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     sources = []
     permissions = CurriculumPermissionService.permissions_by_source(db)
-    for state in (
-        db.query(CurriculumSourceModel)
-        .order_by(CurriculumSourceModel.source.asc())
-        .all()
-    ):
+    source_query = db.query(CurriculumSourceModel)
+    if normalized_category:
+        source_query = source_query.filter(
+            CurriculumSourceModel.category == normalized_category
+        )
+    for state in source_query.order_by(CurriculumSourceModel.source.asc()).all():
         chunks = (
             db.query(CurriculumChunkModel)
             .filter(CurriculumChunkModel.source == state.source)
@@ -271,6 +304,7 @@ def export_curriculum_bundle(
         sources.append(
             {
                 "source": state.source,
+                "category": state.category or "curriculum",
                 "checksum": state.checksum,
                 "allowed_expert_ids": permissions.get(state.source, []),
                 "chunks": [
@@ -283,6 +317,7 @@ def export_curriculum_bundle(
         "version": EXPORT_VERSION,
         "exported_at": now_iso(),
         "embedding_model": get_settings().curriculum_embedding_model,
+        "category_filter": normalized_category or "all",
         "sources": sources,
     }
     output = io.BytesIO()
@@ -296,7 +331,10 @@ def export_curriculum_bundle(
         output,
         media_type="application/zip",
         headers={
-            "Content-Disposition": 'attachment; filename="curriculum-knowledge.zip"'
+            "Content-Disposition": (
+                "attachment; filename=\""
+                f"{normalized_category or 'all'}-knowledge-base.zip\""
+            )
         },
     )
 
@@ -323,7 +361,7 @@ async def import_curriculum_bundle(
                 raise CurriculumFileError("导入包解压后的数据过大")
             payload = json.loads(archive.read(EXPORT_ENTRY).decode("utf-8"))
         version = payload.get("version")
-        if version not in {1, EXPORT_VERSION}:
+        if version not in {1, 2, EXPORT_VERSION}:
             raise CurriculumFileError("不支持的知识库导入包版本")
         sources = payload.get("sources")
         if not isinstance(sources, list):
@@ -357,18 +395,32 @@ async def import_curriculum_bundle(
             expert_ids = CurriculumPermissionService.validate_expert_ids(
                 raw_expert_ids if version == 2 else []
             )
+            category = normalize_knowledge_category(
+                str(item.get("category") or "curriculum")
+            ) or "curriculum"
+            if version == 3:
+                expert_ids = CurriculumPermissionService.validate_expert_ids(
+                    raw_expert_ids
+                )
             prepared_sources.append(
-                (source, chunks, expected_checksum or actual_checksum, expert_ids)
+                (
+                    source,
+                    chunks,
+                    expected_checksum or actual_checksum,
+                    expert_ids,
+                    category,
+                )
             )
 
         service = CurriculumKnowledgeService(db, settings)
         imported_sources = 0
         imported_chunks = 0
-        for source, chunks, checksum, expert_ids in prepared_sources:
+        for source, chunks, checksum, expert_ids, category in prepared_sources:
             count = service.ingest_chunks(
                 source,
                 chunks,
                 checksum=checksum,
+                category=category,
             )
             CurriculumPermissionService.replace_permissions(db, source, expert_ids)
             imported_sources += 1

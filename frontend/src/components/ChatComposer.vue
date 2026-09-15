@@ -17,7 +17,7 @@
       <div class="composer-toolbar">
         <div class="composer-tools">
           <button type="button" title="上传参考资料" :disabled="streaming || uploading || files.length >= 10 || !session" @click="$emit('open-file')"><LoaderCircle v-if="uploading" class="spin-icon" :size="17" /><Paperclip v-else :size="17" /></button>
-          <button type="button" title="课标知识库" @click="$emit('open-curriculum')"><BookOpen :size="17" /></button>
+          <button type="button" title="知识库" @click="$emit('open-curriculum')"><BookOpen :size="17" /></button>
           <slot name="file-input" />
           <small v-if="fileError" class="composer-file-error">{{ fileError }}</small>
         </div>

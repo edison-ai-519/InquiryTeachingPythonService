@@ -28,6 +28,8 @@ from app.services.draft_generate_service import DraftGenerateService
 from app.services.draft_service import DraftService
 from app.services.draft_proposal_service import DraftProposalService
 from app.services.draft_target_resolver import DraftTarget, DraftTargetResolver
+from app.services.graph_rag_service import GraphRagService
+from app.services.knowledge_graph_service import KnowledgeGraphService
 from app.services.llm_service import LLMService
 from app.services.prompt_service import PromptService
 from app.services.rag_service import RagService
@@ -369,10 +371,13 @@ async def chat(
     base_doc_input = ContextService.build_doc_input(db, session_id, stage["id"])
     curriculum_context = ""
     curriculum_source: dict = {}
+    graph_context = ""
+    graph_source: dict = {}
+    graph_warning = ""
     allowed_sources: list[str] = []
     if selected_expert is not None:
         allowed_sources = CurriculumPermissionService.allowed_sources(db, selected_expert.id)
-        if allowed_sources:
+        if allowed_sources and payload.graph_selection is None:
             curriculum_context, curriculum_source = RagService.retrieve_curriculum_context(
                 db,
                 topic=sess.topic,
@@ -381,8 +386,48 @@ async def chat(
                 expert_id=selected_expert.id,
                 allowed_sources=allowed_sources,
             )
-    doc_input = RagService.merge_context(base_doc_input, curriculum_context)
+    if payload.graph_selection is not None:
+        graph_selection = payload.graph_selection
+        graph_service = KnowledgeGraphService(db)
+        validation = graph_service.validate_selection(
+            message=payload.message,
+            selected_path_ids=graph_selection.path_ids,
+            selected_relation_ids=graph_selection.relation_ids,
+            selected_entity_ids=graph_selection.entity_ids,
+        )
+        if validation.valid:
+            selected_graph = graph_service.selected_graph_payload(
+                selected_path_ids=graph_selection.path_ids,
+                selected_relation_ids=graph_selection.relation_ids,
+                selected_entity_ids=graph_selection.entity_ids,
+            )
+            graph_link_context = graph_service.format_selected_graph_context(selected_graph)
+            graph_rag_context, graph_rag_source = GraphRagService(db).retrieve_for_selection(
+                message=payload.message,
+                selected_entity_ids=[entity["id"] for entity in selected_graph["entities"]],
+                selected_relation_ids=selected_graph["selected_relation_ids"],
+                allowed_sources=allowed_sources,
+            )
+            graph_context = RagService.merge_context(graph_link_context, graph_rag_context)
+            graph_source = {
+                **graph_rag_source,
+                "selected_entity_ids": selected_graph["selected_entity_ids"],
+                "selected_relation_ids": selected_graph["selected_relation_ids"],
+                "selected_path_ids": selected_graph["selected_path_ids"],
+                "paths": selected_graph["paths"],
+            }
+        else:
+            graph_warning = validation.warning
+    doc_input = RagService.merge_context(
+        RagService.merge_context(base_doc_input, curriculum_context),
+        graph_context,
+    )
     curriculum_sources = RagService.curriculum_sources(curriculum_source)
+    if graph_source.get("hit_sources"):
+        curriculum_sources = list(dict.fromkeys([*curriculum_sources, *graph_source["hit_sources"]]))
+    rag_source = curriculum_source.copy() if curriculum_source else {}
+    if graph_source:
+        rag_source["graph"] = graph_source
 
     session_snapshot = {
         "session_id": sess.id,
@@ -396,13 +441,14 @@ async def chat(
         "llm_history": llm_history,
         "doc_input": doc_input,
         "rag_record": {
-            "query": curriculum_source.get("query", ""),
-            "context": curriculum_context,
-            "source": curriculum_source,
-        } if curriculum_source else None,
+            "query": curriculum_source.get("query", "") or payload.message,
+            "context": RagService.merge_context(curriculum_context, graph_context),
+            "source": rag_source,
+        } if rag_source else None,
         "rag_sources": curriculum_sources,
         "allowed_sources": allowed_sources,
         "selection_text": get_selection_text(payload),
+        "graph_warning": graph_warning,
     }
 
     try:
@@ -446,6 +492,15 @@ async def chat(
                 "draft_mode_enabled": session_snapshot["draft_mode_enabled"],
             },
         )
+        if session_snapshot["graph_warning"]:
+            yield format_sse(
+                "warning",
+                {
+                    **agent_identity,
+                    "message": session_snapshot["graph_warning"],
+                    "warning_type": "graph_selection",
+                },
+            )
         if selected_expert is not None:
             yield format_sse(
                 "agent",

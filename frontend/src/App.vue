@@ -15,6 +15,7 @@
     @toggle-sidebar="toggleLeftSidebar"
     @toggle-theme="toggleTheme"
     @logout="logout"
+    @open-graph-admin="openGraphAdmin"
   />
   <div
     class="workspace-grid"
@@ -56,7 +57,6 @@
         @rollback="rollbackRecent"
         @feed-ready="feedRef = $event"
       >
-
         <ChatComposer
           v-model="chatInput"
           :expert="selectedExpert"
@@ -89,35 +89,70 @@
     </section>
 
     <!-- RIGHT COLUMN: Document Display & Editor -->
-    <DocumentWorkbench
-      v-model="draftContent"
-      :session="currentSession"
-      :stage="activeStages.find(stage => stage.id === selectedStageId) || currentStage"
-      :selected-stage-id="selectedStageId"
-      :current-stage-id="currentStageId"
-      :stage-index="currentStageIndex"
-      :streaming="isStreaming"
-      :drafting="workflowPhase === 'draft'"
-      :proposal="draftProposal"
-      :proposal-label="draftProposal ? proposalStatusLabel(draftProposal.status) : draftWorkbenchEmptyText"
-      :visual-lines="draftVisualLines"
-      :scroll-top="draftEditorScrollTop"
-      :line-height="draftEditorLineHeight"
-      :cursor-line="currentDraftCursorLine"
-      :selection-label="currentSelectionReferenceLabel"
-      :attached-label="attachedChatSelectionLabel"
-      @previous="goPreviousStage"
-      @next="goNextStage"
-      @save="saveDraftToServer"
-      @export="exportCurrentPlan"
-      @preview="openDraftReviewOverlay"
-      @editor-ready="draftEditorRef = $event"
-      @editor-input="onDraftEditorInput"
-      @editor-scroll="syncDraftEditorScroll"
-      @capture-selection="captureDraftSelection"
-      @add-selection="addSelectionToChat"
-      @clear-selection="clearDraftSelection"
-    />
+    <div class="right-panel-container">
+      <div v-if="isInsectOrNatureExpert" class="right-panel-toggle">
+        <button
+          type="button"
+          class="toggle-button"
+          :class="{ active: showGraphInRightPanel }"
+          @click="openKnowledgeGraphPanel"
+        >
+          图谱
+        </button>
+        <button
+          type="button"
+          class="toggle-button"
+          :class="{ active: !showGraphInRightPanel }"
+          @click="showGraphInRightPanel = false"
+        >
+          编辑器
+        </button>
+      </div>
+      <DocumentWorkbench
+        v-if="!isInsectOrNatureExpert || !showGraphInRightPanel"
+        v-model="draftContent"
+        :session="currentSession"
+        :stage="activeStages.find(stage => stage.id === selectedStageId) || currentStage"
+        :selected-stage-id="selectedStageId"
+        :current-stage-id="currentStageId"
+        :stage-index="currentStageIndex"
+        :streaming="isStreaming"
+        :drafting="workflowPhase === 'draft'"
+        :proposal="draftProposal"
+        :proposal-label="draftProposal ? proposalStatusLabel(draftProposal.status) : draftWorkbenchEmptyText"
+        :visual-lines="draftVisualLines"
+        :scroll-top="draftEditorScrollTop"
+        :line-height="draftEditorLineHeight"
+        :cursor-line="currentDraftCursorLine"
+        :selection-label="currentSelectionReferenceLabel"
+        :attached-label="attachedChatSelectionLabel"
+        @previous="goPreviousStage"
+        @next="goNextStage"
+        @save="saveDraftToServer"
+        @export="exportCurrentPlan"
+        @preview="openDraftReviewOverlay"
+        @editor-ready="draftEditorRef = $event"
+        @editor-input="onDraftEditorInput"
+        @editor-scroll="syncDraftEditorScroll"
+        @capture-selection="captureDraftSelection"
+        @add-selection="addSelectionToChat"
+        @clear-selection="clearDraftSelection"
+      />
+      <KnowledgeGraphPanel
+        v-if="isInsectOrNatureExpert && showGraphInRightPanel"
+        :graph="knowledgeGraph"
+        :selected-entity-ids="selectedGraphEntityIds"
+        :selected-relation-ids="selectedGraphRelationIds"
+        :loading="isLoadingKnowledgeGraph"
+        :streaming="isStreaming"
+        :agent-name="selectedExpert?.name || ''"
+        @close="showGraphInRightPanel = false"
+        @toggle-node="toggleGraphEntity"
+        @toggle-relation="toggleGraphRelation"
+        @select-path="selectGraphPath"
+        @answer="sendGraphSelectedChat"
+      />
+    </div>
 
     <DraftReviewOverlay
       :visible="showDraftReviewOverlay"
@@ -285,6 +320,7 @@
       :loading="isLoadingCurriculum"
       :loading-admin="isLoadingCurriculumAdmin"
       :uploading="isUploadingCurriculum"
+      :upload-category="knowledgeUploadCategory"
       :error="curriculumError"
       :upload-results="curriculumUploadResults"
       :experts="experts"
@@ -306,12 +342,23 @@
       @pick-files="openCurriculumFilePicker"
       @drop-files="handleCurriculumDrop"
       @files-selected="handleCurriculumFileSelection"
+      @update:upload-category="knowledgeUploadCategory = $event"
       @toggle-permission="togglePermissionExpert"
       @save-permissions="saveCurriculumPermissions"
       @cancel-permissions="closePermissionEditor"
       @edit-permissions="openPermissionEditor"
       @delete-file="removeCurriculumSource"
       @refresh-admin="refreshCurriculumAdminData"
+      @save-metadata="saveKnowledgeMetadata"
+      @review-source="handleKnowledgeReview"
+      @refresh-files="refreshCurriculumFiles"
+    />
+    <KnowledgeGraphAdminModal
+      v-if="showGraphAdminModal"
+      :graph="graphAdminData"
+      :files="curriculumFiles"
+      @close="showGraphAdminModal = false"
+      @refresh="refreshGraphAdmin"
     />
     <div v-if="showCurriculumModal" class="modal-overlay legacy-hidden" @click.self="showCurriculumModal = false">
       <section class="modal-content curriculum-modal glass" role="dialog" aria-modal="true" aria-labelledby="curriculum-title">
@@ -352,7 +399,7 @@
               class="ghost-button compact"
               type="button"
               :disabled="Boolean(curriculumAdminOperation)"
-              @click="handleExportCurriculum"
+              @click="() => handleExportCurriculum()"
             >
               <LoaderCircle v-if="curriculumAdminOperation === 'export'" class="spin-icon" :size="15" />
               <Download v-else :size="15" />
@@ -553,12 +600,14 @@ import ConversationPanel from "@/components/ConversationPanel.vue";
 import CurriculumModal from "@/components/CurriculumModal.vue";
 import DocumentWorkbench from "@/components/DocumentWorkbench.vue";
 import DraftReviewOverlay from "@/components/DraftReviewOverlay.vue";
+import KnowledgeGraphPanel from "@/components/KnowledgeGraphPanel.vue";
+import KnowledgeGraphAdminModal from "@/components/KnowledgeGraphAdminModal.vue";
 import WorkspaceSidebar from "@/components/WorkspaceSidebar.vue";
 import { BookOpen, Database, Download, FileText, History, LoaderCircle, RefreshCw, Upload, X } from "lucide-vue-next";
 import {
   createSession,
-  deleteCurriculumFile,
-  downloadCurriculumBundle,
+  deleteKnowledgeSource,
+  downloadKnowledgeBundle,
   deleteSession,
   deleteSessionFile,
   applyDraftProposalActions,
@@ -566,9 +615,11 @@ import {
   getDraftProposal,
   getExperts,
   getCurrentUser,
-  getCurriculumFiles,
+  getKnowledgeSources,
   getCurriculumRetrievals,
   getCurriculumStatus,
+  getKnowledgeGraphCandidates,
+  getKnowledgeGraphAdmin,
   exportSession,
   getFlows,
   getMessages,
@@ -576,14 +627,16 @@ import {
   getSessionFiles,
   getSessions,
   logoutUser,
-  importCurriculumBundle,
+  importKnowledgeBundle,
   rebuildCurriculumVectors,
   rollbackSession,
   saveDraft,
   setDraftMode,
   streamChat,
   updateCurriculumPermissions,
-  uploadCurriculumFile,
+  updateKnowledgeSource,
+  reviewKnowledgeSource,
+  uploadKnowledgeSource,
   uploadSessionFile,
 } from "@/api";
 import type {
@@ -597,6 +650,8 @@ import type {
   ExpertAgentItem,
   FlowInfo,
   FlowStage,
+  GraphSelectionPayload,
+  KnowledgeGraphPayload,
   MessageItem,
   SessionDetail,
   SessionFileItem,
@@ -661,8 +716,11 @@ const fileOperationError = ref("");
 const showCurriculumModal = ref(false);
 const isLoadingCurriculum = ref(false);
 const isUploadingCurriculum = ref(false);
+const knowledgeUploadCategory = ref<"curriculum" | "ecology" | "rural_revitalization">("curriculum");
 const isLoadingCurriculumAdmin = ref(false);
-const curriculumAdminOperation = ref<"" | "rebuild" | "export" | "import">("");
+const curriculumAdminOperation = ref<
+  "" | "rebuild" | "export" | "import" | `metadata:${string}` | `review:${string}`
+>("");
 const deletingCurriculumSources = ref<string[]>([]);
 const curriculumError = ref("");
 const curriculumUploadResults = ref<Array<{
@@ -670,6 +728,24 @@ const curriculumUploadResults = ref<Array<{
   status: "pending" | "success" | "failed";
   message: string;
 }>>([]);
+const showKnowledgeGraphPanel = ref(false);
+const showGraphInRightPanel = ref(false);
+const showGraphAdminModal = ref(false);
+const graphAdminData = ref<KnowledgeGraphPayload>({
+  entities: [],
+  relations: [],
+  paths: [],
+  recommended_path_ids: [],
+});
+const isLoadingKnowledgeGraph = ref(false);
+const knowledgeGraph = ref<KnowledgeGraphPayload>({
+  entities: [],
+  relations: [],
+  paths: [],
+  recommended_path_ids: [],
+});
+const selectedGraphEntityIds = ref<string[]>([]);
+const selectedGraphRelationIds = ref<string[]>([]);
 const currentDraftCursorLine = ref(1);
 const draftEditorScrollTop = ref(0);
 const draftEditorMeasureWidth = ref(0);
@@ -682,6 +758,19 @@ let draftMeasureCanvas: HTMLCanvasElement | null = null;
 
 // New ref for modal
 const showNewSessionModal = ref(false);
+
+function resetKnowledgeGraphState() {
+  showKnowledgeGraphPanel.value = false;
+  isLoadingKnowledgeGraph.value = false;
+  knowledgeGraph.value = {
+    entities: [],
+    relations: [],
+    paths: [],
+    recommended_path_ids: [],
+  };
+  selectedGraphEntityIds.value = [];
+  selectedGraphRelationIds.value = [];
+}
 
 function applyTheme(mode: "dark" | "light") {
   document.body.classList.toggle("theme-light", mode === "light");
@@ -759,6 +848,9 @@ const progressPercentage = computed(() => {
 const isDraftMode = computed(() => Boolean(currentSession.value?.draft_mode_enabled));
 const selectedExpert = computed(() =>
   experts.value.find((expert) => expert.id === selectedExpertId.value) || null,
+);
+const isInsectOrNatureExpert = computed(() =>
+  selectedExpertId.value === "insect_agent" || selectedExpertId.value === "nature_agent",
 );
 const curriculumTotalChunks = computed(() =>
   curriculumFiles.value.reduce((total, item) => total + item.chunk_count, 0),
@@ -1225,6 +1317,7 @@ async function logout() {
     experts.value = [];
     selectedExpertId.value = "";
     showCurriculumModal.value = false;
+    resetKnowledgeGraphState();
     draftContent.value = "";
     draftProposal.value = null;
     draftStreamingContent.value = "";
@@ -1246,6 +1339,7 @@ async function loadSession(sessionId: string, loadMessages = true, preserveWarni
   selectedSessionId.value = session.id;
   selectedExpertId.value = "";
   selectedStageId.value = pickStageIdFromSession(session);
+  resetKnowledgeGraphState();
   if (loadMessages) {
     messages.value = await getMessages(sessionId);
   }
@@ -1274,7 +1368,7 @@ async function refreshCurriculumFiles() {
   isLoadingCurriculum.value = true;
   curriculumError.value = "";
   try {
-    curriculumFiles.value = await getCurriculumFiles();
+    curriculumFiles.value = await getKnowledgeSources();
   } catch (error: any) {
     curriculumError.value = error.message || String(error);
   } finally {
@@ -1388,11 +1482,15 @@ async function importCurriculumFiles(files: File[]) {
   try {
     for (const file of files) {
       try {
-        const uploaded = await uploadCurriculumFile(file);
+        const uploaded = await uploadKnowledgeSource(file, knowledgeUploadCategory.value);
         curriculumFiles.value = [
           uploaded,
           ...curriculumFiles.value.filter((item) => item.source !== uploaded.source),
         ];
+        if (knowledgeUploadCategory.value === "rural_revitalization") {
+          await nextTick();
+          curriculumModalRef.value?.openMetadataEditor?.(uploaded);
+        }
         curriculumUploadResults.value = curriculumUploadResults.value.map((item) =>
           item.name === file.name ? { ...item, status: "success", message: "导入完成" } : item,
         );
@@ -1408,7 +1506,12 @@ async function importCurriculumFiles(files: File[]) {
     isUploadingCurriculum.value = false;
   }
   curriculumError.value = errors.join("；");
-  statusText.value = errors.length ? "部分课标导入失败" : `已导入 ${files.length} 个课标文件`;
+  const categoryLabel = knowledgeUploadCategory.value === "ecology"
+    ? "生态资料"
+    : knowledgeUploadCategory.value === "rural_revitalization"
+      ? "乡村振兴资料"
+      : "课标文件";
+  statusText.value = errors.length ? "部分知识资料导入失败" : `已导入 ${files.length} 个${categoryLabel}`;
   await refreshCurriculumAdminData();
 }
 
@@ -1427,15 +1530,15 @@ async function removeCurriculumSource(item: CurriculumFileItem) {
   if (!currentUser.value?.is_admin || isUploadingCurriculum.value) {
     return;
   }
-  if (!confirm(`确认删除课标《${item.source}》吗？删除后将不再参与检索。`)) {
+  if (!confirm(`确认删除知识文件《${item.source}》吗？删除后将不再参与检索。`)) {
     return;
   }
   deletingCurriculumSources.value = [...deletingCurriculumSources.value, item.source];
   curriculumError.value = "";
   try {
-    await deleteCurriculumFile(item.source);
+    await deleteKnowledgeSource(item.id);
     curriculumFiles.value = curriculumFiles.value.filter((file) => file.source !== item.source);
-    statusText.value = `已删除课标：${item.source}`;
+    statusText.value = `已删除知识文件：${item.source}`;
     await refreshCurriculumAdminData();
   } catch (error: any) {
     curriculumError.value = error.message || String(error);
@@ -1453,7 +1556,7 @@ async function handleRebuildCurriculumVectors() {
   try {
     curriculumStatus.value = await rebuildCurriculumVectors();
     await refreshCurriculumFiles();
-    statusText.value = "课标向量索引已重建";
+    statusText.value = "知识库向量索引已重建";
   } catch (error: any) {
     curriculumError.value = error.message || String(error);
   } finally {
@@ -1461,19 +1564,32 @@ async function handleRebuildCurriculumVectors() {
   }
 }
 
-async function handleExportCurriculum() {
+async function handleExportCurriculum(category?: string) {
   if (!currentUser.value?.is_admin || curriculumAdminOperation.value) return;
+  const exportCategory = category === "curriculum"
+    || category === "ecology"
+    || category === "rural_revitalization"
+    ? category
+    : undefined;
   curriculumAdminOperation.value = "export";
   curriculumError.value = "";
   try {
-    const blob = await downloadCurriculumBundle();
+    const blob = await downloadKnowledgeBundle(exportCategory);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "curriculum-knowledge.zip";
+    anchor.download = exportCategory
+      ? `${exportCategory}-knowledge-v4.zip`
+      : "all-knowledge-v4.zip";
     anchor.click();
     URL.revokeObjectURL(url);
-    statusText.value = "课标知识库已导出";
+    statusText.value = exportCategory === "ecology"
+      ? "生态知识库已导出"
+      : exportCategory === "curriculum"
+        ? "课标知识库已导出"
+        : exportCategory === "rural_revitalization"
+          ? "乡村振兴知识库已导出"
+          : "全部知识库已导出";
   } catch (error: any) {
     curriculumError.value = error.message || String(error);
   } finally {
@@ -1486,13 +1602,54 @@ async function handleCurriculumBundleSelection(event: Event) {
   const file = input.files?.[0];
   input.value = "";
   if (!file || !currentUser.value?.is_admin || curriculumAdminOperation.value) return;
-  if (!confirm("导入会替换知识包中同名课标，其他课标保持不变。确认继续吗？")) return;
+  if (!confirm("导入会替换知识包中的同名知识文件，其他文件保持不变。确认继续吗？")) return;
   curriculumAdminOperation.value = "import";
   curriculumError.value = "";
   try {
-    const result = await importCurriculumBundle(file);
+    const result = await importKnowledgeBundle(file);
     await Promise.all([refreshCurriculumFiles(), refreshCurriculumAdminData()]);
-    statusText.value = `已导入 ${result.source_count} 个课标、${result.chunk_count} 个片段`;
+    statusText.value = `已导入 ${result.source_count} 个知识文件、${result.chunk_count} 个片段`;
+  } catch (error: any) {
+    curriculumError.value = error.message || String(error);
+  } finally {
+    curriculumAdminOperation.value = "";
+  }
+}
+
+async function saveKnowledgeMetadata(
+  item: CurriculumFileItem,
+  metadata: Record<string, unknown>,
+) {
+  if (!currentUser.value?.is_admin) return;
+  curriculumAdminOperation.value = `metadata:${item.id}`;
+  curriculumError.value = "";
+  try {
+    const updated = await updateKnowledgeSource(item.id, metadata);
+    curriculumFiles.value = curriculumFiles.value.map((source) =>
+      source.id === updated.id ? updated : source,
+    );
+    statusText.value = `已保存政策元数据：${updated.title}`;
+  } catch (error: any) {
+    curriculumError.value = error.message || String(error);
+  } finally {
+    curriculumAdminOperation.value = "";
+  }
+}
+
+async function handleKnowledgeReview(
+  item: CurriculumFileItem,
+  action: "submit" | "return" | "publish" | "archive",
+  note = "",
+) {
+  if (!currentUser.value?.is_admin) return;
+  curriculumAdminOperation.value = `review:${item.id}`;
+  curriculumError.value = "";
+  try {
+    const updated = await reviewKnowledgeSource(item.id, action, note);
+    curriculumFiles.value = curriculumFiles.value.map((source) =>
+      source.id === updated.id ? updated : source,
+    );
+    statusText.value = `《${updated.title}》审核状态已更新`;
   } catch (error: any) {
     curriculumError.value = error.message || String(error);
   } finally {
@@ -1799,6 +1956,124 @@ function createStreamRequestId() {
   return `chat_${Date.now()}_${randomId}`;
 }
 
+async function openKnowledgeGraphPanel() {
+  if (!currentSession.value || isStreaming.value) {
+    return;
+  }
+  if (!selectedExpertId.value) {
+    statusText.value = "请先选择专家 Agent，再查看知识图谱";
+    return;
+  }
+  const message = chatInput.value.trim();
+  showGraphInRightPanel.value = true;
+  isLoadingKnowledgeGraph.value = true;
+  streamWarning.value = "";
+  try {
+    const graph = await getKnowledgeGraphCandidates(currentSession.value.id, message, selectedExpertId.value || undefined);
+    knowledgeGraph.value = graph;
+    const recommendedPath = graph.paths.find((path) => graph.recommended_path_ids.includes(path.id));
+    selectedGraphEntityIds.value = recommendedPath?.entity_ids?.length
+      ? [...recommendedPath.entity_ids]
+      : [];
+    selectedGraphRelationIds.value = recommendedPath?.relation_ids?.length
+      ? [...recommendedPath.relation_ids]
+      : [];
+    statusText.value = graph.entities.length
+      ? (recommendedPath ? "已自动选择推荐关系，可调整后回答" : "已生成局部知识图谱，请选择回答节点")
+      : "没有找到相关图谱关系";
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+    statusText.value = "知识图谱解析失败";
+  } finally {
+    isLoadingKnowledgeGraph.value = false;
+  }
+}
+
+async function openGraphAdmin() {
+  if (!currentUser.value?.is_admin) return;
+  try {
+    graphAdminData.value = await getKnowledgeGraphAdmin();
+    showGraphAdminModal.value = true;
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+  }
+}
+
+async function refreshGraphAdmin() {
+  if (!currentUser.value?.is_admin) return;
+  try {
+    graphAdminData.value = await getKnowledgeGraphAdmin();
+    statusText.value = "知识图谱已更新";
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+  }
+}
+
+
+
+function toggleGraphEntity(entityId: string) {
+  const current = selectedGraphEntityIds.value;
+  if (current.includes(entityId)) {
+    selectedGraphEntityIds.value = current.filter((item) => item !== entityId);
+    selectedGraphRelationIds.value = selectedGraphRelationIds.value.filter((relationId) => {
+      const relation = knowledgeGraph.value.relations.find((item) => item.id === relationId);
+      return relation && relation.subject_entity_id !== entityId && relation.object_entity_id !== entityId;
+    });
+    return;
+  }
+  selectedGraphEntityIds.value = [...current, entityId];
+}
+
+function toggleGraphRelation(relationId: string) {
+  if (selectedGraphRelationIds.value.includes(relationId)) {
+    selectedGraphRelationIds.value = selectedGraphRelationIds.value.filter((item) => item !== relationId);
+    return;
+  }
+  const relation = knowledgeGraph.value.relations.find((item) => item.id === relationId);
+  if (!relation) return;
+  selectedGraphRelationIds.value = [...selectedGraphRelationIds.value, relationId];
+  selectedGraphEntityIds.value = Array.from(new Set([
+    ...selectedGraphEntityIds.value,
+    relation.subject_entity_id,
+    relation.object_entity_id,
+  ]));
+}
+
+function selectGraphPath(pathId: string) {
+  const path = knowledgeGraph.value.paths.find((item) => item.id === pathId);
+  if (!path) return;
+  selectedGraphEntityIds.value = [...path.entity_ids];
+  selectedGraphRelationIds.value = [...path.relation_ids];
+}
+
+function buildGraphSelection(): GraphSelectionPayload {
+  const selected = new Set(selectedGraphEntityIds.value);
+  const relationIds = selectedGraphRelationIds.value.filter((relationId) => {
+    const relation = knowledgeGraph.value.relations.find((item) => item.id === relationId);
+    return relation && selected.has(relation.subject_entity_id) && selected.has(relation.object_entity_id);
+  });
+  const selectedRelations = new Set(relationIds);
+  const pathIds = knowledgeGraph.value.paths
+    .filter((path) => path.entity_ids.length > 0
+      && path.entity_ids.every((entityId) => selected.has(entityId))
+      && path.relation_ids.every((relationId) => selectedRelations.has(relationId)))
+    .map((path) => path.id);
+  return {
+    entity_ids: [...selectedGraphEntityIds.value],
+    relation_ids: relationIds,
+    path_ids: pathIds,
+  };
+}
+
+async function sendGraphSelectedChat() {
+  if (!selectedGraphEntityIds.value.length) {
+    statusText.value = "请先选择至少一个图谱节点";
+    return;
+  }
+  await sendChat(buildGraphSelection());
+  showKnowledgeGraphPanel.value = false;
+}
+
 async function interruptChat() {
   if (!isStreaming.value || !currentSession.value || !activeStreamRequestId.value) {
     return;
@@ -1815,7 +2090,7 @@ async function interruptChat() {
   }
 }
 
-async function sendChat() {
+async function sendChat(graphSelection: GraphSelectionPayload | null = null) {
   if (isStreaming.value) {
     return;
   }
@@ -1916,6 +2191,7 @@ async function sendChat() {
         expert_id: requestExpertId || undefined,
         draft_request_kind: draftRequestKind,
         selection: selectionPayload,
+        graph_selection: graphSelection,
       },
       {
         stage: () => {
@@ -2022,6 +2298,11 @@ async function sendChat() {
           }
         },
         warning: (data) => {
+          if (data.warning_type === "graph_selection") {
+            streamWarning.value = data.message || "您选择的图谱链路与当前问题关联较弱。";
+            statusText.value = "图谱链路需要调整";
+            return;
+          }
           streamWarning.value = `${data.agent_name || "专家"}暂时不可用：${data.message || "请稍后重试"}`;
           statusText.value = "专家咨询暂时不可用";
         },
@@ -2293,6 +2574,17 @@ watch(saveSuccessVisible, (visible) => {
   if (!visible && saveSuccessTimer) {
     window.clearTimeout(saveSuccessTimer);
     saveSuccessTimer = undefined;
+  }
+});
+
+watch(selectedExpertId, (newExpertId) => {
+  if (newExpertId === "insect_agent" || newExpertId === "nature_agent") {
+    showGraphInRightPanel.value = true;
+    if (currentSession.value && !isStreaming.value) {
+      openKnowledgeGraphPanel();
+    }
+  } else {
+    showGraphInRightPanel.value = false;
   }
 });
 </script>
