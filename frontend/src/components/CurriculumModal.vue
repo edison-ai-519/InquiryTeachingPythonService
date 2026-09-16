@@ -182,6 +182,9 @@ defineExpose({ openFilePicker: () => fileInput.value?.click(), openBundlePicker:
 .knowledge-admin-workbench.has-error{grid-template-rows:auto auto auto minmax(0,1fr)}
 .knowledge-admin-sources{display:flex;flex-direction:column}
 .knowledge-admin-filter-bar,.knowledge-admin-advanced-filters,.knowledge-admin-filter-chips{flex:0 0 auto}
-.knowledge-admin-source-layout{flex:1}
+.knowledge-admin-main{display:flex;flex-direction:column;overflow:hidden}
+.knowledge-admin-main>.knowledge-admin-health,.knowledge-admin-main>.knowledge-admin-retrievals{flex:1 1 0;min-height:0;overflow:auto}
+.knowledge-admin-sources{flex:1 1 0;height:auto;min-height:0}
+.knowledge-admin-source-layout{flex:1 1 0;height:0;min-height:0;grid-template-rows:minmax(0,1fr)}
 @media(max-width:760px){.knowledge-admin-transfer-menu{display:block}}
 </style>
