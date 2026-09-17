@@ -186,5 +186,6 @@ defineExpose({ openFilePicker: () => fileInput.value?.click(), openBundlePicker:
 .knowledge-admin-main>.knowledge-admin-health,.knowledge-admin-main>.knowledge-admin-retrievals{flex:1 1 0;min-height:0;overflow:auto}
 .knowledge-admin-sources{flex:1 1 0;height:auto;min-height:0}
 .knowledge-admin-source-layout{flex:1 1 0;height:0;min-height:0;grid-template-rows:minmax(0,1fr)}
+.knowledge-admin-retrievals{box-sizing:border-box;width:100%;max-width:none;margin:0}
 @media(max-width:760px){.knowledge-admin-transfer-menu{display:block}}
 </style>
