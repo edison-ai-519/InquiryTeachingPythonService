@@ -90,14 +90,14 @@
 
     <!-- RIGHT COLUMN: Document Display & Editor -->
     <div class="right-panel-container">
-      <div v-if="isInsectOrNatureExpert" class="right-panel-toggle">
+      <div v-if="hasKnowledgeGraphContext" class="right-panel-toggle">
         <button
           type="button"
           class="toggle-button"
           :class="{ active: showGraphInRightPanel }"
           @click="openKnowledgeGraphPanel"
         >
-          图谱
+          局部图谱
         </button>
         <button
           type="button"
@@ -109,7 +109,7 @@
         </button>
       </div>
       <DocumentWorkbench
-        v-if="!isInsectOrNatureExpert || !showGraphInRightPanel"
+        v-if="!hasKnowledgeGraphContext || !showGraphInRightPanel"
         v-model="draftContent"
         :session="currentSession"
         :stage="activeStages.find(stage => stage.id === selectedStageId) || currentStage"
@@ -139,14 +139,17 @@
         @clear-selection="clearDraftSelection"
       />
       <KnowledgeGraphPanel
-        v-if="isInsectOrNatureExpert && showGraphInRightPanel"
+        v-if="hasKnowledgeGraphContext && showGraphInRightPanel"
         :graph="knowledgeGraph"
         :selected-entity-ids="selectedGraphEntityIds"
         :selected-relation-ids="selectedGraphRelationIds"
         :loading="isLoadingKnowledgeGraph"
         :streaming="isStreaming"
-        :agent-name="selectedExpert?.name || ''"
+        :agent-name="activeGraphExpert?.name || ''"
+        :query="lastGraphQuery"
+        :error="knowledgeGraphError"
         @close="showGraphInRightPanel = false"
+        @refresh="openKnowledgeGraphPanel"
         @toggle-node="toggleGraphEntity"
         @toggle-relation="toggleGraphRelation"
         @select-path="selectGraphPath"
@@ -738,6 +741,7 @@ const graphAdminData = ref<KnowledgeGraphPayload>({
   recommended_path_ids: [],
 });
 const isLoadingKnowledgeGraph = ref(false);
+const knowledgeGraphError = ref("");
 const knowledgeGraph = ref<KnowledgeGraphPayload>({
   entities: [],
   relations: [],
@@ -746,6 +750,10 @@ const knowledgeGraph = ref<KnowledgeGraphPayload>({
 });
 const selectedGraphEntityIds = ref<string[]>([]);
 const selectedGraphRelationIds = ref<string[]>([]);
+const lastGraphQuery = ref("");
+const lastGraphExpertId = ref("");
+const graphContextSessionId = ref("");
+let knowledgeGraphRequestSequence = 0;
 const currentDraftCursorLine = ref(1);
 const draftEditorScrollTop = ref(0);
 const draftEditorMeasureWidth = ref(0);
@@ -759,9 +767,11 @@ let draftMeasureCanvas: HTMLCanvasElement | null = null;
 // New ref for modal
 const showNewSessionModal = ref(false);
 
-function resetKnowledgeGraphState() {
-  showKnowledgeGraphPanel.value = false;
-  isLoadingKnowledgeGraph.value = false;
+function isKnowledgeGraphExpert(expertId: string): boolean {
+  return expertId === "insect_agent" || expertId === "nature_agent";
+}
+
+function clearKnowledgeGraphPayload() {
   knowledgeGraph.value = {
     entities: [],
     relations: [],
@@ -770,6 +780,17 @@ function resetKnowledgeGraphState() {
   };
   selectedGraphEntityIds.value = [];
   selectedGraphRelationIds.value = [];
+}
+
+function resetKnowledgeGraphState() {
+  knowledgeGraphRequestSequence += 1;
+  showKnowledgeGraphPanel.value = false;
+  isLoadingKnowledgeGraph.value = false;
+  knowledgeGraphError.value = "";
+  clearKnowledgeGraphPayload();
+  lastGraphQuery.value = "";
+  lastGraphExpertId.value = "";
+  graphContextSessionId.value = "";
 }
 
 function applyTheme(mode: "dark" | "light") {
@@ -849,8 +870,18 @@ const isDraftMode = computed(() => Boolean(currentSession.value?.draft_mode_enab
 const selectedExpert = computed(() =>
   experts.value.find((expert) => expert.id === selectedExpertId.value) || null,
 );
-const isInsectOrNatureExpert = computed(() =>
-  selectedExpertId.value === "insect_agent" || selectedExpertId.value === "nature_agent",
+const isSelectedGraphExpert = computed(() =>
+  isKnowledgeGraphExpert(selectedExpertId.value),
+);
+const activeGraphExpert = computed(() =>
+  experts.value.find((expert) => expert.id === lastGraphExpertId.value) || null,
+);
+const hasKnowledgeGraphContext = computed(() =>
+  Boolean(
+    currentSession.value
+    && graphContextSessionId.value === currentSession.value.id
+    && (lastGraphExpertId.value || isSelectedGraphExpert.value),
+  ),
 );
 const curriculumTotalChunks = computed(() =>
   curriculumFiles.value.reduce((total, item) => total + item.chunk_count, 0),
@@ -1325,7 +1356,31 @@ async function logout() {
   }
 }
 
-async function loadSession(sessionId: string, loadMessages = true, preserveWarning = false) {
+function restoreKnowledgeGraphContextFromMessages(sessionId: string, history: MessageItem[]): boolean {
+  for (let assistantIndex = history.length - 1; assistantIndex >= 0; assistantIndex -= 1) {
+    const assistant = history[assistantIndex];
+    if (assistant.role !== "assistant" || !isKnowledgeGraphExpert(assistant.agent_id || "")) continue;
+    for (let userIndex = assistantIndex - 1; userIndex >= 0; userIndex -= 1) {
+      const userMessage = history[userIndex];
+      if (userMessage.role !== "user" || !userMessage.content.trim()) continue;
+      graphContextSessionId.value = sessionId;
+      lastGraphExpertId.value = assistant.agent_id || "";
+      lastGraphQuery.value = userMessage.content.trim();
+      showGraphInRightPanel.value = true;
+      return true;
+    }
+  }
+  return false;
+}
+
+async function loadSession(
+  sessionId: string,
+  loadMessages = true,
+  preserveWarning = false,
+  preserveGraphContext = false,
+) {
+  const keepGraphContext = graphContextSessionId.value === sessionId
+    && (preserveGraphContext || !loadMessages);
   const [session, files] = await Promise.all([
     getSession(sessionId),
     getSessionFiles(sessionId),
@@ -1339,10 +1394,13 @@ async function loadSession(sessionId: string, loadMessages = true, preserveWarni
   selectedSessionId.value = session.id;
   selectedExpertId.value = "";
   selectedStageId.value = pickStageIdFromSession(session);
-  resetKnowledgeGraphState();
+  if (!keepGraphContext) resetKnowledgeGraphState();
   if (loadMessages) {
     messages.value = await getMessages(sessionId);
   }
+  const restoredGraphContext = !keepGraphContext
+    && loadMessages
+    && restoreKnowledgeGraphContextFromMessages(sessionId, messages.value);
   clearAttachedChatSelection(true);
   syncDraftFromSelection();
   draftStreamingContent.value = "";
@@ -1350,6 +1408,9 @@ async function loadSession(sessionId: string, loadMessages = true, preserveWarni
   syncDraftEditor();
   updateDraftCursorLine();
   await refreshDraftProposal();
+  if (restoredGraphContext) {
+    await refreshKnowledgeGraph(lastGraphQuery.value, lastGraphExpertId.value, sessionId);
+  }
   statusText.value = `已切换到 ${session.topic}`;
 }
 
@@ -1956,20 +2017,26 @@ function createStreamRequestId() {
   return `chat_${Date.now()}_${randomId}`;
 }
 
-async function openKnowledgeGraphPanel() {
-  if (!currentSession.value || isStreaming.value) {
+async function refreshKnowledgeGraph(query: string, expertId: string, sessionId: string) {
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery || !expertId || !sessionId) {
+    knowledgeGraphRequestSequence += 1;
+    isLoadingKnowledgeGraph.value = false;
+    knowledgeGraphError.value = "";
+    clearKnowledgeGraphPayload();
     return;
   }
-  if (!selectedExpertId.value) {
-    statusText.value = "请先选择专家 Agent，再查看知识图谱";
-    return;
-  }
-  const message = chatInput.value.trim();
-  showGraphInRightPanel.value = true;
+  const requestSequence = ++knowledgeGraphRequestSequence;
   isLoadingKnowledgeGraph.value = true;
-  streamWarning.value = "";
+  knowledgeGraphError.value = "";
   try {
-    const graph = await getKnowledgeGraphCandidates(currentSession.value.id, message, selectedExpertId.value || undefined);
+    const graph = await getKnowledgeGraphCandidates(sessionId, normalizedQuery, expertId);
+    if (
+      requestSequence !== knowledgeGraphRequestSequence
+      || graphContextSessionId.value !== sessionId
+      || lastGraphQuery.value !== normalizedQuery
+      || lastGraphExpertId.value !== expertId
+    ) return;
     knowledgeGraph.value = graph;
     const recommendedPath = graph.paths.find((path) => graph.recommended_path_ids.includes(path.id));
     selectedGraphEntityIds.value = recommendedPath?.entity_ids?.length
@@ -1978,15 +2045,30 @@ async function openKnowledgeGraphPanel() {
     selectedGraphRelationIds.value = recommendedPath?.relation_ids?.length
       ? [...recommendedPath.relation_ids]
       : [];
-    statusText.value = graph.entities.length
-      ? (recommendedPath ? "已自动选择推荐关系，可调整后回答" : "已生成局部知识图谱，请选择回答节点")
-      : "没有找到相关图谱关系";
   } catch (error: any) {
-    streamWarning.value = error.message || String(error);
-    statusText.value = "知识图谱解析失败";
+    if (requestSequence !== knowledgeGraphRequestSequence) return;
+    clearKnowledgeGraphPayload();
+    knowledgeGraphError.value = error.message || String(error);
   } finally {
-    isLoadingKnowledgeGraph.value = false;
+    if (requestSequence === knowledgeGraphRequestSequence) {
+      isLoadingKnowledgeGraph.value = false;
+    }
   }
+}
+
+async function openKnowledgeGraphPanel() {
+  if (!currentSession.value) return;
+  if (isSelectedGraphExpert.value) {
+    lastGraphExpertId.value = selectedExpertId.value;
+    graphContextSessionId.value = currentSession.value.id;
+  }
+  if (!lastGraphExpertId.value) return;
+  showGraphInRightPanel.value = true;
+  await refreshKnowledgeGraph(
+    lastGraphQuery.value,
+    lastGraphExpertId.value,
+    currentSession.value.id,
+  );
 }
 
 async function openGraphAdmin() {
@@ -2070,8 +2152,15 @@ async function sendGraphSelectedChat() {
     statusText.value = "请先选择至少一个图谱节点";
     return;
   }
-  await sendChat(buildGraphSelection());
-  showKnowledgeGraphPanel.value = false;
+  if (!lastGraphQuery.value || !lastGraphExpertId.value) {
+    statusText.value = "当前没有可重新回答的图谱问题";
+    return;
+  }
+  await sendChat({
+    graphSelection: buildGraphSelection(),
+    message: lastGraphQuery.value,
+    expertId: lastGraphExpertId.value,
+  });
 }
 
 async function interruptChat() {
@@ -2090,11 +2179,17 @@ async function interruptChat() {
   }
 }
 
-async function sendChat(graphSelection: GraphSelectionPayload | null = null) {
+type SendChatOptions = {
+  graphSelection?: GraphSelectionPayload | null;
+  message?: string;
+  expertId?: string;
+};
+
+async function sendChat(options: SendChatOptions = {}) {
   if (isStreaming.value) {
     return;
   }
-  const text = chatInput.value.trim();
+  const text = (options.message ?? chatInput.value).trim();
   if (!text) {
     statusText.value = "请输入要发送的内容";
     return;
@@ -2106,8 +2201,10 @@ async function sendChat(graphSelection: GraphSelectionPayload | null = null) {
     return;
   }
 
-  const requestExpert = selectedExpert.value;
+  const requestedExpertId = options.expertId || selectedExpertId.value;
+  const requestExpert = experts.value.find((expert) => expert.id === requestedExpertId) || null;
   const requestExpertId = requestExpert?.id || "";
+  const graphSelection = options.graphSelection || null;
   const requestMode: "main" | "expert" | "draft" = requestExpertId
     ? "expert"
     : currentSession.value.draft_mode_enabled
@@ -2138,6 +2235,15 @@ async function sendChat(graphSelection: GraphSelectionPayload | null = null) {
   messages.value = [...messages.value, userMessage];
   chatInput.value = "";
   void nextTick(resizeChatInput);
+  if (isKnowledgeGraphExpert(requestExpertId)) {
+    graphContextSessionId.value = sessionId;
+    lastGraphQuery.value = text;
+    lastGraphExpertId.value = requestExpertId;
+    showGraphInRightPanel.value = true;
+    if (!graphSelection) {
+      void refreshKnowledgeGraph(text, requestExpertId, sessionId);
+    }
+  }
   isStreaming.value = true;
   activeStreamRequestId.value = requestId;
   activeStreamAbortController.value = abortController;
@@ -2313,7 +2419,7 @@ async function sendChat(graphSelection: GraphSelectionPayload | null = null) {
           updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "expert" ? "expert" : "guide", statusText.value, "done");
         },
         done: async (data) => {
-          await loadSession(sessionId, true, true);
+          await loadSession(sessionId, true, true, true);
           await refreshDraftProposal();
           if (requestMode === "draft") {
             if (data.draft_proposal) {
@@ -2578,12 +2684,16 @@ watch(saveSuccessVisible, (visible) => {
 });
 
 watch(selectedExpertId, (newExpertId) => {
-  if (newExpertId === "insect_agent" || newExpertId === "nature_agent") {
-    showGraphInRightPanel.value = true;
-    if (currentSession.value && !isStreaming.value) {
-      openKnowledgeGraphPanel();
+  if (isKnowledgeGraphExpert(newExpertId)) {
+    if (currentSession.value) {
+      graphContextSessionId.value = currentSession.value.id;
+      lastGraphExpertId.value = newExpertId;
     }
-  } else {
+    showGraphInRightPanel.value = true;
+    if (currentSession.value && lastGraphQuery.value) {
+      void refreshKnowledgeGraph(lastGraphQuery.value, newExpertId, currentSession.value.id);
+    }
+  } else if (newExpertId) {
     showGraphInRightPanel.value = false;
   }
 });

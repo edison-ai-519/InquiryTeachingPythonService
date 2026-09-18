@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import shutil
@@ -21,6 +22,7 @@ os.environ["KNOWLEDGE_SOURCE_DIR"] = str(TEST_DIR / "knowledge_sources")
 os.environ["LLM_API_KEY"] = ""
 os.environ["AGENT_CONFIG_PATH"] = "app/agents/config/agents.yaml"
 os.environ["CURRICULUM_VECTOR_ENABLED"] = "false"
+os.environ["ECOLOGY_GRAPH_AUTO_SYNC_ENABLED"] = "false"
 os.environ["FRONTEND_ORIGIN"] = (
     "http://127.0.0.1:5173,"
     "http://localhost:5173,"
@@ -43,6 +45,8 @@ from app.db.models import (
     CurriculumSourceModel,
     CurriculumSourceAgentPermissionModel,
     DraftProposalModel,
+    EcologyGraphSourceStateModel,
+    EcologyGraphSyncJobModel,
     KnowledgeEntityModel,
     KnowledgeEntityMentionModel,
     KnowledgeEntitySourceModel,
@@ -67,6 +71,15 @@ from app.services.curriculum_knowledge_service import (
 from app.services.curriculum_vector_service import CurriculumVectorHit
 from app.services.curriculum_permission_service import CurriculumPermissionService
 from app.services.graph_rag_service import GraphRagService
+from app.services.ecology_graph_sync_service import (
+    EcologyGraphJobProcessor,
+    EcologyGraphSyncService,
+)
+from app.services.ecology_lightrag_service import (
+    EcologyExtractionResult,
+    ExtractedEntity,
+    ExtractedRelation,
+)
 from app.services.knowledge_graph_service import KnowledgeGraphService
 from app.services.prompt_service import PromptService
 from app.services.session_file_service import SessionFileService
@@ -201,6 +214,20 @@ class FakeCurriculumVectorStore:
             "rebuild_required": False,
             "error": self.error,
         }
+
+
+class FakeEcologyExtractor:
+    def __init__(self, result: EcologyExtractionResult):
+        self.result = result
+        self.calls = []
+        self.deleted_sources = []
+
+    async def extract(self, *, source: str, checksum: str, chunks: list[str]):
+        self.calls.append((source, checksum, list(chunks)))
+        return self.result
+
+    def delete_source_artifacts(self, source: str):
+        self.deleted_sources.append(source)
 
 
 class AgentArchitectureApiTests(unittest.TestCase):
@@ -2043,10 +2070,33 @@ class AgentArchitectureApiTests(unittest.TestCase):
         try:
             with SessionLocal() as db:
                 service = KnowledgeGraphService(db)
-                service.load_seed_graph()
                 service.import_graph_json(
                     {
                         "entities": [
+                            {
+                                "id": "plant_rose",
+                                "name": "月季",
+                                "entity_type": "plant",
+                                "aliases": ["玫瑰", "月季花"],
+                                "description": "用于测试的植物节点。",
+                                "source": "test",
+                            },
+                            {
+                                "id": "insect_aphid",
+                                "name": "蚜虫",
+                                "entity_type": "insect",
+                                "aliases": ["腻虫"],
+                                "description": "用于测试的昆虫节点。",
+                                "source": "test",
+                            },
+                            {
+                                "id": "insect_ladybug",
+                                "name": "七星瓢虫",
+                                "entity_type": "insect",
+                                "aliases": ["瓢虫"],
+                                "description": "用于测试的捕食性昆虫节点。",
+                                "source": "test",
+                            },
                             {
                                 "id": "plant_pine",
                                 "name": "松树",
@@ -2065,6 +2115,24 @@ class AgentArchitectureApiTests(unittest.TestCase):
                             },
                         ],
                         "relations": [
+                            {
+                                "id": "rel_aphid_feeds_on_rose",
+                                "subject_entity_id": "insect_aphid",
+                                "predicate": "feeds_on",
+                                "object_entity_id": "plant_rose",
+                                "description": "蚜虫取食月季。",
+                                "evidence_source": "test",
+                                "confidence": "high",
+                            },
+                            {
+                                "id": "rel_ladybug_predator_of_aphid",
+                                "subject_entity_id": "insect_ladybug",
+                                "predicate": "predator_of",
+                                "object_entity_id": "insect_aphid",
+                                "description": "七星瓢虫捕食蚜虫。",
+                                "evidence_source": "test",
+                                "confidence": "high",
+                            },
                             {
                                 "id": "rel_pine_photosynthesis",
                                 "subject_entity_id": "plant_pine",
@@ -2526,6 +2594,259 @@ class AgentArchitectureApiTests(unittest.TestCase):
             knowledge.delete_source(source)
             db.commit()
 
+    def test_lightrag_ecology_sync_validates_evidence_and_preserves_admin_control(self):
+        suffix = uuid.uuid4().hex[:8]
+        source = f"auto_ecology_{suffix}.md"
+        aphid_name = f"测试蚜虫{suffix}"
+        aphid_alias = f"测试腻虫{suffix}"
+        rose = f"测试月季{suffix}"
+        bee = f"测试蜜蜂{suffix}"
+        ladybird = f"测试瓢虫{suffix}"
+        ant = f"测试蚂蚁{suffix}"
+        moss = f"测试苔藓{suffix}"
+        result = EcologyExtractionResult(
+            entities={
+                aphid_alias: ExtractedEntity(aphid_alias, "昆虫"),
+                rose: ExtractedEntity(rose, "植物"),
+                bee: ExtractedEntity(bee, "insect"),
+                ladybird: ExtractedEntity(ladybird, "insect"),
+                ant: ExtractedEntity(ant, "insect"),
+                moss: ExtractedEntity(moss, "plant"),
+            },
+            relations=[
+                ExtractedRelation(aphid_alias, rose, "取食关系"),
+                ExtractedRelation(bee, rose, "访花关系"),
+                ExtractedRelation(aphid_alias, ladybird, "捕食关系"),
+                ExtractedRelation(ant, moss, "模型误连了跨句实体"),
+            ],
+            document_id=f"fake-doc-{suffix}",
+        )
+        extractor = FakeEcologyExtractor(result)
+        processor = EcologyGraphJobProcessor(get_settings(), extractor)
+
+        with SessionLocal() as db:
+            knowledge = CurriculumKnowledgeService(db)
+            knowledge.ingest_chunks(
+                source,
+                [
+                    f"{aphid_alias}取食{rose}的嫩叶。",
+                    f"{bee}经常访花{rose}。",
+                    f"{aphid_alias}被{ladybird}捕食。",
+                    f"{ant}停在石头上。{moss}遭到危害。",
+                ],
+                category="ecology",
+            )
+            KnowledgeGraphService(db).create_entity(
+                name=aphid_name,
+                entity_type="insect",
+                aliases=[aphid_alias],
+            )
+            db.commit()
+            job_id = (
+                db.query(EcologyGraphSyncJobModel.id)
+                .filter(
+                    EcologyGraphSyncJobModel.source == source,
+                    EcologyGraphSyncJobModel.operation == "sync",
+                )
+                .one()[0]
+            )
+
+        asyncio.run(processor.process_job(job_id))
+
+        with SessionLocal() as db:
+            state = db.get(EcologyGraphSourceStateModel, source)
+            self.assertEqual(state.status, "ready")
+            self.assertEqual(state.relation_count, 3)
+            self.assertEqual(state.rejected_count, 1)
+            graph = KnowledgeGraphService(db)
+            relations = (
+                db.query(KnowledgeRelationModel)
+                .filter(KnowledgeRelationModel.origin == "lightrag")
+                .all()
+            )
+            source_relation_ids = {
+                relation.id
+                for relation in relations
+                if source in graph.serialize_relation(relation)["evidence_source"]
+            }
+            self.assertEqual(len(source_relation_ids), 3)
+            self.assertEqual(
+                {row.predicate for row in relations if row.id in source_relation_ids},
+                {"feeds_on", "visits", "predator_of"},
+            )
+            predator = next(
+                row
+                for row in relations
+                if row.id in source_relation_ids and row.predicate == "predator_of"
+            )
+            entity_names = {
+                row.id: row.name for row in db.query(KnowledgeEntityModel).all()
+            }
+            self.assertEqual(entity_names[predator.subject_entity_id], ladybird)
+            self.assertEqual(entity_names[predator.object_entity_id], aphid_name)
+            payload = graph.find_candidate_graph(message=aphid_alias)
+            self.assertTrue(
+                any(
+                    len(path["relation_ids"]) == 2 and "同一植物" in path["reason"]
+                    for path in payload["paths"]
+                )
+            )
+
+            feed_relation = next(
+                row
+                for row in relations
+                if row.id in source_relation_ids and row.predicate == "feeds_on"
+            )
+            feed_relation_id = feed_relation.id
+            serialized = graph.serialize_relation(feed_relation)
+            graph.update_relation(
+                feed_relation.id,
+                subject_entity_id=feed_relation.subject_entity_id,
+                predicate=feed_relation.predicate,
+                object_entity_id=feed_relation.object_entity_id,
+                description="管理员确认后的说明",
+                confidence="high",
+                evidence_chunk_ids=[item["chunk_id"] for item in serialized["evidence"]],
+            )
+            db.commit()
+            next_job = EcologyGraphSyncService(db).enqueue_source(source, force=True)
+            db.commit()
+
+        asyncio.run(processor.process_job(next_job["id"]))
+
+        with SessionLocal() as db:
+            feed_relation = db.get(KnowledgeRelationModel, feed_relation_id)
+            self.assertEqual(feed_relation.description, "管理员确认后的说明")
+            self.assertEqual(feed_relation.management_mode, "manual_override")
+            graph = KnowledgeGraphService(db)
+            graph.delete_relation(feed_relation.id)
+            db.commit()
+            suppressed_job = EcologyGraphSyncService(db).enqueue_source(source, force=True)
+            db.commit()
+
+        asyncio.run(processor.process_job(suppressed_job["id"]))
+
+        with SessionLocal() as db:
+            feed_relation = db.get(KnowledgeRelationModel, feed_relation_id)
+            self.assertEqual(feed_relation.status, "suppressed")
+            self.assertEqual(
+                db.query(KnowledgeRelationModel)
+                .filter(
+                    KnowledgeRelationModel.subject_entity_id == feed_relation.subject_entity_id,
+                    KnowledgeRelationModel.predicate == "feeds_on",
+                    KnowledgeRelationModel.object_entity_id == feed_relation.object_entity_id,
+                )
+                .count(),
+                1,
+            )
+            restored = KnowledgeGraphService(db).restore_auto_relation(feed_relation.id)
+            self.assertEqual(restored["management_mode"], "auto")
+            self.assertEqual(restored["status"], "active")
+            CurriculumKnowledgeService(db).delete_source(source)
+            db.commit()
+            delete_job_id = (
+                db.query(EcologyGraphSyncJobModel.id)
+                .filter(
+                    EcologyGraphSyncJobModel.source == source,
+                    EcologyGraphSyncJobModel.operation == "delete",
+                )
+                .order_by(EcologyGraphSyncJobModel.created_at.desc())
+                .first()[0]
+            )
+
+        asyncio.run(processor.process_job(delete_job_id))
+        self.assertEqual(extractor.deleted_sources, [source])
+        with SessionLocal() as db:
+            self.assertIsNone(db.get(EcologyGraphSourceStateModel, source))
+            for entity in db.query(KnowledgeEntityModel).filter(
+                KnowledgeEntityModel.name.in_([aphid_name, rose, bee, ladybird, ant, moss])
+            ):
+                db.delete(entity)
+            db.commit()
+
+    def test_ecology_category_change_cancels_sync_and_queues_cleanup(self):
+        source = f"ecology_category_change_{uuid.uuid4().hex}.md"
+        with SessionLocal() as db:
+            knowledge = CurriculumKnowledgeService(db)
+            knowledge.ingest_chunks(
+                source,
+                ["测试昆虫取食测试植物。"],
+                category="ecology",
+            )
+            db.commit()
+            sync_job = (
+                db.query(EcologyGraphSyncJobModel)
+                .filter(
+                    EcologyGraphSyncJobModel.source == source,
+                    EcologyGraphSyncJobModel.operation == "sync",
+                )
+                .one()
+            )
+            self.assertEqual(sync_job.status, "queued")
+
+            knowledge.ingest_chunks(
+                source,
+                ["已经转为普通课程资料。"],
+                category="curriculum",
+            )
+            db.commit()
+            self.assertEqual(sync_job.status, "cancelled")
+            self.assertEqual(
+                db.query(EcologyGraphSyncJobModel)
+                .filter(
+                    EcologyGraphSyncJobModel.source == source,
+                    EcologyGraphSyncJobModel.operation == "delete",
+                    EcologyGraphSyncJobModel.status == "queued",
+                )
+                .count(),
+                1,
+            )
+            knowledge.delete_source(source)
+            db.commit()
+
+    def test_ecology_sync_api_is_admin_only_and_reports_jobs(self):
+        source = f"ecology_sync_api_{uuid.uuid4().hex}.md"
+        admin_client = TestClient(app)
+        try:
+            registered = admin_client.post(
+                "/api/auth/admin/register",
+                json={
+                    "username": f"ecology_admin_{uuid.uuid4().hex[:8]}",
+                    "password": "valid-password-123",
+                },
+            )
+            self.assertEqual(registered.status_code, 200, registered.text)
+            with SessionLocal() as db:
+                CurriculumKnowledgeService(db).ingest_chunks(
+                    source,
+                    ["测试蜜蜂访花测试月季。"],
+                    category="ecology",
+                )
+                db.commit()
+
+            denied = self.client.get("/api/knowledge/ecology-graph/sync")
+            self.assertEqual(denied.status_code, 403)
+            queued = admin_client.post(
+                "/api/knowledge/ecology-graph/sync",
+                json={"source": source, "force": True},
+            )
+            self.assertEqual(queued.status_code, 200, queued.text)
+            self.assertEqual(queued.json()["data"]["queued_count"], 1)
+            status = admin_client.get("/api/knowledge/ecology-graph/sync")
+            self.assertEqual(status.status_code, 200, status.text)
+            source_jobs = [
+                item
+                for item in status.json()["data"]["jobs"]
+                if item["source"] == source
+            ]
+            self.assertTrue(source_jobs)
+            self.assertEqual(source_jobs[0]["status"], "queued")
+        finally:
+            with SessionLocal() as db:
+                CurriculumKnowledgeService(db).delete_source(source)
+                db.commit()
+            admin_client.close()
+
     def test_insect_plant_insect_path_prefers_chunk_evidence(self):
         suffix = uuid.uuid4().hex[:8]
         source = f"ecology_path_{suffix}.md"
@@ -2723,12 +3044,11 @@ class AgentArchitectureApiTests(unittest.TestCase):
             self.assertEqual(source["mode"], "local_bm25_error")
             self.assertIn("retrieval failed", source["error"])
 
-    def test_knowledge_graph_empty_message_uses_selected_agent_defaults(self):
+    def test_knowledge_graph_empty_and_unmatched_messages_return_empty(self):
         session_id, _ = self.create_session(topic="光的折射")
         try:
             with SessionLocal() as db:
                 service = KnowledgeGraphService(db)
-                service.load_seed_graph()
                 service.import_graph_json(
                     {
                         "entities": [
@@ -2748,6 +3068,14 @@ class AgentArchitectureApiTests(unittest.TestCase):
                                 "description": "植物合成有机物的过程。",
                                 "source": "test",
                             },
+                            {
+                                "id": "habitat_orphan",
+                                "name": "孤立生境",
+                                "entity_type": "habitat",
+                                "aliases": [],
+                                "description": "用于验证全量图谱保留孤立节点。",
+                                "source": "test",
+                            },
                         ],
                         "relations": [
                             {
@@ -2762,7 +3090,18 @@ class AgentArchitectureApiTests(unittest.TestCase):
                         ],
                     }
                 )
+                relation = db.get(KnowledgeRelationModel, "rel_pine_photosynthesis")
+                relation.status = "suppressed"
                 db.commit()
+
+                full_graph = service.all_graph()
+                self.assertIn("孤立生境", {item["name"] for item in full_graph["entities"]})
+                self.assertIn(
+                    "rel_pine_photosynthesis",
+                    {item["id"] for item in full_graph["relations"]},
+                )
+                self.assertEqual(full_graph["paths"], [])
+                self.assertEqual(full_graph["recommended_path_ids"], [])
 
             response = self.client.post(
                 "/api/knowledge/graph/candidates",
@@ -2774,11 +3113,20 @@ class AgentArchitectureApiTests(unittest.TestCase):
             )
             self.assertEqual(response.status_code, 200)
             data = response.json()["data"]
-            names = {entity["name"] for entity in data["entities"]}
-            self.assertIn("蚜虫", names)
-            self.assertIn("七星瓢虫", names)
-            self.assertNotIn("松树", names)
-            self.assertNotEqual(data["recommended_path_ids"], [])
+            self.assertEqual(data["entities"], [])
+            self.assertEqual(data["relations"], [])
+            self.assertEqual(data["recommended_path_ids"], [])
+
+            unmatched = self.client.post(
+                "/api/knowledge/graph/candidates",
+                json={
+                    "session_id": session_id,
+                    "message": "银河系边缘的量子卫星",
+                    "expert_id": "insect_agent",
+                },
+            )
+            self.assertEqual(unmatched.status_code, 200)
+            self.assertEqual(unmatched.json()["data"]["entities"], [])
         finally:
             self.delete_session(session_id)
 

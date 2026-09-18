@@ -170,6 +170,28 @@ CURRICULUM_HYBRID_BM25_WEIGHT=0.35
 
 新接口导出 v4、导入兼容 v1—v4；旧 `/api/curriculum` 接口继续导出 v3，并保留旧客户端响应结构。
 
+## 生态资料自动建图
+
+分类为 `ecology` 的知识文件会自动进入串行 LightRAG 抽取队列。LightRAG 只负责候选实体和关系抽取；正式问答仍使用现有 SQL 图谱、片段证据、Chroma 与 BM25。只有原文片段同时出现双方实体（名称或别名）和受控关系词时，关系才会发布到正式图谱。
+
+自动关系支持取食、访花、授粉、栖息、产卵、危害、捕食和寄生。管理员可以在“知识图谱与证据连接”中查看同步进度、手工覆盖或屏蔽自动关系，也可以恢复自动管理。上传、替换和删除生态资料会自动创建增量任务；课程课标和乡村振兴资料不会进入 LightRAG。
+
+```text
+ECOLOGY_GRAPH_AUTO_SYNC_ENABLED=true
+ECOLOGY_LIGHTRAG_DIR=./data/lightrag/ecology
+ECOLOGY_GRAPH_WORKER_POLL_SECONDS=2
+ECOLOGY_GRAPH_JOB_MAX_ATTEMPTS=3
+ECOLOGY_GRAPH_EXTRACT_MODEL=deepseek/deepseek-v4-flash
+```
+
+同步接口（管理员）：
+
+```text
+POST /api/knowledge/ecology-graph/sync
+GET  /api/knowledge/ecology-graph/sync
+POST /api/knowledge/graph/relations/{relation_id}/restore-auto
+```
+
 ## 快速请求示例
 
 创建会话：

@@ -178,6 +178,11 @@ CREATE TABLE IF NOT EXISTS knowledge_entities (
     aliases_json TEXT NOT NULL DEFAULT '[]',
     description  TEXT NOT NULL DEFAULT '',
     source       TEXT NOT NULL DEFAULT '',
+    origin       TEXT NOT NULL DEFAULT 'manual',
+    management_mode TEXT NOT NULL DEFAULT 'manual',
+    extractor_model TEXT NOT NULL DEFAULT '',
+    extractor_version TEXT NOT NULL DEFAULT '',
+    last_auto_sync_at TEXT NOT NULL DEFAULT '',
     created_at   TEXT NOT NULL,
     updated_at   TEXT NOT NULL
 );
@@ -204,12 +209,20 @@ CREATE TABLE IF NOT EXISTS knowledge_relations (
     description        TEXT NOT NULL DEFAULT '',
     evidence_source    TEXT NOT NULL DEFAULT '',
     confidence         TEXT NOT NULL DEFAULT 'medium',
+    origin             TEXT NOT NULL DEFAULT 'manual',
+    management_mode    TEXT NOT NULL DEFAULT 'manual',
+    status             TEXT NOT NULL DEFAULT 'active',
+    extractor_model    TEXT NOT NULL DEFAULT '',
+    extractor_version  TEXT NOT NULL DEFAULT '',
+    last_auto_sync_at  TEXT NOT NULL DEFAULT '',
     created_at         TEXT NOT NULL,
     updated_at         TEXT NOT NULL,
     CONSTRAINT fk_knowledge_relations_subject
         FOREIGN KEY (subject_entity_id) REFERENCES knowledge_entities (id) ON DELETE CASCADE,
     CONSTRAINT fk_knowledge_relations_object
-        FOREIGN KEY (object_entity_id) REFERENCES knowledge_entities (id) ON DELETE CASCADE
+        FOREIGN KEY (object_entity_id) REFERENCES knowledge_entities (id) ON DELETE CASCADE,
+    CONSTRAINT uq_knowledge_relation_triple
+        UNIQUE (subject_entity_id, predicate, object_entity_id)
 );
 
 CREATE INDEX IF NOT EXISTS ix_knowledge_relations_subject_entity_id
@@ -218,6 +231,12 @@ CREATE INDEX IF NOT EXISTS ix_knowledge_relations_object_entity_id
     ON knowledge_relations (object_entity_id);
 CREATE INDEX IF NOT EXISTS ix_knowledge_relations_predicate
     ON knowledge_relations (predicate);
+CREATE INDEX IF NOT EXISTS ix_knowledge_entities_origin
+    ON knowledge_entities (origin);
+CREATE INDEX IF NOT EXISTS ix_knowledge_relations_origin
+    ON knowledge_relations (origin);
+CREATE INDEX IF NOT EXISTS ix_knowledge_relations_status
+    ON knowledge_relations (status);
 
 CREATE TABLE IF NOT EXISTS knowledge_entity_mentions (
     entity_id  TEXT NOT NULL,
@@ -248,6 +267,46 @@ CREATE TABLE IF NOT EXISTS knowledge_relation_evidence (
 
 CREATE INDEX IF NOT EXISTS ix_knowledge_relation_evidence_source
     ON knowledge_relation_evidence (source);
+
+CREATE TABLE IF NOT EXISTS ecology_graph_sync_jobs (
+    id              TEXT PRIMARY KEY,
+    source          TEXT NOT NULL DEFAULT '',
+    source_checksum TEXT NOT NULL DEFAULT '',
+    operation       TEXT NOT NULL DEFAULT 'sync',
+    status          TEXT NOT NULL DEFAULT 'queued',
+    attempts        INTEGER NOT NULL DEFAULT 0,
+    stats_json      TEXT NOT NULL DEFAULT '{}',
+    last_error      TEXT NOT NULL DEFAULT '',
+    lease_until     TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL,
+    started_at      TEXT NOT NULL DEFAULT '',
+    finished_at     TEXT NOT NULL DEFAULT '',
+    updated_at      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_ecology_graph_sync_jobs_source
+    ON ecology_graph_sync_jobs (source);
+CREATE INDEX IF NOT EXISTS ix_ecology_graph_sync_jobs_status
+    ON ecology_graph_sync_jobs (status);
+CREATE INDEX IF NOT EXISTS ix_ecology_graph_jobs_source_status
+    ON ecology_graph_sync_jobs (source, status);
+
+CREATE TABLE IF NOT EXISTS ecology_graph_source_states (
+    source          TEXT PRIMARY KEY,
+    source_checksum TEXT NOT NULL DEFAULT '',
+    lightrag_doc_id TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL DEFAULT 'pending',
+    last_job_id     TEXT NOT NULL DEFAULT '',
+    entity_count    INTEGER NOT NULL DEFAULT 0,
+    relation_count  INTEGER NOT NULL DEFAULT 0,
+    rejected_count  INTEGER NOT NULL DEFAULT 0,
+    last_error      TEXT NOT NULL DEFAULT '',
+    last_synced_at  TEXT NOT NULL DEFAULT '',
+    updated_at      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_ecology_graph_source_states_status
+    ON ecology_graph_source_states (status);
 
 -- One rollback unit per chat round. Message IDs are application-managed
 -- references because rollback currently deletes messages before this row.

@@ -3,12 +3,18 @@
     <header>
       <div>
         <strong>{{ agentName ? `${agentName} 局部知识图谱` : "局部知识图谱" }}</strong>
-        <span>{{ graph.entities.length }} 个节点 · {{ graph.relations.length }} 条关系</span>
+        <span v-if="query" :title="query">问题：{{ query }} · {{ graph.entities.length }} 个节点 · {{ graph.relations.length }} 条关系</span>
+        <span v-else>{{ graph.entities.length }} 个节点 · {{ graph.relations.length }} 条关系</span>
       </div>
-      <button type="button" @click="$emit('close')"><X :size="15" />关闭</button>
+      <div class="graph-panel-actions">
+        <button type="button" :disabled="loading || !query" @click="$emit('refresh')"><RefreshCw :size="14" />刷新</button>
+        <button type="button" @click="$emit('close')"><X :size="15" />关闭</button>
+      </div>
     </header>
     <div v-if="loading" class="knowledge-graph-empty"><LoaderCircle class="spin-icon" :size="18" />正在解析局部图谱</div>
-    <div v-else-if="!graph.entities.length" class="knowledge-graph-empty">没有找到可展示的图谱关系</div>
+    <div v-else-if="error" class="knowledge-graph-empty graph-error">图谱加载失败：{{ error }}</div>
+    <div v-else-if="!query" class="knowledge-graph-empty">请先向昆虫或自然生态专家发送问题</div>
+    <div v-else-if="!graph.entities.length" class="knowledge-graph-empty">当前问题没有匹配到可展示的图谱关系</div>
     <div v-else class="knowledge-graph-body">
       <svg class="knowledge-graph-svg" viewBox="0 0 520 320" role="img" aria-label="知识图谱局部关系">
         <defs>
@@ -81,7 +87,7 @@
     <footer>
       <span>{{ selectedEntityIds.length ? `已选择 ${selectedEntityIds.length} 个节点、${selectedRelationIds.length} 条关系` : "点击节点或关系选择回答依据" }}</span>
       <button type="button" :disabled="!selectedEntityIds.length || streaming" @click="$emit('answer')">
-        <GitBranch :size="15" />按选中链路回答
+        <GitBranch :size="15" />按选中链路重新回答
       </button>
     </footer>
   </section>
@@ -89,7 +95,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { GitBranch, LoaderCircle, X } from "lucide-vue-next";
+import { GitBranch, LoaderCircle, RefreshCw, X } from "lucide-vue-next";
 import type { KnowledgeGraphPayload, KnowledgePath } from "@/types";
 
 const props = defineProps<{
@@ -99,10 +105,13 @@ const props = defineProps<{
   loading: boolean;
   streaming: boolean;
   agentName: string;
+  query: string;
+  error: string;
 }>();
 
 const emit = defineEmits<{
   close: [];
+  refresh: [];
   answer: [];
   "toggle-node": [entityId: string];
   "toggle-relation": [relationId: string];

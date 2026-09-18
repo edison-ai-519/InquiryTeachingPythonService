@@ -6,6 +6,7 @@ import type {
   DraftProposal,
   DraftSelection,
   ExpertAgentItem,
+  EcologyGraphSyncStatus,
   FlowInfo,
   GraphSelectionPayload,
   KnowledgeEntity,
@@ -596,6 +597,35 @@ export async function deleteKnowledgeGraphRelation(relationId: string): Promise<
     `${API_BASE}/api/knowledge/graph/relations/${encodeURIComponent(relationId)}`,
     { method: "DELETE" },
   );
+}
+
+export async function restoreAutomaticKnowledgeGraphRelation(
+  relationId: string,
+): Promise<KnowledgeRelation> {
+  const payload = await readJson<ApiEnvelope<KnowledgeRelation>>(
+    `${API_BASE}/api/knowledge/graph/relations/${encodeURIComponent(relationId)}/restore-auto`,
+    { method: "POST" },
+  );
+  return payload.data;
+}
+
+export async function startEcologyGraphSync(source?: string): Promise<number> {
+  const payload = await readJson<ApiEnvelope<{ jobs: unknown[]; queued_count: number }>>(
+    `${API_BASE}/api/knowledge/ecology-graph/sync`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: source || null, force: true }),
+    },
+  );
+  return payload.data.queued_count;
+}
+
+export async function getEcologyGraphSyncStatus(): Promise<EcologyGraphSyncStatus> {
+  const payload = await readJson<ApiEnvelope<EcologyGraphSyncStatus>>(
+    `${API_BASE}/api/knowledge/ecology-graph/sync`,
+  );
+  return payload.data;
 }
 
 export async function getKnowledgeEvidenceChunks(

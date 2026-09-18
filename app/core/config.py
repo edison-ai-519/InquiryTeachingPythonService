@@ -107,9 +107,32 @@ class Settings:
         int(os.getenv("CURRICULUM_EMBEDDING_BATCH_SIZE", "8")),
     )
 
+    ecology_graph_auto_sync_enabled: bool = os.getenv(
+        "ECOLOGY_GRAPH_AUTO_SYNC_ENABLED",
+        "true",
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    ecology_lightrag_dir: Path = Path(
+        os.getenv(
+            "ECOLOGY_LIGHTRAG_DIR",
+            str(BASE_DIR / "data" / "lightrag" / "ecology"),
+        )
+    ).resolve()
+    ecology_graph_worker_poll_seconds: float = max(
+        0.5,
+        float(os.getenv("ECOLOGY_GRAPH_WORKER_POLL_SECONDS", "2")),
+    )
+    ecology_graph_job_max_attempts: int = max(
+        1,
+        int(os.getenv("ECOLOGY_GRAPH_JOB_MAX_ATTEMPTS", "3")),
+    )
+
     llm_api_key: str = os.getenv("LLM_API_KEY", "")
     llm_api_base: str = os.getenv("LLM_API_BASE", "https://api.openai.com/v1")
     llm_model: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
+    ecology_graph_extract_model: str = os.getenv(
+        "ECOLOGY_GRAPH_EXTRACT_MODEL",
+        "",
+    ).strip() or os.getenv("LLM_MODEL", "gpt-4o-mini").strip()
     llm_reasoning_enabled: bool = os.getenv(
         "LLM_REASONING_ENABLED",
         "false",

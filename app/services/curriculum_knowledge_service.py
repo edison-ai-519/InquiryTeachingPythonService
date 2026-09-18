@@ -260,6 +260,8 @@ class CurriculumKnowledgeService:
                     raise CurriculumFileError(vector_error) from exc
 
         source_state = self.db.get(CurriculumSourceModel, normalized_source)
+        previous_category = source_state.category if source_state is not None else ""
+        previous_checksum = source_state.checksum if source_state is not None else ""
         if source_state is None:
             source_state = CurriculumSourceModel(
                 source=normalized_source,
@@ -299,6 +301,21 @@ class CurriculumKnowledgeService:
             normalized_source,
             chunks=rows,
         )
+        if source_state.category == "ecology":
+            # 与知识文件写入使用同一事务，避免出现文件已更新但未排队的窗口。
+            from app.services.ecology_graph_sync_service import EcologyGraphSyncService
+
+            EcologyGraphSyncService(self.db).enqueue_source(
+                normalized_source,
+                force=True,
+            )
+        elif previous_category == "ecology":
+            from app.services.ecology_graph_sync_service import EcologyGraphSyncService
+
+            EcologyGraphSyncService(self.db).enqueue_delete(
+                normalized_source,
+                checksum=previous_checksum or "",
+            )
         return len(rows)
 
     def ensure_source_records(self) -> None:
@@ -345,6 +362,14 @@ class CurriculumKnowledgeService:
 
     def delete_source(self, source: str) -> int:
         normalized_source = normalize_source(source)
+        state = self.db.get(CurriculumSourceModel, normalized_source)
+        if state is not None and state.category == "ecology":
+            from app.services.ecology_graph_sync_service import EcologyGraphSyncService
+
+            EcologyGraphSyncService(self.db).enqueue_delete(
+                normalized_source,
+                checksum=state.checksum or "",
+            )
         try:
             self.vector_store.delete_source(normalized_source)
         except Exception:
@@ -354,7 +379,6 @@ class CurriculumKnowledgeService:
             .filter(CurriculumChunkModel.source == normalized_source)
             .delete(synchronize_session=False)
         )
-        state = self.db.get(CurriculumSourceModel, normalized_source)
         if state and state.id:
             from app.db.models import (
                 KnowledgeSourceReviewEventModel,

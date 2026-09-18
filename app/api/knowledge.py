@@ -12,6 +12,7 @@ from app.schemas import (
     KnowledgeRelationUpsertRequest,
 )
 from app.services.knowledge_graph_service import KnowledgeGraphService
+from app.services.ecology_graph_sync_service import EcologyGraphSyncService
 from app.services.session_access_service import get_owned_session
 from app.workflow.flows import get_flow
 
@@ -23,6 +24,11 @@ class GraphCandidateRequest(BaseModel):
     session_id: str = Field(min_length=1)
     message: str = Field(default="")
     expert_id: str | None = Field(default=None, max_length=128)
+
+
+class EcologyGraphSyncRequest(BaseModel):
+    source: str | None = Field(default=None, max_length=1024)
+    force: bool = True
 
 
 def _raise_graph_error(exc: Exception) -> None:
@@ -69,10 +75,6 @@ def get_graph_for_admin(
 ):
     service = KnowledgeGraphService(db)
     data = service.all_graph()
-    if not data["entities"]:
-        service.load_seed_graph()
-        db.commit()
-        data = service.all_graph()
     return {"code": 0, "message": "success", "data": data}
 
 
@@ -196,6 +198,64 @@ def delete_graph_relation(
         db.rollback()
         _raise_graph_error(exc)
     return {"code": 0, "message": "graph relation deleted", "data": None}
+
+
+@router.post("/graph/relations/{relation_id}/restore-auto")
+def restore_auto_graph_relation(
+    relation_id: str,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    try:
+        relation = KnowledgeGraphService(db).restore_auto_relation(relation_id)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        _raise_graph_error(exc)
+    return {
+        "code": 0,
+        "message": "automatic graph relation restored",
+        "data": relation,
+    }
+
+
+@router.post("/ecology-graph/sync")
+def start_ecology_graph_sync(
+    payload: EcologyGraphSyncRequest,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    service = EcologyGraphSyncService(db)
+    try:
+        if payload.source:
+            job = service.enqueue_source(payload.source, force=payload.force)
+            if job is None:
+                raise ValueError("指定来源不存在，或不属于生态资料")
+            jobs = [job]
+        else:
+            jobs = service.enqueue_all(force=payload.force)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        _raise_graph_error(exc)
+    return {
+        "code": 0,
+        "message": "ecology graph sync queued",
+        "data": {"jobs": jobs, "queued_count": len(jobs)},
+    }
+
+
+@router.get("/ecology-graph/sync")
+def get_ecology_graph_sync(
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    return {
+        "code": 0,
+        "message": "success",
+        "data": EcologyGraphSyncService(db).status_payload(limit=limit),
+    }
 
 
 @router.get("/graph/evidence-chunks")

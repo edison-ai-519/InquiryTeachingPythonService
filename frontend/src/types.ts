@@ -141,6 +141,11 @@ export type KnowledgeEntity = {
   source: string;
   rag_sources: string[];
   mention_count: number;
+  origin: "manual" | "lightrag" | string;
+  management_mode: "manual" | "auto" | "manual_override" | string;
+  extractor_model: string;
+  extractor_version: string;
+  last_auto_sync_at: string;
 };
 
 export type KnowledgeEvidence = {
@@ -161,6 +166,46 @@ export type KnowledgeRelation = {
   confidence: "high" | "medium" | "low" | string;
   evidence_status: "verified" | "unverified";
   evidence: KnowledgeEvidence[];
+  origin: "manual" | "lightrag" | string;
+  management_mode: "manual" | "auto" | "manual_override" | string;
+  status: "active" | "suppressed" | string;
+  extractor_model: string;
+  extractor_version: string;
+  last_auto_sync_at: string;
+};
+
+export type EcologyGraphSyncJob = {
+  id: string;
+  source: string;
+  source_checksum: string;
+  operation: "sync" | "delete" | string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled" | string;
+  attempts: number;
+  stats: Record<string, number>;
+  last_error: string;
+  created_at: string;
+  started_at: string;
+  finished_at: string;
+  updated_at: string;
+};
+
+export type EcologyGraphSourceState = {
+  source: string;
+  source_checksum: string;
+  lightrag_doc_id: string;
+  status: string;
+  last_job_id: string;
+  entity_count: number;
+  relation_count: number;
+  rejected_count: number;
+  last_error: string;
+  last_synced_at: string;
+  updated_at: string;
+};
+
+export type EcologyGraphSyncStatus = {
+  jobs: EcologyGraphSyncJob[];
+  sources: EcologyGraphSourceState[];
 };
 
 export type KnowledgePath = {

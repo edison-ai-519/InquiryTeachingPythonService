@@ -2773,13 +2773,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .knowledge-graph-panel { display:grid; gap:10px; margin:10px 0 12px; padding:12px; border:1px solid var(--border-default); border-radius:8px; background:var(--surface); box-shadow:var(--shadow-soft); }
 .knowledge-graph-panel header,.knowledge-graph-panel footer { display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .knowledge-graph-panel header div { display:grid; gap:2px; }
+.knowledge-graph-panel header .graph-panel-actions { display:flex; flex:0 0 auto; gap:6px; }
 .knowledge-graph-panel header strong { color:var(--text-primary); font-size:13px; }
-.knowledge-graph-panel header span,.knowledge-graph-panel footer span { color:var(--text-secondary); font-size:11px; }
+.knowledge-graph-panel header span,.knowledge-graph-panel footer span { display:block; max-width:320px; overflow:hidden; color:var(--text-secondary); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
 .knowledge-graph-panel button { display:inline-flex; align-items:center; gap:5px; min-height:28px; padding:5px 8px; border:1px solid var(--border-default); border-radius:6px; color:var(--text-secondary); background:var(--surface-subtle); font-size:11px; }
 .knowledge-graph-panel button:hover:not(:disabled) { color:var(--brand); border-color:var(--brand); background:var(--brand-soft); }
 .knowledge-graph-panel button:disabled { cursor:not-allowed; opacity:.55; }
 .knowledge-graph-body { display:flex; flex-direction:column; min-height:0; flex:1; }
 .knowledge-graph-empty { display:flex; align-items:center; justify-content:center; gap:7px; min-height:120px; color:var(--text-muted); font-size:12px; }
+.knowledge-graph-empty.graph-error { color:var(--danger); }
 .knowledge-graph-svg { width:100%; flex:1; min-height:260px; border:1px solid var(--border-default); border-radius:7px; background:var(--surface-subtle); }
 .knowledge-edge { stroke:var(--border-strong); stroke-width:1.5; transition:stroke .15s ease, stroke-width .15s ease, filter .15s ease; }
 .knowledge-edge.selected { stroke:var(--brand); stroke-width:3.5; filter:drop-shadow(0 0 4px rgba(65,105,93,.6)); }

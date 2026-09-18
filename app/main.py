@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -5,15 +8,30 @@ from app.api import agents, auth, chat, curriculum, export, flows, health, knowl
 from app.core.config import get_settings
 from app.db.database import Base, engine
 from app.db.migrations import ensure_schema_compatibility
+from app.services.ecology_graph_sync_service import EcologyGraphWorker
 
 
 Base.metadata.create_all(bind=engine)
 ensure_schema_compatibility()
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    worker = EcologyGraphWorker()
+    task = asyncio.create_task(worker.run(), name="ecology-graph-worker")
+    try:
+        yield
+    finally:
+        worker.stop()
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
 app = FastAPI(
     title="AI 教师探究式教学指导 Python Service",
     version="0.1.0",
     description="支持多用户会话隔离的探究式教学设计后端服务。",
+    lifespan=lifespan,
 )
 
 app_settings = get_settings()

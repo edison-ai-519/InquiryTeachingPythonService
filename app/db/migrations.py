@@ -41,6 +41,66 @@ def ensure_schema_compatibility() -> None:
                     text("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
                 )
 
+        if "knowledge_entities" in table_names:
+            entity_columns = {
+                column["name"] for column in inspector.get_columns("knowledge_entities")
+            }
+            entity_definitions = {
+                "origin": "VARCHAR NOT NULL DEFAULT 'manual'",
+                "management_mode": "VARCHAR NOT NULL DEFAULT 'manual'",
+                "extractor_model": "VARCHAR NOT NULL DEFAULT ''",
+                "extractor_version": "VARCHAR NOT NULL DEFAULT ''",
+                "last_auto_sync_at": "VARCHAR NOT NULL DEFAULT ''",
+            }
+            for name, definition in entity_definitions.items():
+                if name not in entity_columns:
+                    connection.execute(
+                        text(f"ALTER TABLE knowledge_entities ADD COLUMN {name} {definition}")
+                    )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_knowledge_entities_origin "
+                    "ON knowledge_entities (origin)"
+                )
+            )
+
+        if "knowledge_relations" in table_names:
+            relation_columns = {
+                column["name"] for column in inspector.get_columns("knowledge_relations")
+            }
+            relation_definitions = {
+                "origin": "VARCHAR NOT NULL DEFAULT 'manual'",
+                "management_mode": "VARCHAR NOT NULL DEFAULT 'manual'",
+                "status": "VARCHAR NOT NULL DEFAULT 'active'",
+                "extractor_model": "VARCHAR NOT NULL DEFAULT ''",
+                "extractor_version": "VARCHAR NOT NULL DEFAULT ''",
+                "last_auto_sync_at": "VARCHAR NOT NULL DEFAULT ''",
+            }
+            for name, definition in relation_definitions.items():
+                if name not in relation_columns:
+                    connection.execute(
+                        text(f"ALTER TABLE knowledge_relations ADD COLUMN {name} {definition}")
+                    )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_knowledge_relations_origin "
+                    "ON knowledge_relations (origin)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_knowledge_relations_status "
+                    "ON knowledge_relations (status)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_knowledge_relation_triple "
+                    "ON knowledge_relations "
+                    "(subject_entity_id, predicate, object_entity_id)"
+                )
+            )
+
         if "curriculum_sources" in table_names:
             curriculum_source_columns = {
                 column["name"] for column in inspector.get_columns("curriculum_sources")
@@ -246,6 +306,11 @@ def ensure_schema_compatibility() -> None:
                     aliases_json TEXT NOT NULL DEFAULT '[]',
                     description TEXT NOT NULL DEFAULT '',
                     source VARCHAR NOT NULL DEFAULT '',
+                    origin VARCHAR NOT NULL DEFAULT 'manual',
+                    management_mode VARCHAR NOT NULL DEFAULT 'manual',
+                    extractor_model VARCHAR NOT NULL DEFAULT '',
+                    extractor_version VARCHAR NOT NULL DEFAULT '',
+                    last_auto_sync_at VARCHAR NOT NULL DEFAULT '',
                     created_at VARCHAR NOT NULL,
                     updated_at VARCHAR NOT NULL
                 )
@@ -257,6 +322,9 @@ def ensure_schema_compatibility() -> None:
         )
         connection.execute(
             text("CREATE INDEX IF NOT EXISTS ix_knowledge_entities_entity_type ON knowledge_entities (entity_type)")
+        )
+        connection.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_knowledge_entities_origin ON knowledge_entities (origin)")
         )
         connection.execute(
             text(
@@ -289,10 +357,17 @@ def ensure_schema_compatibility() -> None:
                     description TEXT NOT NULL DEFAULT '',
                     evidence_source TEXT NOT NULL DEFAULT '',
                     confidence VARCHAR NOT NULL DEFAULT 'medium',
+                    origin VARCHAR NOT NULL DEFAULT 'manual',
+                    management_mode VARCHAR NOT NULL DEFAULT 'manual',
+                    status VARCHAR NOT NULL DEFAULT 'active',
+                    extractor_model VARCHAR NOT NULL DEFAULT '',
+                    extractor_version VARCHAR NOT NULL DEFAULT '',
+                    last_auto_sync_at VARCHAR NOT NULL DEFAULT '',
                     created_at VARCHAR NOT NULL,
                     updated_at VARCHAR NOT NULL,
                     FOREIGN KEY(subject_entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE,
-                    FOREIGN KEY(object_entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE
+                    FOREIGN KEY(object_entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE,
+                    UNIQUE(subject_entity_id, predicate, object_entity_id)
                 )
                 """
             )
@@ -311,6 +386,18 @@ def ensure_schema_compatibility() -> None:
         )
         connection.execute(
             text("CREATE INDEX IF NOT EXISTS ix_knowledge_relations_predicate ON knowledge_relations (predicate)")
+        )
+        connection.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_knowledge_relations_origin ON knowledge_relations (origin)")
+        )
+        connection.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_knowledge_relations_status ON knowledge_relations (status)")
+        )
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_knowledge_relation_triple "
+                "ON knowledge_relations (subject_entity_id, predicate, object_entity_id)"
+            )
         )
         connection.execute(
             text(
@@ -352,6 +439,52 @@ def ensure_schema_compatibility() -> None:
             text(
                 "CREATE INDEX IF NOT EXISTS ix_knowledge_relation_evidence_source "
                 "ON knowledge_relation_evidence (source)"
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS ecology_graph_sync_jobs (
+                    id VARCHAR PRIMARY KEY,
+                    source VARCHAR NOT NULL DEFAULT '',
+                    source_checksum VARCHAR NOT NULL DEFAULT '',
+                    operation VARCHAR NOT NULL DEFAULT 'sync',
+                    status VARCHAR NOT NULL DEFAULT 'queued',
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    stats_json TEXT NOT NULL DEFAULT '{}',
+                    last_error TEXT NOT NULL DEFAULT '',
+                    lease_until VARCHAR NOT NULL DEFAULT '',
+                    created_at VARCHAR NOT NULL,
+                    started_at VARCHAR NOT NULL DEFAULT '',
+                    finished_at VARCHAR NOT NULL DEFAULT '',
+                    updated_at VARCHAR NOT NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_ecology_graph_jobs_source_status "
+                "ON ecology_graph_sync_jobs (source, status)"
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS ecology_graph_source_states (
+                    source VARCHAR PRIMARY KEY,
+                    source_checksum VARCHAR NOT NULL DEFAULT '',
+                    lightrag_doc_id VARCHAR NOT NULL DEFAULT '',
+                    status VARCHAR NOT NULL DEFAULT 'pending',
+                    last_job_id VARCHAR NOT NULL DEFAULT '',
+                    entity_count INTEGER NOT NULL DEFAULT 0,
+                    relation_count INTEGER NOT NULL DEFAULT 0,
+                    rejected_count INTEGER NOT NULL DEFAULT 0,
+                    last_error TEXT NOT NULL DEFAULT '',
+                    last_synced_at VARCHAR NOT NULL DEFAULT '',
+                    updated_at VARCHAR NOT NULL
+                )
+                """
             )
         )
         connection.execute(

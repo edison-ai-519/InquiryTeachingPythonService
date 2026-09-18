@@ -5,7 +5,6 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -21,7 +20,6 @@ from app.db.models import (
 )
 
 
-SEED_PATH = Path(__file__).resolve().parents[1] / "data" / "knowledge_graph_seed.json"
 CONFIDENCE_WEIGHT = {"high": 3, "medium": 2, "low": 1}
 ALLOWED_ENTITY_TYPES = {
     "insect",
@@ -66,6 +64,15 @@ def _json_list(value) -> list[str]:
     return []
 
 
+def _empty_graph_payload() -> dict:
+    return {
+        "entities": [],
+        "relations": [],
+        "paths": [],
+        "recommended_path_ids": [],
+    }
+
+
 def _source_list(value) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -87,11 +94,6 @@ class GraphSelectionValidation:
 class KnowledgeGraphService:
     def __init__(self, db: Session):
         self.db = db
-
-    def load_seed_graph(self) -> dict:
-        with SEED_PATH.open("r", encoding="utf-8") as file:
-            payload = json.load(file)
-        return self.import_graph_json(payload)
 
     def import_graph_json(self, payload: dict) -> dict:
         timestamp = _now_iso()
@@ -266,6 +268,8 @@ class KnowledgeGraphService:
             source=source.strip() or row.source or "manual",
             timestamp=_now_iso(),
         )
+        if (row.origin or "manual") == "lightrag":
+            row.management_mode = "manual_override"
         self.db.flush()
         self.rebuild_mentions_for_entity(entity_id)
         return self.serialize_entity(row)
@@ -302,6 +306,9 @@ class KnowledgeGraphService:
             raise ValueError("相同起点、关系和终点的图谱关系已存在")
         row = KnowledgeRelationModel(
             id=f"relation_{uuid.uuid4().hex[:16]}",
+            origin="manual",
+            management_mode="manual",
+            status="active",
             created_at=timestamp,
         )
         self._assign_relation(
@@ -360,6 +367,9 @@ class KnowledgeGraphService:
             confidence=confidence,
             timestamp=_now_iso(),
         )
+        if (row.origin or "manual") == "lightrag":
+            row.management_mode = "manual_override"
+        row.status = "active"
         self.db.flush()
         if evidence_chunk_ids is not None:
             self.replace_relation_evidence(relation_id, evidence_chunk_ids)
@@ -369,8 +379,243 @@ class KnowledgeGraphService:
         row = self.db.get(KnowledgeRelationModel, relation_id)
         if row is None:
             raise LookupError("图谱关系不存在")
-        self.db.delete(row)
+        if (row.origin or "manual") == "lightrag":
+            row.status = "suppressed"
+            row.management_mode = "manual_override"
+            row.updated_at = _now_iso()
+        else:
+            self.db.delete(row)
         self.db.flush()
+
+    def restore_auto_relation(self, relation_id: str) -> dict:
+        row = self.db.get(KnowledgeRelationModel, relation_id)
+        if row is None:
+            raise LookupError("图谱关系不存在")
+        if (row.origin or "manual") != "lightrag":
+            raise ValueError("只有 LightRAG 自动关系可以恢复自动管理")
+        row.status = "active"
+        row.management_mode = "auto"
+        row.updated_at = _now_iso()
+        self.db.flush()
+        return self.serialize_relation(row)
+
+    def resolve_or_create_auto_entity(
+        self,
+        *,
+        name: str,
+        entity_type: str,
+        source: str,
+        extractor_model: str,
+        extractor_version: str,
+    ) -> KnowledgeEntityModel:
+        normalized = _normalized_text(name)
+        for entity in self.db.query(KnowledgeEntityModel).all():
+            variants = [entity.name, *self.aliases(entity)]
+            if normalized in {_normalized_text(value) for value in variants}:
+                if (
+                    (entity.origin or "manual") == "lightrag"
+                    and entity.management_mode == "auto"
+                ):
+                    timestamp = _now_iso()
+                    entity.extractor_model = extractor_model
+                    entity.extractor_version = extractor_version
+                    entity.last_auto_sync_at = timestamp
+                    entity.updated_at = timestamp
+                    self._bind_auto_entity_source(entity, source)
+                return entity
+        self._validate_entity_values(name.strip(), entity_type)
+        timestamp = _now_iso()
+        entity = KnowledgeEntityModel(
+            id=f"entity_{uuid.uuid4().hex[:16]}",
+            name=name.strip(),
+            entity_type=entity_type,
+            aliases_json="[]",
+            description="",
+            source="lightrag",
+            origin="lightrag",
+            management_mode="auto",
+            extractor_model=extractor_model,
+            extractor_version=extractor_version,
+            last_auto_sync_at=timestamp,
+            created_at=timestamp,
+            updated_at=timestamp,
+        )
+        self.db.add(entity)
+        self.db.flush()
+        self._bind_auto_entity_source(entity, source)
+        self.rebuild_mentions_for_entity(entity.id)
+        return entity
+
+    def _bind_auto_entity_source(
+        self,
+        entity: KnowledgeEntityModel,
+        source: str,
+    ) -> None:
+        if not source or self.db.get(
+            KnowledgeEntitySourceModel,
+            {"entity_id": entity.id, "source": source},
+        ):
+            return
+        self.db.add(
+            KnowledgeEntitySourceModel(
+                entity_id=entity.id,
+                source=source,
+                created_at=_now_iso(),
+            )
+        )
+        self.db.flush()
+
+    def clear_auto_evidence_for_source(self, source: str) -> None:
+        relation_ids = [
+            row.id
+            for row in self.db.query(KnowledgeRelationModel).filter(
+                KnowledgeRelationModel.origin == "lightrag",
+                KnowledgeRelationModel.management_mode == "auto",
+            )
+        ]
+        if relation_ids:
+            self.db.query(KnowledgeRelationEvidenceModel).filter(
+                KnowledgeRelationEvidenceModel.relation_id.in_(relation_ids),
+                KnowledgeRelationEvidenceModel.source == source,
+            ).delete(synchronize_session=False)
+        self.db.flush()
+
+    def clear_auto_entity_sources_for_source(self, source: str) -> None:
+        automatic_entity_ids = [
+            row.id
+            for row in self.db.query(KnowledgeEntityModel).filter(
+                KnowledgeEntityModel.origin == "lightrag",
+                KnowledgeEntityModel.management_mode == "auto",
+            )
+        ]
+        if automatic_entity_ids:
+            self.db.query(KnowledgeEntitySourceModel).filter(
+                KnowledgeEntitySourceModel.entity_id.in_(automatic_entity_ids),
+                KnowledgeEntitySourceModel.source == source,
+            ).delete(synchronize_session=False)
+        self.db.flush()
+
+    def upsert_auto_relation(
+        self,
+        *,
+        subject_entity_id: str,
+        predicate: str,
+        object_entity_id: str,
+        description: str,
+        evidence_chunk_ids: list[int],
+        extractor_model: str,
+        extractor_version: str,
+    ) -> tuple[KnowledgeRelationModel, bool]:
+        self._validate_relation_values(subject_entity_id, predicate, object_entity_id)
+        row = (
+            self.db.query(KnowledgeRelationModel)
+            .filter(
+                KnowledgeRelationModel.subject_entity_id == subject_entity_id,
+                KnowledgeRelationModel.predicate == predicate,
+                KnowledgeRelationModel.object_entity_id == object_entity_id,
+            )
+            .first()
+        )
+        timestamp = _now_iso()
+        created = row is None
+        if row is None:
+            row = KnowledgeRelationModel(
+                id=f"relation_{uuid.uuid4().hex[:16]}",
+                subject_entity_id=subject_entity_id,
+                predicate=predicate,
+                object_entity_id=object_entity_id,
+                description=description.strip(),
+                evidence_source="",
+                confidence="high",
+                origin="lightrag",
+                management_mode="auto",
+                status="active",
+                extractor_model=extractor_model,
+                extractor_version=extractor_version,
+                last_auto_sync_at=timestamp,
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
+            self.db.add(row)
+            self.db.flush()
+        elif row.status == "suppressed":
+            return row, False
+        elif row.management_mode == "auto":
+            row.description = description.strip() or row.description
+            row.confidence = "high"
+            row.extractor_model = extractor_model
+            row.extractor_version = extractor_version
+            row.last_auto_sync_at = timestamp
+            row.updated_at = timestamp
+            row.status = "active"
+
+        chunks = (
+            self.db.query(CurriculumChunkModel)
+            .filter(CurriculumChunkModel.id.in_(list(dict.fromkeys(evidence_chunk_ids))))
+            .all()
+        )
+        for chunk in chunks:
+            key = {"relation_id": row.id, "chunk_id": int(chunk.id)}
+            evidence = self.db.get(KnowledgeRelationEvidenceModel, key)
+            if evidence is None:
+                self.db.add(
+                    KnowledgeRelationEvidenceModel(
+                        relation_id=row.id,
+                        chunk_id=int(chunk.id),
+                        source=chunk.source,
+                        evidence_text=chunk.content,
+                        created_at=timestamp,
+                    )
+                )
+        self.db.flush()
+        sources = [item[0] for item in self.db.query(
+            KnowledgeRelationEvidenceModel.source
+        ).filter(
+            KnowledgeRelationEvidenceModel.relation_id == row.id
+        ).distinct().all()]
+        row.evidence_source = "、".join(sorted(sources))
+        self.db.flush()
+        return row, created
+
+    def prune_unverified_auto_relations(self) -> int:
+        rows = self.db.query(KnowledgeRelationModel).filter(
+            KnowledgeRelationModel.origin == "lightrag",
+            KnowledgeRelationModel.management_mode == "auto",
+            KnowledgeRelationModel.status == "active",
+        ).all()
+        evidence_counts = self._evidence_count_map([row.id for row in rows])
+        removed = 0
+        for row in rows:
+            if not evidence_counts.get(row.id):
+                self.db.delete(row)
+                removed += 1
+        self.db.flush()
+        return removed
+
+    def prune_orphan_auto_entities(self) -> int:
+        rows = self.db.query(KnowledgeEntityModel).filter(
+            KnowledgeEntityModel.origin == "lightrag",
+            KnowledgeEntityModel.management_mode == "auto",
+        ).all()
+        removed = 0
+        for row in rows:
+            has_relation = self.db.query(KnowledgeRelationModel.id).filter(
+                or_(
+                    KnowledgeRelationModel.subject_entity_id == row.id,
+                    KnowledgeRelationModel.object_entity_id == row.id,
+                )
+            ).first()
+            has_mention = self.db.query(KnowledgeEntityMentionModel.entity_id).filter(
+                KnowledgeEntityMentionModel.entity_id == row.id
+            ).first()
+            has_source = self.db.query(KnowledgeEntitySourceModel.entity_id).filter(
+                KnowledgeEntitySourceModel.entity_id == row.id
+            ).first()
+            if not has_relation and not has_mention and not has_source:
+                self.db.delete(row)
+                removed += 1
+        self.db.flush()
+        return removed
 
     def _assign_entity(
         self,
@@ -798,41 +1043,23 @@ class KnowledgeGraphService:
         topic: str = "",
         stage: dict | None = None,
     ) -> dict:
-        if not self.db.query(KnowledgeEntityModel).first():
-            self.load_seed_graph()
         message_text = (message or "").strip()
-        if message_text:
-            query_text = "\n".join(
-                item
-                for item in [
-                    topic,
-                    str((stage or {}).get("name") or ""),
-                    str((stage or {}).get("display_direction") or ""),
-                    message_text,
-                ]
-                if item
-            )
-            anchors = self.match_entities(query_text)
-        else:
-            anchors = self.default_entities_for_expert(expert_id)
-            if not anchors:
-                query_text = "\n".join(
-                    item
-                    for item in [
-                        topic,
-                        str((stage or {}).get("name") or ""),
-                        str((stage or {}).get("display_direction") or ""),
-                    ]
-                    if item
-                )
-                anchors = self.match_entities(query_text)
+        if not message_text:
+            return _empty_graph_payload()
+
+        query_text = "\n".join(
+            item
+            for item in [
+                topic,
+                str((stage or {}).get("name") or ""),
+                str((stage or {}).get("display_direction") or ""),
+                message_text,
+            ]
+            if item
+        )
+        anchors = self.match_entities(query_text)
         if not anchors:
-            anchors = (
-                self.db.query(KnowledgeEntityModel)
-                .order_by(KnowledgeEntityModel.name.asc())
-                .limit(3)
-                .all()
-            )
+            return _empty_graph_payload()
 
         relation_map: dict[str, KnowledgeRelationModel] = {}
         for entity in anchors:
@@ -877,7 +1104,7 @@ class KnowledgeGraphService:
         return {
             "entities": [self.serialize_entity(entity) for entity in entities],
             "relations": [self.serialize_relation(relation) for relation in relations],
-            "paths": self._build_paths(entities, relations),
+            "paths": [],
             "recommended_path_ids": [],
         }
 
@@ -948,9 +1175,13 @@ class KnowledgeGraphService:
         if relation_ids:
             relations = (
                 self.db.query(KnowledgeRelationModel)
-                .filter(KnowledgeRelationModel.id.in_(list(relation_ids)))
+                .filter(
+                    KnowledgeRelationModel.id.in_(list(relation_ids)),
+                    KnowledgeRelationModel.status == "active",
+                )
                 .all()
             )
+            relations = self._runtime_relations(relations)
             if len(relations) != len(relation_ids):
                 return GraphSelectionValidation(False, "选择中包含不存在的图谱关系。")
             for relation in relations:
@@ -979,11 +1210,15 @@ class KnowledgeGraphService:
         )
         relations = (
             self.db.query(KnowledgeRelationModel)
-            .filter(KnowledgeRelationModel.id.in_(relation_ids))
+            .filter(
+                KnowledgeRelationModel.id.in_(relation_ids),
+                KnowledgeRelationModel.status == "active",
+            )
             .all()
             if relation_ids
             else []
         )
+        relations = self._runtime_relations(relations)
         entity_ids = set(selected_entity_ids)
         for relation in relations:
             entity_ids.add(relation.subject_entity_id)
@@ -1006,7 +1241,7 @@ class KnowledgeGraphService:
             "relations": [self.serialize_relation(relation) for relation in relations],
             "paths": paths,
             "selected_entity_ids": list(dict.fromkeys(selected_entity_ids)),
-            "selected_relation_ids": relation_ids,
+            "selected_relation_ids": [relation.id for relation in relations],
             "selected_path_ids": list(dict.fromkeys(selected_path_ids)),
         }
 
@@ -1082,18 +1317,6 @@ class KnowledgeGraphService:
         entity_types = DEFAULT_EXPERT_ENTITY_TYPES.get(expert_id or "")
         if not entity_types:
             return []
-        seed_entities = (
-            self.db.query(KnowledgeEntityModel)
-            .filter(
-                KnowledgeEntityModel.entity_type.in_(entity_types),
-                KnowledgeEntityModel.source == "seed",
-            )
-            .order_by(KnowledgeEntityModel.name.asc())
-            .limit(3)
-            .all()
-        )
-        if seed_entities:
-            return seed_entities
         return (
             self.db.query(KnowledgeEntityModel)
             .filter(KnowledgeEntityModel.entity_type.in_(entity_types))
@@ -1114,6 +1337,7 @@ class KnowledgeGraphService:
         predicates: list[str] | None = None,
     ) -> list[KnowledgeRelationModel]:
         query = self.db.query(KnowledgeRelationModel).filter(
+            KnowledgeRelationModel.status == "active",
             or_(
                 KnowledgeRelationModel.subject_entity_id == entity_id,
                 KnowledgeRelationModel.object_entity_id == entity_id,
@@ -1121,7 +1345,7 @@ class KnowledgeGraphService:
         )
         if predicates:
             query = query.filter(KnowledgeRelationModel.predicate.in_(predicates))
-        rows = query.all()
+        rows = self._runtime_relations(query.all())
         evidence_counts = self._evidence_count_map([row.id for row in rows])
         return sorted(
             rows,
@@ -1132,6 +1356,22 @@ class KnowledgeGraphService:
                 row.id,
             ),
         )
+
+    def _runtime_relations(
+        self,
+        rows: list[KnowledgeRelationModel],
+    ) -> list[KnowledgeRelationModel]:
+        """Automatic facts are queryable only while current chunk evidence exists."""
+        automatic_ids = [
+            row.id for row in rows if (row.origin or "manual") == "lightrag"
+        ]
+        evidence_counts = self._evidence_count_map(automatic_ids)
+        return [
+            row
+            for row in rows
+            if (row.origin or "manual") != "lightrag"
+            or evidence_counts.get(row.id, 0) > 0
+        ]
 
     def _relation_ids_from_paths(self, path_ids: list[str]) -> list[str]:
         relation_ids: list[str] = []
@@ -1289,6 +1529,11 @@ class KnowledgeGraphService:
             "aliases": self.aliases(entity),
             "description": entity.description,
             "source": entity.source,
+            "origin": entity.origin or "manual",
+            "management_mode": entity.management_mode or "manual",
+            "extractor_model": entity.extractor_model or "",
+            "extractor_version": entity.extractor_version or "",
+            "last_auto_sync_at": entity.last_auto_sync_at or "",
             "rag_sources": self.rag_sources_for_entity(entity.id),
             "mention_count": mention_count,
         }
@@ -1306,6 +1551,12 @@ class KnowledgeGraphService:
             "description": relation.description,
             "evidence_source": relation.evidence_source,
             "confidence": relation.confidence,
+            "origin": relation.origin or "manual",
+            "management_mode": relation.management_mode or "manual",
+            "status": relation.status or "active",
+            "extractor_model": relation.extractor_model or "",
+            "extractor_version": relation.extractor_version or "",
+            "last_auto_sync_at": relation.last_auto_sync_at or "",
             "evidence_status": "verified" if evidence else "unverified",
             "evidence": evidence,
         }

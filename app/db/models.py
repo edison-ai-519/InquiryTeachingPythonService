@@ -262,6 +262,11 @@ class KnowledgeEntityModel(Base):
     aliases_json = Column(Text, nullable=False, default="[]")
     description = Column(Text, nullable=False, default="")
     source = Column(String, nullable=False, default="")
+    origin = Column(String, nullable=False, default="manual", index=True)
+    management_mode = Column(String, nullable=False, default="manual")
+    extractor_model = Column(String, nullable=False, default="")
+    extractor_version = Column(String, nullable=False, default="")
+    last_auto_sync_at = Column(String, nullable=False, default="")
     created_at = Column(String, nullable=False)
     updated_at = Column(String, nullable=False)
 
@@ -286,8 +291,23 @@ class KnowledgeRelationModel(Base):
     description = Column(Text, nullable=False, default="")
     evidence_source = Column(Text, nullable=False, default="")
     confidence = Column(String, nullable=False, default="medium")
+    origin = Column(String, nullable=False, default="manual", index=True)
+    management_mode = Column(String, nullable=False, default="manual")
+    status = Column(String, nullable=False, default="active", index=True)
+    extractor_model = Column(String, nullable=False, default="")
+    extractor_version = Column(String, nullable=False, default="")
+    last_auto_sync_at = Column(String, nullable=False, default="")
     created_at = Column(String, nullable=False)
     updated_at = Column(String, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "subject_entity_id",
+            "predicate",
+            "object_entity_id",
+            name="uq_knowledge_relation_triple",
+        ),
+    )
 
 
 class KnowledgeEntityMentionModel(Base):
@@ -326,3 +346,41 @@ class KnowledgeRelationEvidenceModel(Base):
     created_at = Column(String, nullable=False)
 
     __table_args__ = (Index("ix_knowledge_relation_evidence_source", "source"),)
+
+
+class EcologyGraphSyncJobModel(Base):
+    __tablename__ = "ecology_graph_sync_jobs"
+
+    id = Column(String, primary_key=True)
+    source = Column(String, nullable=False, default="", index=True)
+    source_checksum = Column(String, nullable=False, default="")
+    operation = Column(String, nullable=False, default="sync")
+    status = Column(String, nullable=False, default="queued", index=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    stats_json = Column(Text, nullable=False, default="{}")
+    last_error = Column(Text, nullable=False, default="")
+    lease_until = Column(String, nullable=False, default="")
+    created_at = Column(String, nullable=False)
+    started_at = Column(String, nullable=False, default="")
+    finished_at = Column(String, nullable=False, default="")
+    updated_at = Column(String, nullable=False)
+
+    __table_args__ = (
+        Index("ix_ecology_graph_jobs_source_status", "source", "status"),
+    )
+
+
+class EcologyGraphSourceStateModel(Base):
+    __tablename__ = "ecology_graph_source_states"
+
+    source = Column(String, primary_key=True)
+    source_checksum = Column(String, nullable=False, default="")
+    lightrag_doc_id = Column(String, nullable=False, default="")
+    status = Column(String, nullable=False, default="pending", index=True)
+    last_job_id = Column(String, nullable=False, default="")
+    entity_count = Column(Integer, nullable=False, default=0)
+    relation_count = Column(Integer, nullable=False, default=0)
+    rejected_count = Column(Integer, nullable=False, default=0)
+    last_error = Column(Text, nullable=False, default="")
+    last_synced_at = Column(String, nullable=False, default="")
+    updated_at = Column(String, nullable=False)
