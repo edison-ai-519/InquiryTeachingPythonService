@@ -45,6 +45,43 @@ describe("knowledge graph layout", () => {
     expect(positions.get("leaf")?.ring).toBeGreaterThanOrEqual(2);
   });
 
+  it("places descendants in the outward local sector of their parent", () => {
+    const branchEntities: GraphLayoutEntity[] = [
+      { id: "root", name: "中心" },
+      { id: "north", name: "分支甲" },
+      { id: "east", name: "分支乙" },
+      { id: "south", name: "分支丙" },
+      { id: "west", name: "分支丁" },
+      { id: "west-leaf", name: "叶节点甲" },
+      { id: "south-leaf", name: "叶节点乙" },
+      { id: "east-leaf", name: "叶节点丙" },
+      { id: "north-leaf", name: "叶节点丁" },
+    ];
+    const relations = [
+      { subject_entity_id: "root", object_entity_id: "north" },
+      { subject_entity_id: "root", object_entity_id: "east" },
+      { subject_entity_id: "root", object_entity_id: "south" },
+      { subject_entity_id: "root", object_entity_id: "west" },
+      { subject_entity_id: "north", object_entity_id: "north-leaf" },
+      { subject_entity_id: "east", object_entity_id: "east-leaf" },
+      { subject_entity_id: "south", object_entity_id: "south-leaf" },
+      { subject_entity_id: "west", object_entity_id: "west-leaf" },
+    ];
+    const positions = buildInitialGraphPositions(branchEntities, "normal", relations, "root");
+    const root = positions.get("root")!;
+
+    for (const [parentId, childId] of [["north", "north-leaf"], ["east", "east-leaf"], ["south", "south-leaf"], ["west", "west-leaf"]]) {
+      const parent = positions.get(parentId)!;
+      const child = positions.get(childId)!;
+      const parentOutwardX = parent.xRatio - root.xRatio;
+      const parentOutwardY = parent.yRatio - root.yRatio;
+      const childDirectionX = child.xRatio - parent.xRatio;
+      const childDirectionY = child.yRatio - parent.yRatio;
+
+      expect(parentOutwardX * childDirectionX + parentOutwardY * childDirectionY).toBeGreaterThan(0);
+    }
+  });
+
   it("keeps existing positions while placing expanded nodes near their source", () => {
     const initial = buildInitialGraphPositions(entities.slice(0, 8), "normal");
     const sourceId = entities[0].id;
