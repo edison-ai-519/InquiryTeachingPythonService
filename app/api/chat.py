@@ -29,6 +29,13 @@ from app.services.draft_service import DraftService
 from app.services.draft_proposal_service import DraftProposalService
 from app.services.draft_target_resolver import DraftTarget, DraftTargetResolver
 from app.services.graph_rag_service import GraphRagService
+from app.services.globi_runtime_service import (
+    GlobiRuntimeService,
+    RUNTIME_ENTITY_PREFIX,
+    RUNTIME_PATH_PREFIX,
+    RUNTIME_RELATION_PREFIX,
+    SUPPORTED_EXPERTS,
+)
 from app.services.knowledge_graph_service import KnowledgeGraphService
 from app.services.llm_service import LLMService
 from app.services.prompt_service import PromptService
@@ -371,9 +378,11 @@ async def chat(
     base_doc_input = ContextService.build_doc_input(db, session_id, stage["id"])
     curriculum_context = ""
     curriculum_source: dict = {}
-    graph_context = ""
+    local_graph_context = ""
+    runtime_graph_context = ""
     graph_source: dict = {}
     graph_warning = ""
+    graph_payload: dict | None = None
     allowed_sources: list[str] = []
     if selected_expert is not None:
         allowed_sources = CurriculumPermissionService.allowed_sources(db, selected_expert.id)
@@ -386,29 +395,82 @@ async def chat(
                 expert_id=selected_expert.id,
                 allowed_sources=allowed_sources,
             )
+    graph_service = KnowledgeGraphService(db)
+    runtime_service = GlobiRuntimeService(db)
+    is_runtime_graph_expert = bool(
+        selected_expert is not None and selected_expert.id in SUPPORTED_EXPERTS
+    )
+    local_candidate: dict | None = None
+    runtime_candidate: dict | None = None
+    if is_runtime_graph_expert:
+        local_candidate = graph_service.find_candidate_graph(
+            message=payload.message,
+            expert_id=selected_expert.id,
+            topic=sess.topic,
+            stage=stage,
+        )
+        query_id = (
+            payload.graph_selection.globi_query_id
+            if payload.graph_selection is not None
+            else None
+        )
+        if query_id:
+            runtime_candidate, snapshot_warning = runtime_service.snapshot_payload(
+                query_id=query_id,
+                user_id=user.id,
+                session_id=sess.id,
+            )
+            if snapshot_warning:
+                graph_warning = snapshot_warning
+        else:
+            runtime_candidate = await runtime_service.query(
+                message=payload.message,
+                expert_id=selected_expert.id,
+                user_id=user.id,
+                session_id=sess.id,
+            )
+        if runtime_candidate is None:
+            runtime_candidate = runtime_service.empty_payload(
+                status="expired",
+                warning=graph_warning,
+            )
+        graph_payload = runtime_service.merge_graphs(local_candidate, runtime_candidate)
+
     if payload.graph_selection is not None:
         graph_selection = payload.graph_selection
-        graph_service = KnowledgeGraphService(db)
+        local_entity_ids = [
+            row for row in graph_selection.entity_ids
+            if not row.startswith(RUNTIME_ENTITY_PREFIX)
+        ]
+        local_relation_ids = [
+            row for row in graph_selection.relation_ids
+            if not row.startswith(RUNTIME_RELATION_PREFIX)
+        ]
+        local_path_ids = [
+            row for row in graph_selection.path_ids
+            if not row.startswith(RUNTIME_PATH_PREFIX)
+        ]
+        has_local_selection = bool(local_entity_ids or local_relation_ids or local_path_ids)
         validation = graph_service.validate_selection(
             message=payload.message,
-            selected_path_ids=graph_selection.path_ids,
-            selected_relation_ids=graph_selection.relation_ids,
-            selected_entity_ids=graph_selection.entity_ids,
-        )
-        if validation.valid:
+            selected_path_ids=local_path_ids,
+            selected_relation_ids=local_relation_ids,
+            selected_entity_ids=local_entity_ids,
+        ) if has_local_selection else None
+        if validation is not None and validation.valid:
             selected_graph = graph_service.selected_graph_payload(
-                selected_path_ids=graph_selection.path_ids,
-                selected_relation_ids=graph_selection.relation_ids,
-                selected_entity_ids=graph_selection.entity_ids,
+                selected_path_ids=local_path_ids,
+                selected_relation_ids=local_relation_ids,
+                selected_entity_ids=local_entity_ids,
             )
-            graph_link_context = graph_service.format_selected_graph_context(selected_graph)
+            local_graph_context = graph_service.format_selected_graph_context(selected_graph)
             graph_rag_context, graph_rag_source = GraphRagService(db).retrieve_for_selection(
                 message=payload.message,
                 selected_entity_ids=[entity["id"] for entity in selected_graph["entities"]],
                 selected_relation_ids=selected_graph["selected_relation_ids"],
                 allowed_sources=allowed_sources,
             )
-            graph_context = RagService.merge_context(graph_link_context, graph_rag_context)
+            local_graph_context = RagService.merge_context(local_graph_context, graph_rag_context)
             graph_source = {
                 **graph_rag_source,
                 "selected_entity_ids": selected_graph["selected_entity_ids"],
@@ -416,8 +478,43 @@ async def chat(
                 "selected_path_ids": selected_graph["selected_path_ids"],
                 "paths": selected_graph["paths"],
             }
-        else:
+        elif validation is not None:
             graph_warning = validation.warning
+
+        runtime_entity_ids = [
+            row for row in graph_selection.entity_ids
+            if row.startswith(RUNTIME_ENTITY_PREFIX)
+        ]
+        runtime_relation_ids = [
+            row for row in graph_selection.relation_ids
+            if row.startswith(RUNTIME_RELATION_PREFIX)
+        ]
+        runtime_path_ids = [
+            row for row in graph_selection.path_ids
+            if row.startswith(RUNTIME_PATH_PREFIX)
+        ]
+        if runtime_entity_ids or runtime_relation_ids or runtime_path_ids:
+            if not graph_selection.globi_query_id:
+                graph_warning = "GloBI 临时图谱缺少查询标识，请刷新后重新选择。"
+            else:
+                selected_runtime, runtime_warning = runtime_service.select_snapshot(
+                    query_id=graph_selection.globi_query_id,
+                    user_id=user.id,
+                    session_id=sess.id,
+                    entity_ids=runtime_entity_ids,
+                    relation_ids=runtime_relation_ids,
+                    path_ids=runtime_path_ids,
+                )
+                if selected_runtime is not None:
+                    runtime_graph_context = runtime_service.format_context(selected_runtime)
+                elif runtime_warning:
+                    graph_warning = runtime_warning
+    elif runtime_candidate is not None:
+        runtime_graph_context = runtime_service.format_context(
+            runtime_service.default_selection(runtime_candidate)
+        )
+
+    graph_context = RagService.merge_context(local_graph_context, runtime_graph_context)
     doc_input = RagService.merge_context(
         RagService.merge_context(base_doc_input, curriculum_context),
         graph_context,
@@ -442,13 +539,14 @@ async def chat(
         "doc_input": doc_input,
         "rag_record": {
             "query": curriculum_source.get("query", "") or payload.message,
-            "context": RagService.merge_context(curriculum_context, graph_context),
+            "context": RagService.merge_context(curriculum_context, local_graph_context),
             "source": rag_source,
         } if rag_source else None,
         "rag_sources": curriculum_sources,
         "allowed_sources": allowed_sources,
         "selection_text": get_selection_text(payload),
         "graph_warning": graph_warning,
+        "graph_payload": graph_payload,
     }
 
     try:
@@ -492,6 +590,14 @@ async def chat(
                 "draft_mode_enabled": session_snapshot["draft_mode_enabled"],
             },
         )
+        if session_snapshot["graph_payload"] is not None:
+            yield format_sse(
+                "graph",
+                {
+                    **agent_identity,
+                    "graph": session_snapshot["graph_payload"],
+                },
+            )
         if session_snapshot["graph_warning"]:
             yield format_sse(
                 "warning",

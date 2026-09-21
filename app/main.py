@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.db.database import Base, engine
 from app.db.migrations import ensure_schema_compatibility
 from app.services.ecology_graph_sync_service import EcologyGraphWorker
+from app.services.globi_import_service import GlobiImportWorker
 
 
 Base.metadata.create_all(bind=engine)
@@ -19,13 +20,19 @@ ensure_schema_compatibility()
 async def lifespan(_app: FastAPI):
     worker = EcologyGraphWorker()
     task = asyncio.create_task(worker.run(), name="ecology-graph-worker")
+    globi_worker = GlobiImportWorker()
+    globi_task = asyncio.create_task(globi_worker.run(), name="globi-import-worker")
     try:
         yield
     finally:
         worker.stop()
+        globi_worker.stop()
         task.cancel()
+        globi_task.cancel()
         with suppress(asyncio.CancelledError):
             await task
+        with suppress(asyncio.CancelledError):
+            await globi_task
 
 app = FastAPI(
     title="AI 教师探究式教学指导 Python Service",

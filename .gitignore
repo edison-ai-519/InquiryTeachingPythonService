@@ -19,5 +19,6 @@ data/models/
 data/curriculum_vector/
 data/curriculum_snapshots/
 data/lightrag/
+data/runtime/globi/
 frontend/node_modules/
 frontend/dist/

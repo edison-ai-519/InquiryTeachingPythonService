@@ -2144,6 +2144,7 @@ function buildGraphSelection(): GraphSelectionPayload {
     entity_ids: [...selectedGraphEntityIds.value],
     relation_ids: relationIds,
     path_ids: pathIds,
+    globi_query_id: knowledgeGraph.value.globi_runtime?.query_id || null,
   };
 }
 
@@ -2223,6 +2224,7 @@ async function sendChat(options: SendChatOptions = {}) {
 
   const sessionId = currentSession.value.id;
   const requestId = createStreamRequestId();
+  let graphRequestSequence = 0;
   const abortController = new AbortController();
   const stageId = currentSession.value.current_stage?.id || "";
   const userMessage: MessageItem = {
@@ -2236,13 +2238,13 @@ async function sendChat(options: SendChatOptions = {}) {
   chatInput.value = "";
   void nextTick(resizeChatInput);
   if (isKnowledgeGraphExpert(requestExpertId)) {
+    graphRequestSequence = ++knowledgeGraphRequestSequence;
     graphContextSessionId.value = sessionId;
     lastGraphQuery.value = text;
     lastGraphExpertId.value = requestExpertId;
     showGraphInRightPanel.value = true;
-    if (!graphSelection) {
-      void refreshKnowledgeGraph(text, requestExpertId, sessionId);
-    }
+    isLoadingKnowledgeGraph.value = true;
+    knowledgeGraphError.value = "";
   }
   isStreaming.value = true;
   activeStreamRequestId.value = requestId;
@@ -2302,6 +2304,30 @@ async function sendChat(options: SendChatOptions = {}) {
       {
         stage: () => {
           selectedStageId.value = currentSession.value?.current_stage?.id || selectedStageId.value;
+        },
+        graph: (data) => {
+          if (
+            graphRequestSequence !== knowledgeGraphRequestSequence
+            || graphContextSessionId.value !== sessionId
+            || lastGraphQuery.value !== text
+            || lastGraphExpertId.value !== requestExpertId
+          ) return;
+          const graph = data.graph as KnowledgeGraphPayload | undefined;
+          if (!graph) return;
+          knowledgeGraph.value = graph;
+          const recommendedPath = graph.paths.find((path) => graph.recommended_path_ids.includes(path.id));
+          selectedGraphEntityIds.value = recommendedPath?.entity_ids?.length
+            ? [...recommendedPath.entity_ids]
+            : [];
+          selectedGraphRelationIds.value = recommendedPath?.relation_ids?.length
+            ? [...recommendedPath.relation_ids]
+            : [];
+          knowledgeGraphError.value = graph.entities.length
+            ? ""
+            : graph.globi_runtime?.status === "failed"
+              ? graph.globi_runtime.warning
+              : "";
+          isLoadingKnowledgeGraph.value = false;
         },
         agent: (data) => {
           const targetKey =
@@ -2419,6 +2445,9 @@ async function sendChat(options: SendChatOptions = {}) {
           updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "expert" ? "expert" : "guide", statusText.value, "done");
         },
         done: async (data) => {
+          if (graphRequestSequence === knowledgeGraphRequestSequence) {
+            isLoadingKnowledgeGraph.value = false;
+          }
           await loadSession(sessionId, true, true, true);
           await refreshDraftProposal();
           if (requestMode === "draft") {
@@ -2443,6 +2472,10 @@ async function sendChat(options: SendChatOptions = {}) {
       },
     );
   } catch (err: any) {
+    if (graphRequestSequence && graphRequestSequence === knowledgeGraphRequestSequence) {
+      isLoadingKnowledgeGraph.value = false;
+      knowledgeGraphError.value = err?.message || String(err);
+    }
     if (shouldStreamDraftIntoEditor) {
       draftContent.value = draftContentBeforeRequest;
       draftStreamingContent.value = "";

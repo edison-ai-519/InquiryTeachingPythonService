@@ -1,4 +1,5 @@
 import asyncio
+import gzip
 import json
 import os
 import shutil
@@ -8,8 +9,10 @@ import uuid
 import zipfile
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
+import httpx
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
@@ -23,6 +26,7 @@ os.environ["LLM_API_KEY"] = ""
 os.environ["AGENT_CONFIG_PATH"] = "app/agents/config/agents.yaml"
 os.environ["CURRICULUM_VECTOR_ENABLED"] = "false"
 os.environ["ECOLOGY_GRAPH_AUTO_SYNC_ENABLED"] = "false"
+os.environ["GLOBI_IMPORT_WORKER_ENABLED"] = "false"
 os.environ["FRONTEND_ORIGIN"] = (
     "http://127.0.0.1:5173,"
     "http://localhost:5173,"
@@ -47,10 +51,14 @@ from app.db.models import (
     DraftProposalModel,
     EcologyGraphSourceStateModel,
     EcologyGraphSyncJobModel,
+    GlobiImportRunModel,
+    GlobiInteractionModel,
     KnowledgeEntityModel,
     KnowledgeEntityMentionModel,
     KnowledgeEntitySourceModel,
+    KnowledgeEntityTaxonModel,
     KnowledgeRelationEvidenceModel,
+    KnowledgeRelationGlobiEvidenceModel,
     KnowledgeRelationModel,
     MessageModel,
     RagRecordModel,
@@ -81,6 +89,12 @@ from app.services.ecology_lightrag_service import (
     ExtractedRelation,
 )
 from app.services.knowledge_graph_service import KnowledgeGraphService
+from app.services.globi_import_service import (
+    GlobiImportOptions,
+    GlobiImportService,
+    GlobiImportWorker,
+)
+from app.services.globi_runtime_service import GlobiRuntimeService
 from app.services.prompt_service import PromptService
 from app.services.session_file_service import SessionFileService
 from app.workflow.flows import get_flow
@@ -2847,6 +2861,178 @@ class AgentArchitectureApiTests(unittest.TestCase):
                 db.commit()
             admin_client.close()
 
+    def test_globi_structured_import_normalizes_evidence_is_idempotent_and_rolls_back(self):
+        source_path = TEST_DIR / f"globi_{uuid.uuid4().hex}.tsv.gz"
+        with gzip.open(source_path, "wt", encoding="utf-8", newline="") as source_file:
+            source_file.write(
+                "\n".join(
+                [
+                    "sourceTaxonName\tsourceTaxonId\tsourceTaxonPath\ttargetTaxonName\ttargetTaxonId\ttargetTaxonPath\tinteractionTypeName\treferenceDoi\treferenceCitation\tlocalityName\tobservationDateTime",
+                    "Coccinella septempunctata\tGBIF:1\tAnimalia | Insecta\tAphis fabae\tGBIF:2\tAnimalia | Insecta\tpreysOn\tstudy-1\tLadybird study\tBeijing\t2025-05-01",
+                    "Apis mellifera\tGBIF:3\tAnimalia | Insecta\tRosa chinensis\tGBIF:4\tPlantae | Rosales\tpollinates\tstudy-2\tPollination study\t\t",
+                    "Rosa chinensis\tGBIF:4\tPlantae | Rosales\tApis mellifera\tGBIF:3\tAnimalia | Insecta\tpollinatedBy\tstudy-3\tReverse pollination study\t\t",
+                    "Pieris rapae\tGBIF:5\tAnimalia | Insecta\tBrassica oleracea\tGBIF:6\tPlantae | Brassicales\teats\tstudy-4\tFeeding study\tChina\t",
+                    "Aphis fabae\tGBIF:2\tAnimalia | Insecta\tAphidius colemani\tGBIF:7\tAnimalia | Insecta\thasParasite\tstudy-5\tParasitoid study\t\t",
+                    "Missing id insect\t\tAnimalia | Insecta\tRosa chinensis\tGBIF:4\tPlantae | Rosales\tpollinates\tstudy-6\tMissing id\t\t",
+                    "Apis mellifera\tGBIF:3\tAnimalia | Insecta\tRosa chinensis\tGBIF:4\tPlantae | Rosales\tcoOccursWith\tstudy-7\tUnsupported\t\t",
+                ]
+                )
+            )
+        options = GlobiImportOptions()
+        first_run_id = ""
+        second_run_id = ""
+        try:
+            with SessionLocal() as db:
+                service = GlobiImportService(db)
+                preview = service.preview(source_path, options)
+                self.assertEqual(preview["total_rows"], 7)
+                self.assertEqual(preview["accepted_rows"], 5)
+                self.assertEqual(preview["rejection_reasons"]["missing_external_id"], 1)
+                self.assertEqual(preview["rejection_reasons"]["unsupported_interaction"], 1)
+                first = service.create_run(
+                    version="test-v1",
+                    source_url="",
+                    source_name=source_path.name,
+                    staged_path=str(source_path),
+                    options=options,
+                    created_by="test-admin",
+                )
+                first_run_id = first["id"]
+                db.commit()
+                completed = service.process_run(first_run_id)
+                self.assertEqual(completed["status"], "completed")
+                self.assertEqual(completed["accepted_rows"], 5)
+                self.assertEqual(completed["created_relations"], 4)
+
+                graph = KnowledgeGraphService(db)
+                payload = graph.find_candidate_graph(message="Apis mellifera")
+                self.assertTrue(payload["relations"])
+                bee_relation = next(
+                    relation
+                    for relation in payload["relations"]
+                    if relation["predicate"] == "pollinates"
+                )
+                self.assertTrue(bee_relation["global_only"])
+                self.assertEqual(bee_relation["globi_evidence_count"], 2)
+                self.assertEqual(bee_relation["evidence_types"], ["globi"])
+                self.assertEqual(bee_relation["geographic_scope"], "global")
+                selected = graph.selected_graph_payload(
+                    selected_path_ids=[],
+                    selected_relation_ids=[bee_relation["id"]],
+                    selected_entity_ids=[],
+                )
+                graph_context = graph.format_selected_graph_context(selected)
+                self.assertIn("GloBI 全球关系证据", graph_context)
+                self.assertIn("不能据此声称", graph_context)
+
+                taxa = db.query(KnowledgeEntityTaxonModel).all()
+                self.assertTrue(any(row.external_id == "GBIF:3" for row in taxa))
+                self.assertEqual(db.query(GlobiInteractionModel).count(), 5)
+                self.assertEqual(db.query(KnowledgeRelationGlobiEvidenceModel).count(), 5)
+
+                second = service.create_run(
+                    version="test-v1",
+                    source_url="",
+                    source_name=source_path.name,
+                    staged_path=str(source_path),
+                    options=options,
+                    created_by="test-admin",
+                )
+                second_run_id = second["id"]
+                db.commit()
+                repeated = service.process_run(second_run_id)
+                self.assertEqual(repeated["created_entities"], 0)
+                self.assertEqual(repeated["created_relations"], 0)
+                self.assertEqual(repeated["stats"]["duplicate_rows"], 5)
+                self.assertEqual(db.query(GlobiInteractionModel).count(), 5)
+
+                service.rollback(second_run_id)
+                db.commit()
+                self.assertEqual(db.query(GlobiInteractionModel).count(), 5)
+                service.rollback(first_run_id)
+                db.commit()
+                self.assertEqual(db.query(GlobiInteractionModel).count(), 0)
+                self.assertEqual(
+                    db.query(KnowledgeRelationModel)
+                    .filter(KnowledgeRelationModel.origin == "globi")
+                    .count(),
+                    0,
+                )
+                self.assertEqual(
+                    db.query(KnowledgeEntityModel)
+                    .filter(KnowledgeEntityModel.origin == "globi")
+                    .count(),
+                    0,
+                )
+        finally:
+            source_path.unlink(missing_ok=True)
+            with SessionLocal() as db:
+                if first_run_id:
+                    db.query(GlobiImportRunModel).filter(GlobiImportRunModel.id == first_run_id).delete()
+                if second_run_id:
+                    db.query(GlobiImportRunModel).filter(GlobiImportRunModel.id == second_run_id).delete()
+                db.commit()
+
+    def test_globi_import_api_is_admin_only_previews_queues_and_rolls_back(self):
+        suffix = uuid.uuid4().hex[:8]
+        csv_data = (
+            "sourceTaxonName,sourceTaxonId,sourceTaxonPath,targetTaxonName,targetTaxonId,targetTaxonPath,interactionTypeName,referenceDoi\n"
+            f"API bee {suffix},GBIF:{suffix}1,Animalia | Insecta,API rose {suffix},GBIF:{suffix}2,Plantae | Rosales,pollinates,api-study-{suffix}\n"
+        ).encode("utf-8")
+        admin_client = TestClient(app)
+        run_id = ""
+        try:
+            registered = admin_client.post(
+                "/api/auth/admin/register",
+                json={
+                    "username": f"globi_admin_{suffix}",
+                    "password": "valid-password-123",
+                },
+            )
+            self.assertEqual(registered.status_code, 200, registered.text)
+            denied = self.client.get("/api/knowledge/globi/import")
+            self.assertEqual(denied.status_code, 403)
+            preview = admin_client.post(
+                "/api/knowledge/globi/import/preview",
+                data={"version": "api-test", "include_insect_insect": "true"},
+                files={"file": ("globi.csv", csv_data, "text/csv")},
+            )
+            self.assertEqual(preview.status_code, 200, preview.text)
+            self.assertEqual(preview.json()["data"]["stats"]["accepted_rows"], 1)
+            queued = admin_client.post(
+                "/api/knowledge/globi/import",
+                data={"version": "api-test", "include_insect_insect": "true"},
+                files={"file": ("globi.csv", csv_data, "text/csv")},
+            )
+            self.assertEqual(queued.status_code, 200, queued.text)
+            run_id = queued.json()["data"]["id"]
+            self.assertEqual(queued.json()["data"]["status"], "queued")
+            with SessionLocal() as db:
+                run = db.get(GlobiImportRunModel, run_id)
+                run.status = "failed"
+                run.last_error = "forced retry test"
+                db.commit()
+            retried = admin_client.post(f"/api/knowledge/globi/import/{run_id}/retry")
+            self.assertEqual(retried.status_code, 200, retried.text)
+            self.assertEqual(retried.json()["data"]["status"], "queued")
+            self.assertEqual(GlobiImportWorker._claim_next_run(), run_id)
+            with SessionLocal() as db:
+                completed = GlobiImportService(db).process_run(run_id, claimed=True)
+                self.assertEqual(completed["status"], "completed")
+                self.assertEqual(completed["attempts"], 1)
+            summary = admin_client.get(f"/api/knowledge/globi/import/{run_id}/summary")
+            self.assertEqual(summary.status_code, 200, summary.text)
+            self.assertEqual(summary.json()["data"]["created_relations"], 1)
+            rolled_back = admin_client.post(f"/api/knowledge/globi/import/{run_id}/rollback")
+            self.assertEqual(rolled_back.status_code, 200, rolled_back.text)
+            self.assertEqual(rolled_back.json()["data"]["status"], "rolled_back")
+        finally:
+            with SessionLocal() as db:
+                if run_id:
+                    db.query(GlobiImportRunModel).filter(GlobiImportRunModel.id == run_id).delete()
+                    db.commit()
+            admin_client.close()
+
     def test_insect_plant_insect_path_prefers_chunk_evidence(self):
         suffix = uuid.uuid4().hex[:8]
         source = f"ecology_path_{suffix}.md"
@@ -3326,6 +3512,310 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     db.commit()
             admin_client.close()
             ordinary_client.close()
+
+
+    def test_globi_runtime_query_is_cached_and_never_writes_graph_tables(self):
+        csv_body = "\n".join(
+            [
+                "source_taxon_external_id,source_taxon_name,source_taxon_path,source_taxon_rank,interaction_type,target_taxon_external_id,target_taxon_name,target_taxon_path,target_taxon_rank,referenceCitation,locality",
+                "EOL:1045608,Apis mellifera,Animalia | Arthropoda | Insecta,species,visitsFlowersOf,EOL:328672,Rosa chinensis,Plantae | Tracheophyta,species,Sample study,",
+                "EOL:1045608,Apis mellifera,Animalia | Arthropoda | Insecta,species,preysOn,EOL:1174737,Aphis gossypii,Animalia | Arthropoda | Insecta,species,Sample study,",
+                "EOL:1045608,Apis mellifera,Animalia | Arthropoda | Insecta,species,interactsWith,EOL:328672,Rosa chinensis,Plantae | Tracheophyta,species,Ignored study,",
+            ]
+        )
+        requests = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(str(request.url))
+            return httpx.Response(200, content=csv_body.encode("utf-8"), request=request)
+
+        async def extract(_system, _history, _message, **_kwargs):
+            return json.dumps(
+                {
+                    "entities": [
+                        {
+                            "mention": "蜜蜂",
+                            "scientific_name": "Apis mellifera",
+                            "entity_type": "insect",
+                            "taxon_rank": "species",
+                            "confidence": 0.99,
+                        }
+                    ]
+                }
+            )
+
+        settings = SimpleNamespace(
+            globi_runtime_enabled=True,
+            globi_runtime_cache_seconds=86400,
+            globi_runtime_timeout_seconds=2,
+            globi_runtime_max_entities=3,
+            globi_runtime_result_limit=250,
+            globi_runtime_relation_limit=40,
+            globi_runtime_concurrency=2,
+            globi_runtime_max_response_bytes=1024 * 1024,
+        )
+        GlobiRuntimeService.clear_cache()
+        with SessionLocal() as db:
+            before = (
+                db.query(KnowledgeEntityModel).count(),
+                db.query(KnowledgeRelationModel).count(),
+                db.query(GlobiInteractionModel).count(),
+                db.query(GlobiImportRunModel).count(),
+            )
+            service = GlobiRuntimeService(
+                db,
+                settings=settings,
+                llm_complete=extract,
+                http_client_factory=lambda: httpx.AsyncClient(
+                    transport=httpx.MockTransport(handler)
+                ),
+            )
+            first = asyncio.run(
+                service.query(
+                    message="蜜蜂和哪些植物、昆虫有关系？",
+                    expert_id="insect_agent",
+                    user_id="user-test",
+                    session_id="session-test",
+                )
+            )
+            second = asyncio.run(
+                service.query(
+                    message="蜜蜂和哪些植物、昆虫有关系？",
+                    expert_id="insect_agent",
+                    user_id="user-test",
+                    session_id="session-test",
+                )
+            )
+            after = (
+                db.query(KnowledgeEntityModel).count(),
+                db.query(KnowledgeRelationModel).count(),
+                db.query(GlobiInteractionModel).count(),
+                db.query(GlobiImportRunModel).count(),
+            )
+
+        self.assertEqual(before, after)
+        self.assertEqual(len(requests), 2)
+        self.assertFalse(first["globi_runtime"]["cache_hit"])
+        self.assertTrue(second["globi_runtime"]["cache_hit"])
+        self.assertEqual(
+            {row["predicate"] for row in first["relations"]},
+            {"visits", "predator_of"},
+        )
+        self.assertTrue(all(row["origin"] == "globi_runtime" for row in first["relations"]))
+        self.assertTrue(all(row["global_only"] for row in first["relations"]))
+        self.assertNotIn("interactsWith", json.dumps(first))
+
+        query_id = first["globi_runtime"]["query_id"]
+        selected, warning = service.select_snapshot(
+            query_id=query_id,
+            user_id="user-test",
+            session_id="session-test",
+            entity_ids=[first["entities"][0]["id"]],
+            relation_ids=[first["relations"][0]["id"]],
+            path_ids=[],
+        )
+        self.assertFalse(warning)
+        context = service.format_context(selected or {})
+        self.assertIn("GloBI 全球数据库显示", context)
+        self.assertIn("不等同于九龙山或门头沟本地观察", context)
+
+    def test_globi_runtime_skips_other_agents_without_llm_or_http(self):
+        calls = []
+
+        async def extract(*_args, **_kwargs):
+            calls.append("llm")
+            return "{}"
+
+        settings = SimpleNamespace(
+            globi_runtime_enabled=True,
+            globi_runtime_cache_seconds=86400,
+            globi_runtime_timeout_seconds=2,
+            globi_runtime_max_entities=3,
+            globi_runtime_result_limit=250,
+            globi_runtime_relation_limit=40,
+            globi_runtime_concurrency=2,
+            globi_runtime_max_response_bytes=1024 * 1024,
+        )
+        with SessionLocal() as db:
+            payload = asyncio.run(
+                GlobiRuntimeService(db, settings=settings, llm_complete=extract).query(
+                    message="蜜蜂",
+                    expert_id="curriculum_agent",
+                    user_id="user-test",
+                    session_id="session-test",
+                )
+            )
+        self.assertEqual(payload["globi_runtime"]["status"], "skipped")
+        self.assertEqual(calls, [])
+
+    def test_ecology_chat_emits_runtime_graph_and_uses_it_without_persisting_payload(self):
+        session_id, _stage_id = self.create_session(topic="蜜蜂与月季")
+        entity_a = "globi_runtime_entity_bee"
+        entity_b = "globi_runtime_entity_rose"
+        relation_id = "globi_runtime_relation_bee_rose"
+        path_id = f"globi_runtime_path_{relation_id}"
+        runtime_graph = {
+            "entities": [
+                {
+                    "id": entity_a,
+                    "name": "Apis mellifera",
+                    "entity_type": "insect",
+                    "aliases": ["蜜蜂"],
+                    "description": "",
+                    "source": "GloBI API",
+                    "rag_sources": [],
+                    "mention_count": 0,
+                    "origin": "globi_runtime",
+                    "management_mode": "auto",
+                    "extractor_model": "GloBI API",
+                    "extractor_version": "runtime",
+                    "last_auto_sync_at": "",
+                    "taxa": [],
+                },
+                {
+                    "id": entity_b,
+                    "name": "Rosa chinensis",
+                    "entity_type": "plant",
+                    "aliases": ["月季"],
+                    "description": "",
+                    "source": "GloBI API",
+                    "rag_sources": [],
+                    "mention_count": 0,
+                    "origin": "globi_runtime",
+                    "management_mode": "auto",
+                    "extractor_model": "GloBI API",
+                    "extractor_version": "runtime",
+                    "last_auto_sync_at": "",
+                    "taxa": [],
+                },
+            ],
+            "relations": [
+                {
+                    "id": relation_id,
+                    "subject_entity_id": entity_a,
+                    "predicate": "pollinates",
+                    "predicate_label": "授粉",
+                    "object_entity_id": entity_b,
+                    "description": "全球关系",
+                    "evidence_source": "GloBI API",
+                    "confidence": "medium",
+                    "evidence_status": "verified",
+                    "evidence": [],
+                    "evidence_types": ["globi"],
+                    "geographic_scope": "global",
+                    "global_only": True,
+                    "globi_evidence_count": 1,
+                    "globi_evidence": [
+                        {
+                            "id": "runtime-evidence",
+                            "raw_interaction_type": "pollinates",
+                            "study_source_id": "study",
+                            "study_source_citation": "Sample study",
+                            "study_url": "",
+                            "study_doi": "",
+                            "study_source_archive_uri": "",
+                            "locality": "",
+                            "latitude": "",
+                            "longitude": "",
+                            "event_date": "",
+                            "region_status": "global",
+                        }
+                    ],
+                    "origin": "globi_runtime",
+                    "management_mode": "auto",
+                    "status": "active",
+                    "extractor_model": "GloBI API",
+                    "extractor_version": "runtime",
+                    "last_auto_sync_at": "",
+                }
+            ],
+            "paths": [
+                {
+                    "id": path_id,
+                    "entity_ids": [entity_a, entity_b],
+                    "relation_ids": [relation_id],
+                    "score": 2,
+                    "evidence_status": "verified",
+                    "reason": "GloBI 全球数据库关系",
+                }
+            ],
+            "recommended_path_ids": [path_id],
+            "globi_runtime": {
+                "query_id": "globi_query_chat_test",
+                "status": "success",
+                "cache_hit": False,
+                "queried_entities": [
+                    {
+                        "mention": "蜜蜂",
+                        "scientific_name": "Apis mellifera",
+                        "entity_type": "insect",
+                    }
+                ],
+                "relation_count": 1,
+                "warning": "",
+            },
+        }
+        prompts = []
+
+        async def fake_query(_service, **_kwargs):
+            return runtime_graph
+
+        async def fake_expert_stream(*, agent, system_prompt, message):
+            prompts.append(system_prompt)
+            yield "GloBI 全球数据库显示蜜蜂与月季存在授粉关系；该记录不等同于本地观察。"
+
+        try:
+            with SessionLocal() as db:
+                before = (
+                    db.query(KnowledgeEntityModel).count(),
+                    db.query(KnowledgeRelationModel).count(),
+                    db.query(GlobiInteractionModel).count(),
+                    db.query(GlobiImportRunModel).count(),
+                )
+            with patch(
+                "app.api.chat.GlobiRuntimeService.query",
+                new=fake_query,
+            ), patch(
+                "app.api.chat.ExpertAgentService.chat_stream",
+                new=fake_expert_stream,
+            ):
+                response = self.client.post(
+                    f"/api/sessions/{session_id}/chat",
+                    json={
+                        "type": "chat",
+                        "message": "蜜蜂和月季有什么关系？",
+                        "expert_id": "insect_agent",
+                    },
+                )
+            self.assertEqual(response.status_code, 200, response.text)
+            events = parse_sse(response.text)
+            event_names = [name for name, _payload in events]
+            self.assertIn("graph", event_names)
+            self.assertLess(event_names.index("graph"), event_names.index("delta"))
+            graph_event = next(payload for name, payload in events if name == "graph")
+            self.assertEqual(graph_event["graph"]["globi_runtime"]["query_id"], "globi_query_chat_test")
+            self.assertTrue(prompts)
+            self.assertIn("GloBI 全球数据库显示", prompts[0])
+            self.assertIn("不等同于九龙山或门头沟本地观察", prompts[0])
+
+            with SessionLocal() as db:
+                after = (
+                    db.query(KnowledgeEntityModel).count(),
+                    db.query(KnowledgeRelationModel).count(),
+                    db.query(GlobiInteractionModel).count(),
+                    db.query(GlobiImportRunModel).count(),
+                )
+                record = (
+                    db.query(RagRecordModel)
+                    .filter(RagRecordModel.session_id == session_id)
+                    .order_by(RagRecordModel.created_at.desc())
+                    .first()
+                )
+                if record is not None:
+                    self.assertNotIn("globi_runtime_reference", record.context)
+            self.assertEqual(before, after)
+        finally:
+            self.delete_session(session_id)
 
 
 if __name__ == "__main__":

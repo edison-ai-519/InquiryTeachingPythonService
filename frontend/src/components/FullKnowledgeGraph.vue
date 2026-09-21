@@ -55,12 +55,13 @@
           <h3>{{ selectedEntity.name }}</h3>
           <div class="inspector-tags">
             <span>{{ entityTypeLabel(selectedEntity.entity_type) }}</span>
-            <span>{{ selectedEntity.origin === 'lightrag' ? '自动提取' : '手工创建' }}</span>
+            <span>{{ entityOriginLabel(selectedEntity) }}</span>
             <span>{{ selectedEntity.mention_count }} 个片段</span>
           </div>
           <p>{{ selectedEntity.description || "暂无节点说明" }}</p>
           <dl>
             <div><dt>别名</dt><dd>{{ selectedEntity.aliases.join("、") || "无" }}</dd></div>
+            <div><dt>分类标识</dt><dd>{{ selectedEntity.taxa?.map((item) => item.external_id).join("、") || "无" }}</dd></div>
             <div><dt>知识文件</dt><dd>{{ selectedEntity.rag_sources.join("、") || "未绑定" }}</dd></div>
           </dl>
           <button class="primary-button" type="button" @click="$emit('edit-entity', selectedEntity.id)">编辑节点</button>
@@ -76,7 +77,9 @@
           <p>{{ selectedRelation.description || "暂无关系说明" }}</p>
           <dl>
             <div><dt>置信度</dt><dd>{{ confidenceLabel(selectedRelation.confidence) }}</dd></div>
-            <div><dt>证据片段</dt><dd>{{ selectedRelation.evidence.length }} 个</dd></div>
+            <div><dt>本地证据片段</dt><dd>{{ selectedRelation.evidence.length }} 个</dd></div>
+            <div><dt>GloBI 证据</dt><dd>{{ selectedRelation.globi_evidence_count || 0 }} 条</dd></div>
+            <div><dt>地域范围</dt><dd>{{ selectedRelation.global_only ? "全球关系（非本地观察）" : selectedRelation.geographic_scope }}</dd></div>
             <div><dt>提取模型</dt><dd>{{ selectedRelation.extractor_model || "—" }}</dd></div>
           </dl>
           <button class="primary-button" type="button" @click="$emit('edit-relation', selectedRelation.id)">编辑关系与证据</button>
@@ -134,7 +137,7 @@ const predicateOptions = computed(() => {
 
 function relationManagementValue(relation: KnowledgeRelation): "manual" | "auto" | "manual_override" {
   if (relation.management_mode === "manual_override") return "manual_override";
-  if (relation.origin === "lightrag") return "auto";
+  if (["lightrag", "globi"].includes(relation.origin)) return "auto";
   return "manual";
 }
 
@@ -152,7 +155,11 @@ const visibleEntities = computed(() => {
   const directIds = new Set(
     props.graph.entities
       .filter((entity) => !entityType.value || entity.entity_type === entityType.value)
-      .filter((entity) => !query || [entity.name, ...entity.aliases].some((name) => name.toLocaleLowerCase("zh-CN").includes(query)))
+      .filter((entity) => !query || [
+        entity.name,
+        ...entity.aliases,
+        ...(entity.taxa || []).flatMap((item) => [item.scientific_name, item.external_id, ...item.common_names]),
+      ].some((name) => name.toLocaleLowerCase("zh-CN").includes(query)))
       .map((entity) => entity.id),
   );
   if (!query) return props.graph.entities.filter((entity) => directIds.has(entity.id));
@@ -288,7 +295,15 @@ function entityTypeLabel(type: string): string {
 
 function evidenceLabel(relation: KnowledgeRelation): string {
   if (relation.status === "suppressed") return "已屏蔽";
+  if (relation.global_only) return "GloBI 全球证据";
+  if (relation.geographic_scope === "mixed") return "本地 + GloBI 证据";
   return relation.evidence_status === "verified" ? "证据完整" : "待补证";
+}
+
+function entityOriginLabel(entity: KnowledgeEntity): string {
+  if (entity.origin === "lightrag") return "LightRAG 自动";
+  if (entity.origin === "globi") return "GloBI 自动";
+  return "手工创建";
 }
 
 function managementLabel(relation: KnowledgeRelation): string {

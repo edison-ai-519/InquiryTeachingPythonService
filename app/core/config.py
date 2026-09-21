@@ -125,6 +125,46 @@ class Settings:
         1,
         int(os.getenv("ECOLOGY_GRAPH_JOB_MAX_ATTEMPTS", "3")),
     )
+    globi_import_worker_enabled: bool = os.getenv(
+        "GLOBI_IMPORT_WORKER_ENABLED",
+        "true",
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    globi_import_worker_poll_seconds: float = max(
+        0.5,
+        float(os.getenv("GLOBI_IMPORT_WORKER_POLL_SECONDS", "2")),
+    )
+    globi_runtime_enabled: bool = os.getenv(
+        "GLOBI_RUNTIME_ENABLED",
+        "true",
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    globi_runtime_cache_seconds: int = max(
+        60,
+        int(os.getenv("GLOBI_RUNTIME_CACHE_SECONDS", "86400")),
+    )
+    globi_runtime_timeout_seconds: float = max(
+        1.0,
+        float(os.getenv("GLOBI_RUNTIME_TIMEOUT_SECONDS", "10")),
+    )
+    globi_runtime_max_entities: int = max(
+        1,
+        min(3, int(os.getenv("GLOBI_RUNTIME_MAX_ENTITIES", "3"))),
+    )
+    globi_runtime_result_limit: int = max(
+        25,
+        min(1000, int(os.getenv("GLOBI_RUNTIME_RESULT_LIMIT", "250"))),
+    )
+    globi_runtime_relation_limit: int = max(
+        5,
+        min(100, int(os.getenv("GLOBI_RUNTIME_RELATION_LIMIT", "40"))),
+    )
+    globi_runtime_concurrency: int = max(
+        1,
+        min(4, int(os.getenv("GLOBI_RUNTIME_CONCURRENCY", "2"))),
+    )
+    globi_runtime_max_response_bytes: int = max(
+        1024 * 1024,
+        int(os.getenv("GLOBI_RUNTIME_MAX_RESPONSE_BYTES", str(8 * 1024 * 1024))),
+    )
 
     llm_api_key: str = os.getenv("LLM_API_KEY", "")
     llm_api_base: str = os.getenv("LLM_API_BASE", "https://api.openai.com/v1")

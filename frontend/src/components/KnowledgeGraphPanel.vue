@@ -11,11 +11,23 @@
         <button type="button" @click="$emit('close')"><X :size="15" />关闭</button>
       </div>
     </header>
-    <div v-if="loading" class="knowledge-graph-empty"><LoaderCircle class="spin-icon" :size="18" />正在解析局部图谱</div>
+    <div v-if="loading" class="knowledge-graph-empty"><LoaderCircle class="spin-icon" :size="18" />正在查询本地图谱与 GloBI 全球关系</div>
     <div v-else-if="error" class="knowledge-graph-empty graph-error">图谱加载失败：{{ error }}</div>
     <div v-else-if="!query" class="knowledge-graph-empty">请先向昆虫或自然生态专家发送问题</div>
-    <div v-else-if="!graph.entities.length" class="knowledge-graph-empty">当前问题没有匹配到可展示的图谱关系</div>
+    <div v-else-if="!graph.entities.length" class="knowledge-graph-empty">
+      {{ graph.globi_runtime?.warning || "当前问题没有匹配到可展示的图谱关系" }}
+    </div>
     <div v-else class="knowledge-graph-body">
+      <div v-if="graph.globi_runtime" class="knowledge-graph-runtime-status">
+        <strong>GloBI 实时查询</strong>
+        <span v-if="graph.globi_runtime.queried_entities.length">
+          查询实体：{{ graph.globi_runtime.queried_entities.map((item) => `${item.mention}（${item.scientific_name}）`).join("、") }}
+        </span>
+        <span>
+          {{ graph.globi_runtime.relation_count }} 条全球关系{{ graph.globi_runtime.cache_hit ? " · 已命中 24 小时缓存" : "" }}
+        </span>
+        <small v-if="graph.globi_runtime.warning">{{ graph.globi_runtime.warning }}</small>
+      </div>
       <svg class="knowledge-graph-svg" viewBox="0 0 520 320" role="img" aria-label="知识图谱局部关系">
         <defs>
           <marker id="knowledge-arrow" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -55,7 +67,7 @@
           class="knowledge-edge-label"
           :class="[{ selected: isEdgeSelected(edge.id) }, edge.evidenceStatus]"
         >
-          {{ edge.predicateLabel }}{{ edge.evidenceStatus === "unverified" ? " · 待补证" : "" }}
+          {{ edge.predicateLabel }}{{ edge.globalOnly ? " · GloBI全球" : edge.evidenceStatus === "unverified" ? " · 待补证" : "" }}
         </text>
         <g
           v-for="node in graphNodes"
@@ -145,6 +157,7 @@ const graphEdges = computed(() => props.graph.relations.flatMap((relation) => {
     id: relation.id,
     predicateLabel: relation.predicate_label || relation.predicate,
     evidenceStatus: relation.evidence_status,
+    globalOnly: relation.global_only,
     x1: source.x,
     y1: source.y,
     x2: target.x,

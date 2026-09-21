@@ -1,5 +1,10 @@
+import json
+import shutil
+import tempfile
+from pathlib import Path
+
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.agents.registry import get_agent_registry
@@ -13,6 +18,8 @@ from app.schemas import (
 )
 from app.services.knowledge_graph_service import KnowledgeGraphService
 from app.services.ecology_graph_sync_service import EcologyGraphSyncService
+from app.services.globi_import_service import GlobiImportOptions, GlobiImportService
+from app.services.globi_runtime_service import GlobiRuntimeService, SUPPORTED_EXPERTS
 from app.services.session_access_service import get_owned_session
 from app.workflow.flows import get_flow
 
@@ -31,6 +38,48 @@ class EcologyGraphSyncRequest(BaseModel):
     force: bool = True
 
 
+def _globi_options(
+    include_insect_insect: bool,
+    keep_unknown_region: bool,
+    batch_size: int,
+    interaction_types_json: str,
+) -> GlobiImportOptions:
+    try:
+        interaction_types = json.loads(interaction_types_json or "[]")
+    except json.JSONDecodeError as exc:
+        raise ValueError("关系类型筛选不是有效 JSON") from exc
+    if interaction_types and not isinstance(interaction_types, list):
+        raise ValueError("关系类型筛选必须是数组")
+    return GlobiImportOptions.from_dict(
+        {
+            "include_insect_insect": include_insect_insect,
+            "keep_unknown_region": keep_unknown_region,
+            "batch_size": batch_size,
+            "interaction_types": interaction_types or None,
+        }
+    )
+
+
+def _stage_globi_upload(file: UploadFile) -> Path:
+    target_dir = Path("data/runtime/globi").resolve()
+    target_dir.mkdir(parents=True, exist_ok=True)
+    suffixes = "".join(Path(file.filename or "globi.csv").suffixes) or ".csv"
+    handle = tempfile.NamedTemporaryFile(
+        prefix="globi-upload-",
+        suffix=suffixes,
+        dir=target_dir,
+        delete=False,
+    )
+    path = Path(handle.name)
+    try:
+        with handle:
+            shutil.copyfileobj(file.file, handle, length=1024 * 1024)
+        return path
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+
+
 def _raise_graph_error(exc: Exception) -> None:
     if isinstance(exc, LookupError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -40,7 +89,7 @@ def _raise_graph_error(exc: Exception) -> None:
 
 
 @router.post("/graph/candidates")
-def graph_candidates(
+async def graph_candidates(
     payload: GraphCandidateRequest,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
@@ -58,13 +107,22 @@ def graph_candidates(
     ):
         raise HTTPException(status_code=400, detail="未知或不可选择的专家 Agent")
     service = KnowledgeGraphService(db)
-    data = service.find_candidate_graph(
+    local_data = service.find_candidate_graph(
         message=payload.message,
         expert_id=payload.expert_id or "",
         topic=sess.topic,
         stage=stage,
     )
-    db.commit()
+    if (payload.expert_id or "") in SUPPORTED_EXPERTS:
+        runtime_data = await GlobiRuntimeService(db).query(
+            message=payload.message,
+            expert_id=payload.expert_id or "",
+            user_id=user.id,
+            session_id=sess.id,
+        )
+        data = GlobiRuntimeService.merge_graphs(local_data, runtime_data)
+    else:
+        data = local_data
     return {"code": 0, "message": "success", "data": data}
 
 
@@ -243,6 +301,146 @@ def start_ecology_graph_sync(
         "message": "ecology graph sync queued",
         "data": {"jobs": jobs, "queued_count": len(jobs)},
     }
+
+
+@router.post("/globi/import/preview")
+def preview_globi_import(
+    version: str = Form(default="stable"),
+    source_url: str = Form(default=""),
+    include_insect_insect: bool = Form(default=True),
+    keep_unknown_region: bool = Form(default=True),
+    batch_size: int = Form(default=1000),
+    interaction_types_json: str = Form(default="[]"),
+    file: UploadFile | None = File(default=None),
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    service = GlobiImportService(db)
+    path: Path | None = None
+    downloaded = False
+    try:
+        options = _globi_options(
+            include_insect_insect,
+            keep_unknown_region,
+            batch_size,
+            interaction_types_json,
+        )
+        if file is not None:
+            path = _stage_globi_upload(file)
+        elif source_url.strip():
+            path = service.download(source_url.strip())
+            downloaded = True
+        else:
+            raise ValueError("请上传 GloBI CSV/TSV 文件或填写官方下载地址")
+        data = {
+            "version": version.strip() or "stable",
+            "source_name": file.filename if file is not None else source_url.strip(),
+            "checksum": service.checksum(path),
+            "filters": options.as_dict(),
+            "stats": service.preview(path, options),
+        }
+        return {"code": 0, "message": "globi import preview", "data": data}
+    except Exception as exc:
+        _raise_graph_error(exc)
+    finally:
+        if path is not None and (file is not None or downloaded):
+            path.unlink(missing_ok=True)
+
+
+@router.post("/globi/import")
+def start_globi_import(
+    version: str = Form(default="stable"),
+    source_url: str = Form(default=""),
+    include_insect_insect: bool = Form(default=True),
+    keep_unknown_region: bool = Form(default=True),
+    batch_size: int = Form(default=1000),
+    interaction_types_json: str = Form(default="[]"),
+    file: UploadFile | None = File(default=None),
+    db: Session = Depends(get_db),
+    admin: UserModel = Depends(get_admin_user),
+):
+    staged_path: Path | None = None
+    try:
+        options = _globi_options(
+            include_insect_insect,
+            keep_unknown_region,
+            batch_size,
+            interaction_types_json,
+        )
+        if file is not None:
+            staged_path = _stage_globi_upload(file)
+        run = GlobiImportService(db).create_run(
+            version=version,
+            source_url="" if file is not None else source_url,
+            source_name=file.filename if file is not None else source_url,
+            staged_path=str(staged_path or ""),
+            options=options,
+            created_by=admin.id,
+            delete_staged_after=staged_path is not None,
+        )
+        db.commit()
+        return {"code": 0, "message": "globi import queued", "data": run}
+    except Exception as exc:
+        db.rollback()
+        if staged_path is not None:
+            staged_path.unlink(missing_ok=True)
+        _raise_graph_error(exc)
+
+
+@router.get("/globi/import")
+def list_globi_imports(
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    return {
+        "code": 0,
+        "message": "success",
+        "data": GlobiImportService(db).list_runs(limit),
+    }
+
+
+@router.get("/globi/import/{run_id}/summary")
+def get_globi_import_summary(
+    run_id: str,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    try:
+        data = GlobiImportService(db).summary(run_id)
+    except Exception as exc:
+        _raise_graph_error(exc)
+    return {"code": 0, "message": "success", "data": data}
+
+
+@router.post("/globi/import/{run_id}/rollback")
+def rollback_globi_import(
+    run_id: str,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    try:
+        data = GlobiImportService(db).rollback(run_id)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        _raise_graph_error(exc)
+    return {"code": 0, "message": "globi import rolled back", "data": data}
+
+
+@router.post("/globi/import/{run_id}/retry")
+def retry_globi_import(
+    run_id: str,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    try:
+        data = GlobiImportService(db).retry(run_id)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        _raise_graph_error(exc)
+    return {"code": 0, "message": "globi import queued for retry", "data": data}
 
 
 @router.get("/ecology-graph/sync")

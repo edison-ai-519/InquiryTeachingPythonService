@@ -192,6 +192,47 @@ GET  /api/knowledge/ecology-graph/sync
 POST /api/knowledge/graph/relations/{relation_id}/restore-auto
 ```
 
+## GloBI 结构化生态关系导入
+
+管理员可在“图谱管理 → GloBI 导入”上传 GloBI CSV、TSV、GZIP 或 ZIP 稳定数据，也可以填写受信任的 GloBI/Zenodo HTTPS 下载地址。系统先按 `Insecta`、`Plantae` 分类路径和受控关系类型生成预览，再将昆虫—植物与昆虫—昆虫关系直接写入 SQL 图谱，不经过 LightRAG 和向量化。
+
+导入会保留外部分类 ID、学名、原始关系、研究引用、数据集引用和地域字段。同一三元组只发布一条正式关系，多条 GloBI 记录作为外部证据关联；只有 GloBI 证据的关系会标记为“全球关系”，问答时不得表述为九龙山或门头沟本地观察。重复导入保持幂等，并支持按导入批次回滚；手工覆盖和其他来源证据不会被回滚删除。
+
+接口（管理员，使用 `multipart/form-data`）：
+
+```text
+POST /api/knowledge/globi/import/preview
+POST /api/knowledge/globi/import
+GET  /api/knowledge/globi/import
+GET  /api/knowledge/globi/import/{run_id}/summary
+POST /api/knowledge/globi/import/{run_id}/retry
+POST /api/knowledge/globi/import/{run_id}/rollback
+```
+
+支持的首批关系包括 `eats`、`preysOn`、`pollinates`、`pollinatedBy`、`visitsFlowersOf`、`flowersVisitedBy`、`hasHabitat`、`parasiteOf` 及其受控反向关系。不明确的“相关”“共现”等关系不会自动发布。
+
+```text
+GLOBI_IMPORT_WORKER_ENABLED=true
+GLOBI_IMPORT_WORKER_POLL_SECONDS=2
+```
+
+### GloBI 对话实时查询（不落库）
+
+当教师选择昆虫 Agent 或自然 Agent 时，系统会从本轮问题提取最多 3 个昆虫或植物实体，使用规范学名双向查询 GloBI API，并把受控关系作为临时图谱通过聊天 SSE 返回。临时节点和关系使用 `globi_runtime_*` ID，只保存在后端进程内的 TTL 缓存中，不创建或修改 `knowledge_entities`、`knowledge_relations`、`globi_interactions` 或导入任务记录，也不会出现在全量图谱、导出文件和管理员编辑列表中。
+
+回答引用实时结果时会明确标注为 GloBI 全球数据库关系，不把它当作九龙山或门头沟的本地观察。服务重启或缓存过期后，旧的临时图谱选择失效，需要重新查询。
+
+```text
+GLOBI_RUNTIME_ENABLED=true
+GLOBI_RUNTIME_CACHE_SECONDS=86400
+GLOBI_RUNTIME_TIMEOUT_SECONDS=10
+GLOBI_RUNTIME_MAX_ENTITIES=3
+GLOBI_RUNTIME_RESULT_LIMIT=250
+GLOBI_RUNTIME_RELATION_LIMIT=40
+GLOBI_RUNTIME_CONCURRENCY=2
+GLOBI_RUNTIME_MAX_RESPONSE_BYTES=8388608
+```
+
 ## 快速请求示例
 
 创建会话：

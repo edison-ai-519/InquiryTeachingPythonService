@@ -141,11 +141,22 @@ export type KnowledgeEntity = {
   source: string;
   rag_sources: string[];
   mention_count: number;
-  origin: "manual" | "lightrag" | string;
+  origin: "manual" | "lightrag" | "globi" | string;
   management_mode: "manual" | "auto" | "manual_override" | string;
   extractor_model: string;
   extractor_version: string;
   last_auto_sync_at: string;
+  taxa: KnowledgeEntityTaxon[];
+};
+
+export type KnowledgeEntityTaxon = {
+  authority: string;
+  external_id: string;
+  scientific_name: string;
+  taxon_rank: string;
+  common_names: string[];
+  match_method: string;
+  match_confidence: string;
 };
 
 export type KnowledgeEvidence = {
@@ -166,12 +177,89 @@ export type KnowledgeRelation = {
   confidence: "high" | "medium" | "low" | string;
   evidence_status: "verified" | "unverified";
   evidence: KnowledgeEvidence[];
-  origin: "manual" | "lightrag" | string;
+  evidence_types: Array<"local_document" | "globi" | "manual" | string>;
+  geographic_scope: "local" | "global" | "mixed" | "unknown" | string;
+  global_only: boolean;
+  globi_evidence_count: number;
+  globi_evidence: GlobiEvidence[];
+  origin: "manual" | "lightrag" | "globi" | string;
   management_mode: "manual" | "auto" | "manual_override" | string;
   status: "active" | "suppressed" | string;
   extractor_model: string;
   extractor_version: string;
   last_auto_sync_at: string;
+};
+
+export type GlobiEvidence = {
+  id: string;
+  raw_interaction_type: string;
+  study_source_id: string;
+  study_source_citation: string;
+  study_url: string;
+  study_doi: string;
+  study_source_archive_uri: string;
+  locality: string;
+  latitude: string;
+  longitude: string;
+  event_date: string;
+  region_status: "located" | "global" | string;
+};
+
+export type GlobiImportStats = {
+  total_rows: number;
+  candidate_rows: number;
+  accepted_rows: number;
+  rejected_rows: number;
+  duplicate_rows: number;
+  created_entities: number;
+  updated_entities: number;
+  created_relations: number;
+  updated_relations: number;
+  rejection_reasons: Record<string, number>;
+  rejection_samples: Array<{ reason: string; source: string; interaction: string; target: string }>;
+  predicate_counts: Record<string, number>;
+  rollback?: { interactions: number; relations: number; entities: number };
+};
+
+export type GlobiImportOptions = {
+  include_insect_insect: boolean;
+  keep_unknown_region: boolean;
+  batch_size: number;
+  interaction_types: string[];
+};
+
+export type GlobiImportRun = {
+  id: string;
+  version: string;
+  source_url: string;
+  source_name: string;
+  checksum: string;
+  filters: GlobiImportOptions;
+  status: "preview" | "queued" | "running" | "completed" | "failed" | "rolled_back" | string;
+  attempts: number;
+  total_rows: number;
+  candidate_rows: number;
+  accepted_rows: number;
+  rejected_rows: number;
+  created_entities: number;
+  updated_entities: number;
+  created_relations: number;
+  updated_relations: number;
+  stats: GlobiImportStats;
+  started_at: string;
+  finished_at: string;
+  last_error: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GlobiImportPreview = {
+  version: string;
+  source_name: string;
+  checksum: string;
+  filters: GlobiImportOptions;
+  stats: GlobiImportStats;
 };
 
 export type EcologyGraphSyncJob = {
@@ -239,12 +327,25 @@ export type KnowledgeGraphPayload = {
   relations: KnowledgeRelation[];
   paths: KnowledgePath[];
   recommended_path_ids: string[];
+  globi_runtime?: {
+    query_id: string;
+    status: "success" | "empty" | "failed" | "disabled" | "expired" | "skipped" | string;
+    cache_hit: boolean;
+    queried_entities: Array<{
+      mention: string;
+      scientific_name: string;
+      entity_type: "insect" | "plant" | string;
+    }>;
+    relation_count: number;
+    warning: string;
+  } | null;
 };
 
 export type GraphSelectionPayload = {
   entity_ids: string[];
   relation_ids: string[];
   path_ids: string[];
+  globi_query_id?: string | null;
 };
 
 export type FlowInfo = {

@@ -8,6 +8,8 @@ import type {
   ExpertAgentItem,
   EcologyGraphSyncStatus,
   FlowInfo,
+  GlobiImportPreview,
+  GlobiImportRun,
   GraphSelectionPayload,
   KnowledgeEntity,
   KnowledgeEntityInput,
@@ -232,6 +234,7 @@ export async function exportSession(sessionId: string): Promise<Blob> {
 
 type StreamHandlers = {
   stage?: (data: any) => void | Promise<void>;
+  graph?: (data: any) => void | Promise<void>;
   agent?: (data: any) => void | Promise<void>;
   delta?: (data: any) => void | Promise<void>;
   draft?: (data: any) => void | Promise<void>;
@@ -624,6 +627,67 @@ export async function startEcologyGraphSync(source?: string): Promise<number> {
 export async function getEcologyGraphSyncStatus(): Promise<EcologyGraphSyncStatus> {
   const payload = await readJson<ApiEnvelope<EcologyGraphSyncStatus>>(
     `${API_BASE}/api/knowledge/ecology-graph/sync`,
+  );
+  return payload.data;
+}
+
+export type GlobiImportRequest = {
+  version: string;
+  sourceUrl: string;
+  file: File | null;
+  includeInsectInsect: boolean;
+  keepUnknownRegion: boolean;
+  batchSize: number;
+  interactionTypes: string[];
+};
+
+function globiImportForm(input: GlobiImportRequest): FormData {
+  const form = new FormData();
+  form.set("version", input.version || "stable");
+  form.set("source_url", input.sourceUrl || "");
+  form.set("include_insect_insect", String(input.includeInsectInsect));
+  form.set("keep_unknown_region", String(input.keepUnknownRegion));
+  form.set("batch_size", String(input.batchSize || 1000));
+  form.set("interaction_types_json", JSON.stringify(input.interactionTypes || []));
+  if (input.file) form.set("file", input.file);
+  return form;
+}
+
+export async function previewGlobiImport(input: GlobiImportRequest): Promise<GlobiImportPreview> {
+  const payload = await readJson<ApiEnvelope<GlobiImportPreview>>(
+    `${API_BASE}/api/knowledge/globi/import/preview`,
+    { method: "POST", body: globiImportForm(input) },
+  );
+  return payload.data;
+}
+
+export async function startGlobiImport(input: GlobiImportRequest): Promise<GlobiImportRun> {
+  const payload = await readJson<ApiEnvelope<GlobiImportRun>>(
+    `${API_BASE}/api/knowledge/globi/import`,
+    { method: "POST", body: globiImportForm(input) },
+  );
+  return payload.data;
+}
+
+export async function getGlobiImports(limit = 50): Promise<GlobiImportRun[]> {
+  const payload = await readJson<ApiEnvelope<GlobiImportRun[]>>(
+    `${API_BASE}/api/knowledge/globi/import?limit=${limit}`,
+  );
+  return payload.data || [];
+}
+
+export async function rollbackGlobiImport(runId: string): Promise<GlobiImportRun> {
+  const payload = await readJson<ApiEnvelope<GlobiImportRun>>(
+    `${API_BASE}/api/knowledge/globi/import/${encodeURIComponent(runId)}/rollback`,
+    { method: "POST" },
+  );
+  return payload.data;
+}
+
+export async function retryGlobiImport(runId: string): Promise<GlobiImportRun> {
+  const payload = await readJson<ApiEnvelope<GlobiImportRun>>(
+    `${API_BASE}/api/knowledge/globi/import/${encodeURIComponent(runId)}/retry`,
+    { method: "POST" },
   );
   return payload.data;
 }

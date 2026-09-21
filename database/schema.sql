@@ -308,6 +308,133 @@ CREATE TABLE IF NOT EXISTS ecology_graph_source_states (
 CREATE INDEX IF NOT EXISTS ix_ecology_graph_source_states_status
     ON ecology_graph_source_states (status);
 
+-- Canonical taxon identifiers used to merge GloBI taxa with local graph nodes.
+CREATE TABLE IF NOT EXISTS knowledge_entity_taxa (
+    authority          TEXT NOT NULL,
+    external_id        TEXT NOT NULL,
+    entity_id          TEXT NOT NULL,
+    scientific_name    TEXT NOT NULL DEFAULT '',
+    verbatim_name      TEXT NOT NULL DEFAULT '',
+    taxon_rank         TEXT NOT NULL DEFAULT '',
+    taxon_path         TEXT NOT NULL DEFAULT '',
+    taxon_path_ids     TEXT NOT NULL DEFAULT '',
+    common_names_json  TEXT NOT NULL DEFAULT '[]',
+    match_method       TEXT NOT NULL DEFAULT 'external_id',
+    match_confidence   TEXT NOT NULL DEFAULT 'high',
+    created_by_run_id  TEXT NOT NULL DEFAULT '',
+    created_at         TEXT NOT NULL,
+    updated_at         TEXT NOT NULL,
+    PRIMARY KEY (authority, external_id),
+    CONSTRAINT fk_knowledge_entity_taxa_entity
+        FOREIGN KEY (entity_id) REFERENCES knowledge_entities (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ix_knowledge_entity_taxa_entity_id
+    ON knowledge_entity_taxa (entity_id);
+CREATE INDEX IF NOT EXISTS ix_knowledge_entity_taxa_scientific_name
+    ON knowledge_entity_taxa (scientific_name);
+
+CREATE TABLE IF NOT EXISTS globi_import_runs (
+    id                 TEXT PRIMARY KEY,
+    version            TEXT NOT NULL DEFAULT '',
+    source_url         TEXT NOT NULL DEFAULT '',
+    source_name        TEXT NOT NULL DEFAULT '',
+    checksum           TEXT NOT NULL DEFAULT '',
+    filter_json        TEXT NOT NULL DEFAULT '{}',
+    status             TEXT NOT NULL DEFAULT 'queued',
+    attempts           INTEGER NOT NULL DEFAULT 0,
+    lease_until        TEXT NOT NULL DEFAULT '',
+    total_rows         INTEGER NOT NULL DEFAULT 0,
+    candidate_rows     INTEGER NOT NULL DEFAULT 0,
+    accepted_rows      INTEGER NOT NULL DEFAULT 0,
+    rejected_rows      INTEGER NOT NULL DEFAULT 0,
+    created_entities   INTEGER NOT NULL DEFAULT 0,
+    updated_entities   INTEGER NOT NULL DEFAULT 0,
+    created_relations  INTEGER NOT NULL DEFAULT 0,
+    updated_relations  INTEGER NOT NULL DEFAULT 0,
+    stats_json         TEXT NOT NULL DEFAULT '{}',
+    started_at         TEXT NOT NULL DEFAULT '',
+    finished_at        TEXT NOT NULL DEFAULT '',
+    last_error         TEXT NOT NULL DEFAULT '',
+    created_by         TEXT NOT NULL DEFAULT '',
+    created_at         TEXT NOT NULL,
+    updated_at         TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_globi_import_runs_version ON globi_import_runs (version);
+CREATE INDEX IF NOT EXISTS ix_globi_import_runs_status ON globi_import_runs (status);
+CREATE INDEX IF NOT EXISTS ix_globi_import_runs_checksum ON globi_import_runs (checksum);
+
+CREATE TABLE IF NOT EXISTS globi_interactions (
+    id                           TEXT PRIMARY KEY,
+    import_run_id                TEXT NOT NULL,
+    source_taxon_external_id     TEXT NOT NULL DEFAULT '',
+    target_taxon_external_id     TEXT NOT NULL DEFAULT '',
+    source_taxon_name            TEXT NOT NULL DEFAULT '',
+    target_taxon_name            TEXT NOT NULL DEFAULT '',
+    source_taxon_common_names    TEXT NOT NULL DEFAULT '',
+    target_taxon_common_names    TEXT NOT NULL DEFAULT '',
+    source_taxon_path            TEXT NOT NULL DEFAULT '',
+    target_taxon_path            TEXT NOT NULL DEFAULT '',
+    raw_interaction_type         TEXT NOT NULL DEFAULT '',
+    normalized_predicate         TEXT NOT NULL,
+    source_entity_id             TEXT NOT NULL,
+    target_entity_id             TEXT NOT NULL,
+    study_source_id              TEXT NOT NULL DEFAULT '',
+    study_source_citation        TEXT NOT NULL DEFAULT '',
+    study_url                    TEXT NOT NULL DEFAULT '',
+    study_doi                    TEXT NOT NULL DEFAULT '',
+    study_source_archive_uri     TEXT NOT NULL DEFAULT '',
+    locality                     TEXT NOT NULL DEFAULT '',
+    latitude                     TEXT NOT NULL DEFAULT '',
+    longitude                    TEXT NOT NULL DEFAULT '',
+    event_date                   TEXT NOT NULL DEFAULT '',
+    source_last_seen_at          TEXT NOT NULL DEFAULT '',
+    region_status                TEXT NOT NULL DEFAULT 'global',
+    record_hash                  TEXT NOT NULL UNIQUE,
+    created_at                   TEXT NOT NULL,
+    CONSTRAINT fk_globi_interactions_run
+        FOREIGN KEY (import_run_id) REFERENCES globi_import_runs (id) ON DELETE CASCADE,
+    CONSTRAINT fk_globi_interactions_source_entity
+        FOREIGN KEY (source_entity_id) REFERENCES knowledge_entities (id) ON DELETE CASCADE,
+    CONSTRAINT fk_globi_interactions_target_entity
+        FOREIGN KEY (target_entity_id) REFERENCES knowledge_entities (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ix_globi_interactions_run ON globi_interactions (import_run_id);
+CREATE INDEX IF NOT EXISTS ix_globi_interactions_source_entity ON globi_interactions (source_entity_id);
+CREATE INDEX IF NOT EXISTS ix_globi_interactions_target_entity ON globi_interactions (target_entity_id);
+CREATE INDEX IF NOT EXISTS ix_globi_interactions_predicate ON globi_interactions (normalized_predicate);
+CREATE INDEX IF NOT EXISTS ix_globi_interactions_region ON globi_interactions (region_status);
+
+CREATE TABLE IF NOT EXISTS globi_import_interactions (
+    import_run_id  TEXT NOT NULL,
+    interaction_id TEXT NOT NULL,
+    created_at     TEXT NOT NULL,
+    PRIMARY KEY (import_run_id, interaction_id),
+    CONSTRAINT fk_globi_import_interactions_run
+        FOREIGN KEY (import_run_id) REFERENCES globi_import_runs (id) ON DELETE CASCADE,
+    CONSTRAINT fk_globi_import_interactions_interaction
+        FOREIGN KEY (interaction_id) REFERENCES globi_interactions (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ix_globi_import_interactions_interaction
+    ON globi_import_interactions (interaction_id);
+
+CREATE TABLE IF NOT EXISTS knowledge_relation_globi_evidence (
+    relation_id    TEXT NOT NULL,
+    interaction_id TEXT NOT NULL,
+    created_at     TEXT NOT NULL,
+    PRIMARY KEY (relation_id, interaction_id),
+    CONSTRAINT fk_relation_globi_evidence_relation
+        FOREIGN KEY (relation_id) REFERENCES knowledge_relations (id) ON DELETE CASCADE,
+    CONSTRAINT fk_relation_globi_evidence_interaction
+        FOREIGN KEY (interaction_id) REFERENCES globi_interactions (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ix_knowledge_relation_globi_interaction
+    ON knowledge_relation_globi_evidence (interaction_id);
+
 -- One rollback unit per chat round. Message IDs are application-managed
 -- references because rollback currently deletes messages before this row.
 CREATE TABLE IF NOT EXISTS chat_turns (

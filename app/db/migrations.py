@@ -490,6 +490,171 @@ def ensure_schema_compatibility() -> None:
         connection.execute(
             text(
                 """
+                CREATE TABLE IF NOT EXISTS knowledge_entity_taxa (
+                    authority VARCHAR NOT NULL,
+                    external_id VARCHAR NOT NULL,
+                    entity_id VARCHAR NOT NULL,
+                    scientific_name VARCHAR NOT NULL DEFAULT '',
+                    verbatim_name VARCHAR NOT NULL DEFAULT '',
+                    taxon_rank VARCHAR NOT NULL DEFAULT '',
+                    taxon_path TEXT NOT NULL DEFAULT '',
+                    taxon_path_ids TEXT NOT NULL DEFAULT '',
+                    common_names_json TEXT NOT NULL DEFAULT '[]',
+                    match_method VARCHAR NOT NULL DEFAULT 'external_id',
+                    match_confidence VARCHAR NOT NULL DEFAULT 'high',
+                    created_by_run_id VARCHAR NOT NULL DEFAULT '',
+                    created_at VARCHAR NOT NULL,
+                    updated_at VARCHAR NOT NULL,
+                    PRIMARY KEY (authority, external_id),
+                    FOREIGN KEY(entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_entity_taxa_entity_id "
+                "ON knowledge_entity_taxa (entity_id)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_entity_taxa_scientific_name "
+                "ON knowledge_entity_taxa (scientific_name)"
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS globi_import_runs (
+                    id VARCHAR PRIMARY KEY,
+                    version VARCHAR NOT NULL DEFAULT '',
+                    source_url TEXT NOT NULL DEFAULT '',
+                    source_name VARCHAR NOT NULL DEFAULT '',
+                    checksum VARCHAR NOT NULL DEFAULT '',
+                    filter_json TEXT NOT NULL DEFAULT '{}',
+                    status VARCHAR NOT NULL DEFAULT 'queued',
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    lease_until VARCHAR NOT NULL DEFAULT '',
+                    total_rows INTEGER NOT NULL DEFAULT 0,
+                    candidate_rows INTEGER NOT NULL DEFAULT 0,
+                    accepted_rows INTEGER NOT NULL DEFAULT 0,
+                    rejected_rows INTEGER NOT NULL DEFAULT 0,
+                    created_entities INTEGER NOT NULL DEFAULT 0,
+                    updated_entities INTEGER NOT NULL DEFAULT 0,
+                    created_relations INTEGER NOT NULL DEFAULT 0,
+                    updated_relations INTEGER NOT NULL DEFAULT 0,
+                    stats_json TEXT NOT NULL DEFAULT '{}',
+                    started_at VARCHAR NOT NULL DEFAULT '',
+                    finished_at VARCHAR NOT NULL DEFAULT '',
+                    last_error TEXT NOT NULL DEFAULT '',
+                    created_by VARCHAR NOT NULL DEFAULT '',
+                    created_at VARCHAR NOT NULL,
+                    updated_at VARCHAR NOT NULL
+                )
+                """
+            )
+        )
+        globi_run_columns = {
+            column["name"] for column in inspect(connection).get_columns("globi_import_runs")
+        }
+        if "attempts" not in globi_run_columns:
+            connection.execute(
+                text("ALTER TABLE globi_import_runs ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0")
+            )
+        if "lease_until" not in globi_run_columns:
+            connection.execute(
+                text("ALTER TABLE globi_import_runs ADD COLUMN lease_until VARCHAR NOT NULL DEFAULT ''")
+            )
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_globi_import_runs_version ON globi_import_runs (version)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_globi_import_runs_status ON globi_import_runs (status)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_globi_import_runs_checksum ON globi_import_runs (checksum)"))
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS globi_interactions (
+                    id VARCHAR PRIMARY KEY,
+                    import_run_id VARCHAR NOT NULL,
+                    source_taxon_external_id VARCHAR NOT NULL DEFAULT '',
+                    target_taxon_external_id VARCHAR NOT NULL DEFAULT '',
+                    source_taxon_name VARCHAR NOT NULL DEFAULT '',
+                    target_taxon_name VARCHAR NOT NULL DEFAULT '',
+                    source_taxon_common_names TEXT NOT NULL DEFAULT '',
+                    target_taxon_common_names TEXT NOT NULL DEFAULT '',
+                    source_taxon_path TEXT NOT NULL DEFAULT '',
+                    target_taxon_path TEXT NOT NULL DEFAULT '',
+                    raw_interaction_type VARCHAR NOT NULL DEFAULT '',
+                    normalized_predicate VARCHAR NOT NULL,
+                    source_entity_id VARCHAR NOT NULL,
+                    target_entity_id VARCHAR NOT NULL,
+                    study_source_id VARCHAR NOT NULL DEFAULT '',
+                    study_source_citation TEXT NOT NULL DEFAULT '',
+                    study_url TEXT NOT NULL DEFAULT '',
+                    study_doi VARCHAR NOT NULL DEFAULT '',
+                    study_source_archive_uri TEXT NOT NULL DEFAULT '',
+                    locality TEXT NOT NULL DEFAULT '',
+                    latitude VARCHAR NOT NULL DEFAULT '',
+                    longitude VARCHAR NOT NULL DEFAULT '',
+                    event_date VARCHAR NOT NULL DEFAULT '',
+                    source_last_seen_at VARCHAR NOT NULL DEFAULT '',
+                    region_status VARCHAR NOT NULL DEFAULT 'global',
+                    record_hash VARCHAR NOT NULL UNIQUE,
+                    created_at VARCHAR NOT NULL,
+                    FOREIGN KEY(import_run_id) REFERENCES globi_import_runs(id) ON DELETE CASCADE,
+                    FOREIGN KEY(source_entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE,
+                    FOREIGN KEY(target_entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_globi_interactions_run ON globi_interactions (import_run_id)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_globi_interactions_source_entity ON globi_interactions (source_entity_id)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_globi_interactions_target_entity ON globi_interactions (target_entity_id)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_globi_interactions_predicate ON globi_interactions (normalized_predicate)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_globi_interactions_region ON globi_interactions (region_status)"))
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS globi_import_interactions (
+                    import_run_id VARCHAR NOT NULL,
+                    interaction_id VARCHAR NOT NULL,
+                    created_at VARCHAR NOT NULL,
+                    PRIMARY KEY (import_run_id, interaction_id),
+                    FOREIGN KEY(import_run_id) REFERENCES globi_import_runs(id) ON DELETE CASCADE,
+                    FOREIGN KEY(interaction_id) REFERENCES globi_interactions(id) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_globi_import_interactions_interaction "
+                "ON globi_import_interactions (interaction_id)"
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS knowledge_relation_globi_evidence (
+                    relation_id VARCHAR NOT NULL,
+                    interaction_id VARCHAR NOT NULL,
+                    created_at VARCHAR NOT NULL,
+                    PRIMARY KEY (relation_id, interaction_id),
+                    FOREIGN KEY(relation_id) REFERENCES knowledge_relations(id) ON DELETE CASCADE,
+                    FOREIGN KEY(interaction_id) REFERENCES globi_interactions(id) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_relation_globi_interaction "
+                "ON knowledge_relation_globi_evidence (interaction_id)"
+            )
+        )
+        connection.execute(
+            text(
+                """
                 CREATE TABLE IF NOT EXISTS schema_migrations (
                     key VARCHAR PRIMARY KEY,
                     applied_at VARCHAR NOT NULL

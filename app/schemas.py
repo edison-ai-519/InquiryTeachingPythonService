@@ -39,6 +39,7 @@ class GraphSelection(BaseModel):
     entity_ids: list[str] = Field(default_factory=list)
     relation_ids: list[str] = Field(default_factory=list)
     path_ids: list[str] = Field(default_factory=list)
+    globi_query_id: str | None = Field(default=None, max_length=128)
 
 
 class KnowledgeEntityRagSourcesRequest(BaseModel):

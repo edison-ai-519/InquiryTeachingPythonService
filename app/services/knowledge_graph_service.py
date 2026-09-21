@@ -12,10 +12,13 @@ from sqlalchemy.orm import Session
 from app.db.models import (
     CurriculumChunkModel,
     CurriculumSourceModel,
+    GlobiInteractionModel,
     KnowledgeEntityMentionModel,
     KnowledgeEntityModel,
     KnowledgeEntitySourceModel,
+    KnowledgeEntityTaxonModel,
     KnowledgeRelationEvidenceModel,
+    KnowledgeRelationGlobiEvidenceModel,
     KnowledgeRelationModel,
 )
 
@@ -268,7 +271,7 @@ class KnowledgeGraphService:
             source=source.strip() or row.source or "manual",
             timestamp=_now_iso(),
         )
-        if (row.origin or "manual") == "lightrag":
+        if (row.origin or "manual") in {"lightrag", "globi"}:
             row.management_mode = "manual_override"
         self.db.flush()
         self.rebuild_mentions_for_entity(entity_id)
@@ -367,7 +370,7 @@ class KnowledgeGraphService:
             confidence=confidence,
             timestamp=_now_iso(),
         )
-        if (row.origin or "manual") == "lightrag":
+        if (row.origin or "manual") in {"lightrag", "globi"}:
             row.management_mode = "manual_override"
         row.status = "active"
         self.db.flush()
@@ -379,7 +382,7 @@ class KnowledgeGraphService:
         row = self.db.get(KnowledgeRelationModel, relation_id)
         if row is None:
             raise LookupError("图谱关系不存在")
-        if (row.origin or "manual") == "lightrag":
+        if (row.origin or "manual") in {"lightrag", "globi"}:
             row.status = "suppressed"
             row.management_mode = "manual_override"
             row.updated_at = _now_iso()
@@ -391,8 +394,8 @@ class KnowledgeGraphService:
         row = self.db.get(KnowledgeRelationModel, relation_id)
         if row is None:
             raise LookupError("图谱关系不存在")
-        if (row.origin or "manual") != "lightrag":
-            raise ValueError("只有 LightRAG 自动关系可以恢复自动管理")
+        if (row.origin or "manual") not in {"lightrag", "globi"}:
+            raise ValueError("只有自动关系可以恢复自动管理")
         row.status = "active"
         row.management_mode = "auto"
         row.updated_at = _now_iso()
@@ -1254,6 +1257,7 @@ class KnowledgeGraphService:
         lines = [
             "<knowledge_graph_reference>",
             "以下为教师确认的知识图谱链路。已关联证据的关系可作为事实依据；待补证关系只能作为观察假设，不能表述为确定事实。",
+            "仅有 GloBI 证据的关系属于全球物种交互记录，不能据此声称该关系已在九龙山、门头沟或其他具体本地场景被观察到。",
             "两种昆虫连接到同一植物只说明存在共享生态关联，不代表两种昆虫之间存在直接作用或因果关系。",
         ]
         for index, relation in enumerate(payload.get("relations", []), start=1):
@@ -1272,6 +1276,13 @@ class KnowledgeGraphService:
                 lines.append(
                     f"证据：{evidence['source']} / 片段 {evidence['source_index']}："
                     f"{evidence['content']}"
+                )
+            for evidence in relation.get("globi_evidence", [])[:2]:
+                citation = evidence.get("study_source_citation") or evidence.get("study_source_id") or "GloBI"
+                location = evidence.get("locality") or "未提供具体地域"
+                lines.append(
+                    f"GloBI 全球关系证据：{citation}；地域：{location}；"
+                    f"原始关系：{evidence.get('raw_interaction_type') or relation['predicate']}"
                 )
         lines.append("</knowledge_graph_reference>")
         return "\n".join(lines)
@@ -1296,13 +1307,25 @@ class KnowledgeGraphService:
 
     def match_entities(self, text: str) -> list[KnowledgeEntityModel]:
         normalized = _normalized_text(text)
+        taxon_variants: dict[str, list[str]] = {}
+        for taxon in self.db.query(KnowledgeEntityTaxonModel).all():
+            variants = [taxon.scientific_name, taxon.verbatim_name]
+            try:
+                variants.extend(json.loads(taxon.common_names_json or "[]"))
+            except json.JSONDecodeError:
+                pass
+            taxon_variants.setdefault(taxon.entity_id, []).extend(variants)
         matches = []
         for entity in (
             self.db.query(KnowledgeEntityModel)
             .order_by(KnowledgeEntityModel.name.asc())
             .all()
         ):
-            names = [entity.name, *self.aliases(entity)]
+            names = [
+                entity.name,
+                *self.aliases(entity),
+                *taxon_variants.get(entity.id, []),
+            ]
             if any(
                 _normalized_text(name)
                 and _normalized_text(name) in normalized
@@ -1347,9 +1370,11 @@ class KnowledgeGraphService:
             query = query.filter(KnowledgeRelationModel.predicate.in_(predicates))
         rows = self._runtime_relations(query.all())
         evidence_counts = self._evidence_count_map([row.id for row in rows])
+        local_counts = self._local_evidence_count_map([row.id for row in rows])
         return sorted(
             rows,
             key=lambda row: (
+                -int(local_counts.get(row.id, 0) > 0),
                 -int(evidence_counts.get(row.id, 0) > 0),
                 -CONFIDENCE_WEIGHT.get(row.confidence, 0),
                 row.predicate,
@@ -1361,15 +1386,18 @@ class KnowledgeGraphService:
         self,
         rows: list[KnowledgeRelationModel],
     ) -> list[KnowledgeRelationModel]:
-        """Automatic facts are queryable only while current chunk evidence exists."""
+        """Automatic facts are queryable only while traceable evidence exists."""
         automatic_ids = [
-            row.id for row in rows if (row.origin or "manual") == "lightrag"
+            row.id
+            for row in rows
+            if (row.origin or "manual") in {"lightrag", "globi"}
+            and row.management_mode == "auto"
         ]
         evidence_counts = self._evidence_count_map(automatic_ids)
         return [
             row
             for row in rows
-            if (row.origin or "manual") != "lightrag"
+            if row.id not in automatic_ids
             or evidence_counts.get(row.id, 0) > 0
         ]
 
@@ -1406,6 +1434,8 @@ class KnowledgeGraphService:
             )
         }
         evidence_counts = self._evidence_count_map(list(relation_by_id))
+        local_evidence_counts = self._local_evidence_count_map(list(relation_by_id))
+        globi_evidence_counts = self._globi_evidence_count_map(list(relation_by_id))
         starts = [entity.id for entity in anchors if entity is not None]
         if not starts:
             starts = sorted(entity_ids)
@@ -1440,14 +1470,25 @@ class KnowledgeGraphService:
             )
             score = sum(
                 CONFIDENCE_WEIGHT.get(relation.confidence, 1)
-                + (2 if evidence_counts.get(relation.id, 0) else 0)
+                + (3 if local_evidence_counts.get(relation.id, 0) else 0)
+                + (
+                    1
+                    if not local_evidence_counts.get(relation.id, 0)
+                    and globi_evidence_counts.get(relation.id, 0)
+                    else 0
+                )
                 for relation in path_relations
             )
             if is_insect_plant_bridge:
                 score += 3
                 reason = "发现两种昆虫通过同一植物形成两跳生态关联"
             elif evidence_status == "verified":
-                reason = "关系具有可回查的知识片段证据"
+                if all(local_evidence_counts.get(relation.id, 0) for relation in path_relations):
+                    reason = "关系具有可回查的本地知识片段证据"
+                elif all(globi_evidence_counts.get(relation.id, 0) for relation in path_relations):
+                    reason = "关系具有可追溯的 GloBI 全球数据库证据"
+                else:
+                    reason = "关系具有本地资料或 GloBI 可追溯证据"
             elif len(path_relations) == 2:
                 reason = "发现与问题实体相连的两跳关系"
             else:
@@ -1500,6 +1541,14 @@ class KnowledgeGraphService:
         return relation.subject_entity_id
 
     def _evidence_count_map(self, relation_ids: list[str]) -> dict[str, int]:
+        local = self._local_evidence_count_map(relation_ids)
+        globi = self._globi_evidence_count_map(relation_ids)
+        return {
+            relation_id: local.get(relation_id, 0) + globi.get(relation_id, 0)
+            for relation_id in relation_ids
+        }
+
+    def _local_evidence_count_map(self, relation_ids: list[str]) -> dict[str, int]:
         result = {relation_id: 0 for relation_id in relation_ids}
         if not relation_ids:
             return result
@@ -1512,8 +1561,26 @@ class KnowledgeGraphService:
             result[row.relation_id] = result.get(row.relation_id, 0) + 1
         return result
 
+    def _globi_evidence_count_map(self, relation_ids: list[str]) -> dict[str, int]:
+        result = {relation_id: 0 for relation_id in relation_ids}
+        if not relation_ids:
+            return result
+        globi_rows = (
+            self.db.query(KnowledgeRelationGlobiEvidenceModel)
+            .filter(KnowledgeRelationGlobiEvidenceModel.relation_id.in_(relation_ids))
+            .all()
+        )
+        for row in globi_rows:
+            result[row.relation_id] = result.get(row.relation_id, 0) + 1
+        return result
+
     def _relation_score(self, relation: KnowledgeRelationModel) -> int:
-        evidence_bonus = 2 if self.relation_evidence(relation.id) else 0
+        if self._local_evidence_count_map([relation.id]).get(relation.id):
+            evidence_bonus = 3
+        elif self._globi_evidence_count_map([relation.id]).get(relation.id):
+            evidence_bonus = 1
+        else:
+            evidence_bonus = 0
         return CONFIDENCE_WEIGHT.get(relation.confidence, 1) + evidence_bonus
 
     def serialize_entity(self, entity: KnowledgeEntityModel) -> dict:
@@ -1521,6 +1588,15 @@ class KnowledgeGraphService:
             self.db.query(KnowledgeEntityMentionModel)
             .filter(KnowledgeEntityMentionModel.entity_id == entity.id)
             .count()
+        )
+        taxa = (
+            self.db.query(KnowledgeEntityTaxonModel)
+            .filter(KnowledgeEntityTaxonModel.entity_id == entity.id)
+            .order_by(
+                KnowledgeEntityTaxonModel.authority.asc(),
+                KnowledgeEntityTaxonModel.external_id.asc(),
+            )
+            .all()
         )
         return {
             "id": entity.id,
@@ -1536,10 +1612,38 @@ class KnowledgeGraphService:
             "last_auto_sync_at": entity.last_auto_sync_at or "",
             "rag_sources": self.rag_sources_for_entity(entity.id),
             "mention_count": mention_count,
+            "taxa": [
+                {
+                    "authority": row.authority,
+                    "external_id": row.external_id,
+                    "scientific_name": row.scientific_name,
+                    "taxon_rank": row.taxon_rank,
+                    "common_names": _json_list(json.loads(row.common_names_json or "[]")),
+                    "match_method": row.match_method,
+                    "match_confidence": row.match_confidence,
+                }
+                for row in taxa
+            ],
         }
 
     def serialize_relation(self, relation: KnowledgeRelationModel) -> dict:
         evidence = self.relation_evidence(relation.id)
+        globi_evidence = self.globi_evidence(relation.id)
+        evidence_types = []
+        if evidence:
+            evidence_types.append("local_document")
+        if globi_evidence:
+            evidence_types.append("globi")
+        if not evidence_types and relation.origin == "manual":
+            evidence_types.append("manual")
+        if evidence and globi_evidence:
+            geographic_scope = "mixed"
+        elif globi_evidence:
+            geographic_scope = "global"
+        elif evidence:
+            geographic_scope = "local"
+        else:
+            geographic_scope = "unknown"
         return {
             "id": relation.id,
             "subject_entity_id": relation.subject_entity_id,
@@ -1557,6 +1661,41 @@ class KnowledgeGraphService:
             "extractor_model": relation.extractor_model or "",
             "extractor_version": relation.extractor_version or "",
             "last_auto_sync_at": relation.last_auto_sync_at or "",
-            "evidence_status": "verified" if evidence else "unverified",
+            "evidence_status": "verified" if evidence or globi_evidence else "unverified",
             "evidence": evidence,
+            "evidence_types": evidence_types,
+            "geographic_scope": geographic_scope,
+            "global_only": bool(globi_evidence and not evidence),
+            "globi_evidence_count": len(globi_evidence),
+            "globi_evidence": globi_evidence,
         }
+
+    def globi_evidence(self, relation_id: str, limit: int = 20) -> list[dict]:
+        rows = (
+            self.db.query(GlobiInteractionModel)
+            .join(
+                KnowledgeRelationGlobiEvidenceModel,
+                KnowledgeRelationGlobiEvidenceModel.interaction_id == GlobiInteractionModel.id,
+            )
+            .filter(KnowledgeRelationGlobiEvidenceModel.relation_id == relation_id)
+            .order_by(GlobiInteractionModel.created_at.asc())
+            .limit(max(1, min(limit, 100)))
+            .all()
+        )
+        return [
+            {
+                "id": row.id,
+                "raw_interaction_type": row.raw_interaction_type,
+                "study_source_id": row.study_source_id,
+                "study_source_citation": row.study_source_citation,
+                "study_url": row.study_url,
+                "study_doi": row.study_doi,
+                "study_source_archive_uri": row.study_source_archive_uri,
+                "locality": row.locality,
+                "latitude": row.latitude,
+                "longitude": row.longitude,
+                "event_date": row.event_date,
+                "region_status": row.region_status,
+            }
+            for row in rows
+        ]

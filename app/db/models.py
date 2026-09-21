@@ -271,6 +271,30 @@ class KnowledgeEntityModel(Base):
     updated_at = Column(String, nullable=False)
 
 
+class KnowledgeEntityTaxonModel(Base):
+    __tablename__ = "knowledge_entity_taxa"
+
+    authority = Column(String, primary_key=True)
+    external_id = Column(String, primary_key=True)
+    entity_id = Column(
+        String,
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    scientific_name = Column(String, nullable=False, default="", index=True)
+    verbatim_name = Column(String, nullable=False, default="")
+    taxon_rank = Column(String, nullable=False, default="")
+    taxon_path = Column(Text, nullable=False, default="")
+    taxon_path_ids = Column(Text, nullable=False, default="")
+    common_names_json = Column(Text, nullable=False, default="[]")
+    match_method = Column(String, nullable=False, default="external_id")
+    match_confidence = Column(String, nullable=False, default="high")
+    created_by_run_id = Column(String, nullable=False, default="", index=True)
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+
 class KnowledgeRelationModel(Base):
     __tablename__ = "knowledge_relations"
 
@@ -384,3 +408,117 @@ class EcologyGraphSourceStateModel(Base):
     last_error = Column(Text, nullable=False, default="")
     last_synced_at = Column(String, nullable=False, default="")
     updated_at = Column(String, nullable=False)
+
+
+class GlobiImportRunModel(Base):
+    __tablename__ = "globi_import_runs"
+
+    id = Column(String, primary_key=True)
+    version = Column(String, nullable=False, default="", index=True)
+    source_url = Column(Text, nullable=False, default="")
+    source_name = Column(String, nullable=False, default="")
+    checksum = Column(String, nullable=False, default="", index=True)
+    filter_json = Column(Text, nullable=False, default="{}")
+    status = Column(String, nullable=False, default="queued", index=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    lease_until = Column(String, nullable=False, default="")
+    total_rows = Column(Integer, nullable=False, default=0)
+    candidate_rows = Column(Integer, nullable=False, default=0)
+    accepted_rows = Column(Integer, nullable=False, default=0)
+    rejected_rows = Column(Integer, nullable=False, default=0)
+    created_entities = Column(Integer, nullable=False, default=0)
+    updated_entities = Column(Integer, nullable=False, default=0)
+    created_relations = Column(Integer, nullable=False, default=0)
+    updated_relations = Column(Integer, nullable=False, default=0)
+    stats_json = Column(Text, nullable=False, default="{}")
+    started_at = Column(String, nullable=False, default="")
+    finished_at = Column(String, nullable=False, default="")
+    last_error = Column(Text, nullable=False, default="")
+    created_by = Column(String, nullable=False, default="")
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+
+class GlobiInteractionModel(Base):
+    __tablename__ = "globi_interactions"
+
+    id = Column(String, primary_key=True)
+    import_run_id = Column(
+        String,
+        ForeignKey("globi_import_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_taxon_external_id = Column(String, nullable=False, default="")
+    target_taxon_external_id = Column(String, nullable=False, default="")
+    source_taxon_name = Column(String, nullable=False, default="")
+    target_taxon_name = Column(String, nullable=False, default="")
+    source_taxon_common_names = Column(Text, nullable=False, default="")
+    target_taxon_common_names = Column(Text, nullable=False, default="")
+    source_taxon_path = Column(Text, nullable=False, default="")
+    target_taxon_path = Column(Text, nullable=False, default="")
+    raw_interaction_type = Column(String, nullable=False, default="")
+    normalized_predicate = Column(String, nullable=False, index=True)
+    source_entity_id = Column(
+        String,
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    target_entity_id = Column(
+        String,
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    study_source_id = Column(String, nullable=False, default="")
+    study_source_citation = Column(Text, nullable=False, default="")
+    study_url = Column(Text, nullable=False, default="")
+    study_doi = Column(String, nullable=False, default="")
+    study_source_archive_uri = Column(Text, nullable=False, default="")
+    locality = Column(Text, nullable=False, default="")
+    latitude = Column(String, nullable=False, default="")
+    longitude = Column(String, nullable=False, default="")
+    event_date = Column(String, nullable=False, default="")
+    source_last_seen_at = Column(String, nullable=False, default="")
+    region_status = Column(String, nullable=False, default="global", index=True)
+    record_hash = Column(String, nullable=False, unique=True, index=True)
+    created_at = Column(String, nullable=False)
+
+
+class GlobiImportInteractionModel(Base):
+    __tablename__ = "globi_import_interactions"
+
+    import_run_id = Column(
+        String,
+        ForeignKey("globi_import_runs.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    interaction_id = Column(
+        String,
+        ForeignKey("globi_interactions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at = Column(String, nullable=False)
+
+    __table_args__ = (Index("ix_globi_import_interactions_interaction", "interaction_id"),)
+
+
+class KnowledgeRelationGlobiEvidenceModel(Base):
+    __tablename__ = "knowledge_relation_globi_evidence"
+
+    relation_id = Column(
+        String,
+        ForeignKey("knowledge_relations.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    interaction_id = Column(
+        String,
+        ForeignKey("globi_interactions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at = Column(String, nullable=False)
+
+    __table_args__ = (
+        Index("ix_knowledge_relation_globi_interaction", "interaction_id"),
+    )

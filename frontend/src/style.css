@@ -2780,6 +2780,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .knowledge-graph-panel button:hover:not(:disabled) { color:var(--brand); border-color:var(--brand); background:var(--brand-soft); }
 .knowledge-graph-panel button:disabled { cursor:not-allowed; opacity:.55; }
 .knowledge-graph-body { display:flex; flex-direction:column; min-height:0; flex:1; }
+.knowledge-graph-runtime-status { display:flex; flex-wrap:wrap; align-items:center; gap:5px 10px; margin-bottom:8px; padding:8px 10px; border:1px solid color-mix(in srgb, var(--brand) 28%, var(--border-default)); border-radius:6px; color:var(--text-secondary); background:var(--brand-soft); font-size:11px; }
+.knowledge-graph-runtime-status strong { color:var(--brand-strong); }
+.knowledge-graph-runtime-status small { flex-basis:100%; color:var(--text-muted); }
 .knowledge-graph-empty { display:flex; align-items:center; justify-content:center; gap:7px; min-height:120px; color:var(--text-muted); font-size:12px; }
 .knowledge-graph-empty.graph-error { color:var(--danger); }
 .knowledge-graph-svg { width:100%; flex:1; min-height:260px; border:1px solid var(--border-default); border-radius:7px; background:var(--surface-subtle); }
