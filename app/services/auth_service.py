@@ -103,7 +103,14 @@ def register_user(
     is_admin: bool = False,
 ) -> tuple[UserModel, str]:
     normalized_username = normalize_username(username)
-    existing = db.query(UserModel).filter(UserModel.username == normalized_username).first()
+    existing = (
+        db.query(UserModel)
+        .filter(
+            UserModel.username == normalized_username,
+            UserModel.is_admin == (1 if is_admin else 0),
+        )
+        .first()
+    )
     if existing:
         raise ValueError("用户名已存在")
 
@@ -138,14 +145,11 @@ def login_user(
     *,
     require_admin: bool | None = None,
 ) -> tuple[UserModel, str] | None:
-    user = (
-        db.query(UserModel)
-        .filter(UserModel.username == normalize_username(username))
-        .first()
-    )
+    query = db.query(UserModel).filter(UserModel.username == normalize_username(username))
+    if require_admin is not None:
+        query = query.filter(UserModel.is_admin == (1 if require_admin else 0))
+    user = query.first()
     if not user or not verify_password(password, user.password_hash):
-        return None
-    if require_admin is not None and bool(user.is_admin) != require_admin:
         return None
 
     token = issue_token(db, user)

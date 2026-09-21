@@ -4,6 +4,7 @@ import datetime as dt
 import json
 from dataclasses import dataclass
 from pathlib import Path
+import uuid
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -20,6 +21,9 @@ SEED_PATH = Path(__file__).resolve().parents[1] / "data" / "knowledge_graph_seed
 CONFIDENCE_WEIGHT = {"high": 3, "medium": 2, "low": 1}
 DEFAULT_EXPERT_ENTITY_TYPES = {
     "nature_agent": ["plant", "habitat", "season"],
+}
+DEFAULT_EXPERT_ENTITY_IDS = {
+    "insect_agent": ["insect_aphid", "insect_ladybug"],
 }
 PREDICATE_LABELS = {
     "feeds_on": "取食",
@@ -55,6 +59,9 @@ class GraphSelectionValidation:
 class KnowledgeGraphService:
     def __init__(self, db: Session):
         self.db = db
+
+    def _new_id(self, prefix: str) -> str:
+        return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
     def load_seed_graph(self) -> dict:
         with SEED_PATH.open("r", encoding="utf-8") as file:
@@ -155,6 +162,152 @@ class KnowledgeGraphService:
             row.updated_at = timestamp
         self.db.flush()
         return {"entity_count": entity_count, "relation_count": relation_count}
+
+    def preview_import_graph_json(self, payload: dict) -> dict:
+        errors = []
+        requested_sources = set()
+        payload_entity_ids = set()
+        new_entity_count = 0
+        updated_entity_count = 0
+        new_relation_count = 0
+        updated_relation_count = 0
+        affected_existing_relation_ids: set[str] = set()
+
+        existing_entity_ids = {row.id for row in self.db.query(KnowledgeEntityModel).all()}
+        existing_relation_ids = {row.id for row in self.db.query(KnowledgeRelationModel).all()}
+
+        for index, item in enumerate(payload.get("entities") or [], start=1):
+            entity_id = str(item.get("id") or "").strip()
+            name = str(item.get("name") or "").strip()
+            entity_type = str(item.get("entity_type") or "").strip()
+            if not entity_id or not name or not entity_type:
+                errors.append(f"第 {index} 个图谱实体必须包含 id、name 和 entity_type")
+                continue
+            payload_entity_ids.add(entity_id)
+            if entity_id in existing_entity_ids:
+                updated_entity_count += 1
+                related_relations = self.db.query(KnowledgeRelationModel).filter(
+                    or_(
+                        KnowledgeRelationModel.subject_entity_id == entity_id,
+                        KnowledgeRelationModel.object_entity_id == entity_id,
+                    )
+                ).all()
+                affected_existing_relation_ids.update(relation.id for relation in related_relations)
+            else:
+                new_entity_count += 1
+            requested_sources.update(_source_list(item.get("rag_sources")))
+
+        valid_entity_ids = existing_entity_ids | payload_entity_ids
+        for index, item in enumerate(payload.get("relations") or [], start=1):
+            relation_id = str(item.get("id") or "").strip()
+            subject_id = str(item.get("subject_entity_id") or "").strip()
+            object_id = str(item.get("object_entity_id") or "").strip()
+            predicate = str(item.get("predicate") or "").strip()
+            if not relation_id or not subject_id or not object_id or not predicate:
+                errors.append(f"第 {index} 条图谱关系必须包含 id、subject_entity_id、predicate 和 object_entity_id")
+                continue
+            if subject_id not in valid_entity_ids or object_id not in valid_entity_ids:
+                errors.append(f"图谱关系引用了不存在的实体：{relation_id}")
+                continue
+            if relation_id in existing_relation_ids:
+                updated_relation_count += 1
+                affected_existing_relation_ids.add(relation_id)
+            else:
+                new_relation_count += 1
+
+        existing_sources = {
+            row.source
+            for row in self.db.query(CurriculumSourceModel)
+            .filter(CurriculumSourceModel.source.in_(requested_sources))
+            .all()
+        } if requested_sources else set()
+        missing_sources = sorted(requested_sources - existing_sources)
+        return {
+            "new_entity_count": new_entity_count,
+            "updated_entity_count": updated_entity_count,
+            "new_relation_count": new_relation_count,
+            "updated_relation_count": updated_relation_count,
+            "missing_sources": missing_sources,
+            "errors": errors,
+            "affected_relation_ids": sorted(affected_existing_relation_ids),
+            "can_import": not errors and not missing_sources,
+        }
+
+    def create_entity(self, payload: dict) -> dict:
+        entity_id = str(payload.get("id") or self._new_id("entity")).strip()
+        if not entity_id:
+            raise ValueError("图谱节点 id 不能为空")
+        if self.db.get(KnowledgeEntityModel, entity_id):
+            raise ValueError("图谱节点已存在")
+        timestamp = _now_iso()
+        entity = KnowledgeEntityModel(id=entity_id, created_at=timestamp)
+        self.db.add(entity)
+        self._apply_entity_payload(entity, payload, timestamp)
+        self.replace_rag_sources(entity_id, payload.get("rag_sources", []), timestamp=timestamp)
+        return self.serialize_entity(entity)
+
+    def update_entity(self, entity_id: str, payload: dict) -> dict:
+        entity = self.db.get(KnowledgeEntityModel, entity_id)
+        if not entity:
+            raise LookupError("图谱节点不存在")
+        timestamp = _now_iso()
+        self._apply_entity_payload(entity, payload, timestamp)
+        self.replace_rag_sources(entity_id, payload.get("rag_sources", []), timestamp=timestamp)
+        return self.serialize_entity(entity)
+
+    def delete_entity(self, entity_id: str) -> dict:
+        entity = self.db.get(KnowledgeEntityModel, entity_id)
+        if not entity:
+            raise LookupError("图谱节点不存在")
+        relation_count = self.db.query(KnowledgeRelationModel).filter(
+            or_(
+                KnowledgeRelationModel.subject_entity_id == entity_id,
+                KnowledgeRelationModel.object_entity_id == entity_id,
+            )
+        ).delete(synchronize_session=False)
+        self.db.query(KnowledgeEntitySourceModel).filter(
+            KnowledgeEntitySourceModel.entity_id == entity_id
+        ).delete(synchronize_session=False)
+        self.db.delete(entity)
+        self.db.flush()
+        return {"deleted_relation_count": relation_count}
+
+    def clear_graph(self) -> dict:
+        binding_count = self.db.query(KnowledgeEntitySourceModel).delete(synchronize_session=False)
+        relation_count = self.db.query(KnowledgeRelationModel).delete(synchronize_session=False)
+        entity_count = self.db.query(KnowledgeEntityModel).delete(synchronize_session=False)
+        self.db.flush()
+        return {
+            "deleted_entity_count": entity_count,
+            "deleted_relation_count": relation_count,
+            "deleted_binding_count": binding_count,
+        }
+
+    def create_relation(self, payload: dict) -> dict:
+        relation_id = str(payload.get("id") or self._new_id("rel")).strip()
+        if not relation_id:
+            raise ValueError("图谱关系 id 不能为空")
+        if self.db.get(KnowledgeRelationModel, relation_id):
+            raise ValueError("图谱关系已存在")
+        timestamp = _now_iso()
+        relation = KnowledgeRelationModel(id=relation_id, created_at=timestamp)
+        self.db.add(relation)
+        self._apply_relation_payload(relation, payload, timestamp)
+        return self.serialize_relation(relation)
+
+    def update_relation(self, relation_id: str, payload: dict) -> dict:
+        relation = self.db.get(KnowledgeRelationModel, relation_id)
+        if not relation:
+            raise LookupError("图谱关系不存在")
+        self._apply_relation_payload(relation, payload, _now_iso())
+        return self.serialize_relation(relation)
+
+    def delete_relation(self, relation_id: str) -> None:
+        relation = self.db.get(KnowledgeRelationModel, relation_id)
+        if not relation:
+            raise LookupError("图谱关系不存在")
+        self.db.delete(relation)
+        self.db.flush()
 
     def rag_sources_for_entity(self, entity_id: str) -> list[str]:
         rows = (
@@ -465,6 +618,14 @@ class KnowledgeGraphService:
         return matches
 
     def default_entities_for_expert(self, expert_id: str) -> list[KnowledgeEntityModel]:
+        entity_ids = DEFAULT_EXPERT_ENTITY_IDS.get(expert_id or "")
+        if entity_ids:
+            return (
+                self.db.query(KnowledgeEntityModel)
+                .filter(KnowledgeEntityModel.id.in_(entity_ids))
+                .order_by(KnowledgeEntityModel.name.asc())
+                .all()
+            )
         entity_types = DEFAULT_EXPERT_ENTITY_TYPES.get(expert_id or "")
         if not entity_types:
             return []
@@ -546,6 +707,49 @@ class KnowledgeGraphService:
 
     def _relation_score(self, relation: KnowledgeRelationModel) -> int:
         return CONFIDENCE_WEIGHT.get(relation.confidence, 1)
+
+    def _apply_entity_payload(
+        self,
+        entity: KnowledgeEntityModel,
+        payload: dict,
+        timestamp: str,
+    ) -> None:
+        name = str(payload.get("name") or "").strip()
+        entity_type = str(payload.get("entity_type") or "").strip()
+        if not name or not entity_type:
+            raise ValueError("图谱节点必须包含 name 和 entity_type")
+        entity.name = name
+        entity.entity_type = entity_type
+        entity.aliases_json = json.dumps(_json_list(payload.get("aliases")), ensure_ascii=False)
+        entity.description = str(payload.get("description") or "").strip()
+        entity.source = str(payload.get("source") or "").strip()
+        entity.updated_at = timestamp
+        self.db.flush()
+
+    def _apply_relation_payload(
+        self,
+        relation: KnowledgeRelationModel,
+        payload: dict,
+        timestamp: str,
+    ) -> None:
+        subject_id = str(payload.get("subject_entity_id") or "").strip()
+        object_id = str(payload.get("object_entity_id") or "").strip()
+        predicate = str(payload.get("predicate") or "").strip()
+        confidence = str(payload.get("confidence") or "medium").strip()
+        if not subject_id or not object_id or not predicate:
+            raise ValueError("图谱关系必须包含 subject_entity_id、predicate 和 object_entity_id")
+        if confidence not in CONFIDENCE_WEIGHT:
+            raise ValueError("图谱关系置信度必须是 high、medium 或 low")
+        if not self.db.get(KnowledgeEntityModel, subject_id) or not self.db.get(KnowledgeEntityModel, object_id):
+            raise ValueError("图谱关系引用了不存在的实体")
+        relation.subject_entity_id = subject_id
+        relation.predicate = predicate
+        relation.object_entity_id = object_id
+        relation.description = str(payload.get("description") or "").strip()
+        relation.evidence_source = str(payload.get("evidence_source") or "").strip()
+        relation.confidence = confidence
+        relation.updated_at = timestamp
+        self.db.flush()
 
     def serialize_entity(self, entity: KnowledgeEntityModel) -> dict:
         return {

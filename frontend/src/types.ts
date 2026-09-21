@@ -113,6 +113,17 @@ export type KnowledgeGraphPayload = {
   recommended_path_ids: string[];
 };
 
+export type KnowledgeGraphImportPreview = {
+  new_entity_count: number;
+  updated_entity_count: number;
+  new_relation_count: number;
+  updated_relation_count: number;
+  missing_sources: string[];
+  errors: string[];
+  affected_relation_ids: string[];
+  can_import: boolean;
+};
+
 export type GraphSelectionPayload = {
   entity_ids: string[];
   relation_ids: string[];

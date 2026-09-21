@@ -500,6 +500,38 @@ class AgentArchitectureApiTests(unittest.TestCase):
             )
             self.assertEqual(duplicate.status_code, 409)
 
+            admin_registered = client.post(
+                "/api/auth/admin/register",
+                json={"username": username.upper(), "password": "admin-password-123"},
+            )
+            self.assertEqual(admin_registered.status_code, 200)
+            self.assertEqual(admin_registered.json()["data"]["username"], username)
+            self.assertTrue(admin_registered.json()["data"]["is_admin"])
+
+            client.post("/api/auth/logout")
+            self.assertEqual(
+                client.post(
+                    "/api/auth/admin/login",
+                    json={"username": username, "password": "admin-password-123"},
+                ).status_code,
+                200,
+            )
+            client.post("/api/auth/logout")
+            self.assertEqual(
+                client.post(
+                    "/api/auth/login",
+                    json={"username": username, "password": "admin-password-123"},
+                ).status_code,
+                401,
+            )
+            self.assertEqual(
+                client.post(
+                    "/api/auth/login",
+                    json={"username": username.upper(), "password": "valid-password-123"},
+                ).status_code,
+                200,
+            )
+
             logout = client.post("/api/auth/logout")
             self.assertEqual(logout.status_code, 200)
             self.assertEqual(client.get("/api/auth/me").status_code, 401)
@@ -2036,6 +2068,280 @@ class AgentArchitectureApiTests(unittest.TestCase):
                         ]
                     }
                 )
+
+    def test_admin_can_crud_graph_entities_and_relations(self):
+        admin_client = TestClient(app)
+        ordinary_client = TestClient(app)
+        password = "valid-password-123"
+        admin_name = f"graph_admin_{uuid.uuid4().hex[:8]}"
+        ordinary_name = f"graph_user_{uuid.uuid4().hex[:8]}"
+        try:
+            self.assertEqual(
+                admin_client.post(
+                    "/api/auth/admin/register",
+                    json={"username": admin_name, "password": password},
+                ).status_code,
+                200,
+            )
+            self.assertEqual(
+                ordinary_client.post(
+                    "/api/auth/register",
+                    json={"username": ordinary_name, "password": password},
+                ).status_code,
+                200,
+            )
+            with SessionLocal() as db:
+                db.add(CurriculumSourceModel(source="crud-rag.txt", updated_at="now"))
+                db.commit()
+
+            denied = ordinary_client.post(
+                "/api/knowledge/graph/entities",
+                json={
+                    "id": "entity_denied",
+                    "name": "无权限节点",
+                    "entity_type": "concept",
+                },
+            )
+            self.assertEqual(denied.status_code, 403)
+
+            created_a = admin_client.post(
+                "/api/knowledge/graph/entities",
+                json={
+                    "id": "entity_crud_a",
+                    "name": "节点 A",
+                    "entity_type": "concept",
+                    "aliases": ["A"],
+                    "description": "原描述",
+                    "source": "人工配置",
+                    "rag_sources": ["crud-rag.txt"],
+                },
+            )
+            self.assertEqual(created_a.status_code, 200)
+            self.assertEqual(created_a.json()["data"]["rag_sources"], ["crud-rag.txt"])
+            created_b = admin_client.post(
+                "/api/knowledge/graph/entities",
+                json={
+                    "id": "entity_crud_b",
+                    "name": "节点 B",
+                    "entity_type": "concept",
+                },
+            )
+            self.assertEqual(created_b.status_code, 200)
+
+            updated = admin_client.put(
+                "/api/knowledge/graph/entities/entity_crud_a",
+                json={
+                    "name": "节点 A 更新",
+                    "entity_type": "behavior",
+                    "aliases": ["A1", "A2"],
+                    "description": "新描述",
+                    "source": "人工修订",
+                    "rag_sources": [],
+                },
+            )
+            self.assertEqual(updated.status_code, 200)
+            self.assertEqual(updated.json()["data"]["name"], "节点 A 更新")
+            self.assertEqual(updated.json()["data"]["rag_sources"], [])
+
+            relation = admin_client.post(
+                "/api/knowledge/graph/relations",
+                json={
+                    "id": "rel_crud",
+                    "subject_entity_id": "entity_crud_a",
+                    "predicate": "关联",
+                    "object_entity_id": "entity_crud_b",
+                    "description": "关系描述",
+                    "evidence_source": "观察",
+                    "confidence": "high",
+                },
+            )
+            self.assertEqual(relation.status_code, 200)
+            self.assertEqual(relation.json()["data"]["predicate"], "关联")
+
+            relation_updated = admin_client.put(
+                "/api/knowledge/graph/relations/rel_crud",
+                json={
+                    "subject_entity_id": "entity_crud_b",
+                    "predicate": "影响",
+                    "object_entity_id": "entity_crud_a",
+                    "description": "更新关系",
+                    "evidence_source": "访谈",
+                    "confidence": "medium",
+                },
+            )
+            self.assertEqual(relation_updated.status_code, 200)
+            self.assertEqual(relation_updated.json()["data"]["confidence"], "medium")
+
+            deleted = admin_client.delete("/api/knowledge/graph/entities/entity_crud_a")
+            self.assertEqual(deleted.status_code, 200)
+            with SessionLocal() as db:
+                self.assertIsNone(db.get(KnowledgeEntityModel, "entity_crud_a"))
+                self.assertIsNone(db.get(KnowledgeRelationModel, "rel_crud"))
+                bindings = (
+                    db.query(KnowledgeEntitySourceModel)
+                    .filter(KnowledgeEntitySourceModel.entity_id == "entity_crud_a")
+                    .all()
+                )
+                self.assertEqual(bindings, [])
+        finally:
+            admin_client.close()
+            ordinary_client.close()
+
+    def test_graph_import_preview_reports_changes_without_writing(self):
+        admin_client = TestClient(app)
+        password = "valid-password-123"
+        admin_name = f"preview_admin_{uuid.uuid4().hex[:8]}"
+        try:
+            self.assertEqual(
+                admin_client.post(
+                    "/api/auth/admin/register",
+                    json={"username": admin_name, "password": password},
+                ).status_code,
+                200,
+            )
+            with SessionLocal() as db:
+                db.add(CurriculumSourceModel(source="preview-rag.txt", updated_at="now"))
+                db.add(
+                    KnowledgeEntityModel(
+                        id="entity_preview_existing",
+                        name="旧节点",
+                        entity_type="concept",
+                        aliases_json="[]",
+                        description="",
+                        source="seed",
+                        created_at="now",
+                        updated_at="now",
+                    )
+                )
+                db.commit()
+
+            payload = {
+                "entities": [
+                    {
+                        "id": "entity_preview_existing",
+                        "name": "旧节点更新",
+                        "entity_type": "concept",
+                    },
+                    {
+                        "id": "entity_preview_new",
+                        "name": "新节点",
+                        "entity_type": "concept",
+                        "rag_sources": ["preview-rag.txt"],
+                    },
+                ],
+                "relations": [
+                    {
+                        "id": "rel_preview_new",
+                        "subject_entity_id": "entity_preview_existing",
+                        "predicate": "关联",
+                        "object_entity_id": "entity_preview_new",
+                    }
+                ],
+            }
+            preview = admin_client.post("/api/knowledge/graph/import/preview", json=payload)
+            self.assertEqual(preview.status_code, 200)
+            preview_data = preview.json()["data"]
+            self.assertEqual(preview_data["new_entity_count"], 1)
+            self.assertEqual(preview_data["updated_entity_count"], 1)
+            self.assertEqual(preview_data["new_relation_count"], 1)
+            self.assertEqual(preview_data["updated_relation_count"], 0)
+            self.assertEqual(preview_data["missing_sources"], [])
+            self.assertEqual(preview_data["errors"], [])
+            with SessionLocal() as db:
+                self.assertIsNone(db.get(KnowledgeEntityModel, "entity_preview_new"))
+
+            imported = admin_client.post("/api/knowledge/graph/import", json=payload)
+            self.assertEqual(imported.status_code, 200)
+            with SessionLocal() as db:
+                self.assertIsNotNone(db.get(KnowledgeEntityModel, "entity_preview_existing"))
+                self.assertIsNotNone(db.get(KnowledgeEntityModel, "entity_preview_new"))
+                self.assertIsNotNone(db.get(KnowledgeRelationModel, "rel_preview_new"))
+
+            invalid = admin_client.post(
+                "/api/knowledge/graph/import/preview",
+                json={
+                    "entities": [
+                        {
+                            "id": "entity_preview_missing_source",
+                            "name": "缺 source 节点",
+                            "entity_type": "concept",
+                            "rag_sources": ["missing-preview.txt"],
+                        }
+                    ]
+                },
+            )
+            self.assertEqual(invalid.status_code, 200)
+            self.assertEqual(invalid.json()["data"]["missing_sources"], ["missing-preview.txt"])
+        finally:
+            admin_client.close()
+
+    def test_admin_can_clear_entire_knowledge_graph(self):
+        admin_client = TestClient(app)
+        ordinary_client = TestClient(app)
+        password = "valid-password-123"
+        admin_name = f"clear_graph_admin_{uuid.uuid4().hex[:8]}"
+        ordinary_name = f"clear_graph_user_{uuid.uuid4().hex[:8]}"
+        try:
+            self.assertEqual(
+                admin_client.post(
+                    "/api/auth/admin/register",
+                    json={"username": admin_name, "password": password},
+                ).status_code,
+                200,
+            )
+            self.assertEqual(
+                ordinary_client.post(
+                    "/api/auth/register",
+                    json={"username": ordinary_name, "password": password},
+                ).status_code,
+                200,
+            )
+            with SessionLocal() as db:
+                db.add(CurriculumSourceModel(source="clear-graph-rag.txt", updated_at="now"))
+                db.commit()
+                service = KnowledgeGraphService(db)
+                service.import_graph_json(
+                    {
+                        "entities": [
+                            {
+                                "id": "clear_graph_a",
+                                "name": "清空节点 A",
+                                "entity_type": "concept",
+                                "rag_sources": ["clear-graph-rag.txt"],
+                            },
+                            {
+                                "id": "clear_graph_b",
+                                "name": "清空节点 B",
+                                "entity_type": "concept",
+                            },
+                        ],
+                        "relations": [
+                            {
+                                "id": "rel_clear_graph",
+                                "subject_entity_id": "clear_graph_a",
+                                "predicate": "关联",
+                                "object_entity_id": "clear_graph_b",
+                            }
+                        ],
+                    }
+                )
+                db.commit()
+
+            denied = ordinary_client.delete("/api/knowledge/graph")
+            self.assertEqual(denied.status_code, 403)
+
+            cleared = admin_client.delete("/api/knowledge/graph")
+            self.assertEqual(cleared.status_code, 200)
+            self.assertEqual(cleared.json()["data"]["deleted_entity_count"], 2)
+            self.assertEqual(cleared.json()["data"]["deleted_relation_count"], 1)
+            self.assertEqual(cleared.json()["data"]["deleted_binding_count"], 1)
+            with SessionLocal() as db:
+                self.assertEqual(db.query(KnowledgeEntityModel).count(), 0)
+                self.assertEqual(db.query(KnowledgeRelationModel).count(), 0)
+                self.assertEqual(db.query(KnowledgeEntitySourceModel).count(), 0)
+        finally:
+            admin_client.close()
+            ordinary_client.close()
 
     def test_graph_import_rejects_malformed_entities_and_relations(self):
         with SessionLocal() as db:

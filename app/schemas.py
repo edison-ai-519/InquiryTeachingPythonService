@@ -45,6 +45,26 @@ class KnowledgeEntityRagSourcesRequest(BaseModel):
     sources: list[str] = Field(default_factory=list)
 
 
+class KnowledgeEntityUpsertRequest(BaseModel):
+    id: str | None = Field(default=None, min_length=1, max_length=128)
+    name: str = Field(min_length=1, max_length=128)
+    entity_type: str = Field(min_length=1, max_length=64)
+    aliases: list[str] = Field(default_factory=list)
+    description: str = Field(default="", max_length=2000)
+    source: str = Field(default="", max_length=255)
+    rag_sources: list[str] = Field(default_factory=list)
+
+
+class KnowledgeRelationUpsertRequest(BaseModel):
+    id: str | None = Field(default=None, min_length=1, max_length=128)
+    subject_entity_id: str = Field(min_length=1, max_length=128)
+    predicate: str = Field(min_length=1, max_length=128)
+    object_entity_id: str = Field(min_length=1, max_length=128)
+    description: str = Field(default="", max_length=2000)
+    evidence_source: str = Field(default="", max_length=255)
+    confidence: str = Field(default="medium", pattern=r"^(high|medium|low)$")
+
+
 class ChatRequest(BaseModel):
     type: Literal["chat", "sys_action"] = "chat"
     request_id: str | None = Field(default=None, min_length=1, max_length=128)

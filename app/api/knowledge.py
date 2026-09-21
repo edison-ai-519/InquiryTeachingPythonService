@@ -6,7 +6,11 @@ from app.agents.registry import get_agent_registry
 from app.core.auth import get_admin_user, get_current_user
 from app.db.database import get_db
 from app.db.models import UserModel
-from app.schemas import KnowledgeEntityRagSourcesRequest
+from app.schemas import (
+    KnowledgeEntityRagSourcesRequest,
+    KnowledgeEntityUpsertRequest,
+    KnowledgeRelationUpsertRequest,
+)
 from app.services.knowledge_graph_service import KnowledgeGraphService
 from app.services.session_access_service import get_owned_session
 from app.workflow.flows import get_flow
@@ -19,6 +23,12 @@ class GraphCandidateRequest(BaseModel):
     session_id: str = Field(min_length=1)
     message: str = Field(default="")
     expert_id: str | None = Field(default=None, max_length=128)
+
+
+def request_data(payload: BaseModel) -> dict:
+    if hasattr(payload, "model_dump"):
+        return payload.model_dump()
+    return payload.dict()
 
 
 @router.post("/graph/candidates")
@@ -51,6 +61,16 @@ def get_graph_for_admin(
     return {"code": 0, "message": "success", "data": KnowledgeGraphService(db).all_graph()}
 
 
+@router.delete("/graph")
+def clear_graph_for_admin(
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    data = KnowledgeGraphService(db).clear_graph()
+    db.commit()
+    return {"code": 0, "message": "knowledge graph deleted", "data": data}
+
+
 @router.put("/graph/entities/{entity_id}/rag-sources")
 def replace_graph_entity_rag_sources(
     entity_id: str,
@@ -73,6 +93,108 @@ def replace_graph_entity_rag_sources(
         "message": "graph entity rag sources updated",
         "data": {"entity_id": entity_id, "sources": sources},
     }
+
+
+@router.post("/graph/entities")
+def create_graph_entity(
+    payload: KnowledgeEntityUpsertRequest,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    service = KnowledgeGraphService(db)
+    try:
+        data = service.create_entity(request_data(payload))
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"code": 0, "message": "graph entity created", "data": data}
+
+
+@router.put("/graph/entities/{entity_id}")
+def update_graph_entity(
+    entity_id: str,
+    payload: KnowledgeEntityUpsertRequest,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    service = KnowledgeGraphService(db)
+    try:
+        data = service.update_entity(entity_id, request_data(payload))
+        db.commit()
+    except LookupError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"code": 0, "message": "graph entity updated", "data": data}
+
+
+@router.delete("/graph/entities/{entity_id}")
+def delete_graph_entity(
+    entity_id: str,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    try:
+        data = KnowledgeGraphService(db).delete_entity(entity_id)
+        db.commit()
+    except LookupError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"code": 0, "message": "graph entity deleted", "data": data}
+
+
+@router.post("/graph/relations")
+def create_graph_relation(
+    payload: KnowledgeRelationUpsertRequest,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    service = KnowledgeGraphService(db)
+    try:
+        data = service.create_relation(request_data(payload))
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"code": 0, "message": "graph relation created", "data": data}
+
+
+@router.put("/graph/relations/{relation_id}")
+def update_graph_relation(
+    relation_id: str,
+    payload: KnowledgeRelationUpsertRequest,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    service = KnowledgeGraphService(db)
+    try:
+        data = service.update_relation(relation_id, request_data(payload))
+        db.commit()
+    except LookupError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"code": 0, "message": "graph relation updated", "data": data}
+
+
+@router.delete("/graph/relations/{relation_id}")
+def delete_graph_relation(
+    relation_id: str,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    try:
+        KnowledgeGraphService(db).delete_relation(relation_id)
+        db.commit()
+    except LookupError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"code": 0, "message": "graph relation deleted", "data": None}
 
 
 @router.get("/graph/entities/{entity_id}/neighbors")
@@ -108,3 +230,16 @@ def import_graph_json(
         db.rollback()
         raise
     return {"code": 0, "message": "knowledge graph imported", "data": data}
+
+
+@router.post("/graph/import/preview")
+def preview_graph_import(
+    payload: dict,
+    db: Session = Depends(get_db),
+    _admin: UserModel = Depends(get_admin_user),
+):
+    return {
+        "code": 0,
+        "message": "knowledge graph import preview",
+        "data": KnowledgeGraphService(db).preview_import_graph_json(payload),
+    }
