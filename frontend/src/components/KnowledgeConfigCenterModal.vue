@@ -107,11 +107,16 @@
             </aside>
 
             <div class="graph-preview-pane">
+              <div class="graph-preview-pane-head">
+                <strong>图谱预览</strong>
+                <button class="graph-preview-expand-button" type="button" :disabled="!graph.entities.length" title="放大图谱" aria-label="放大图谱" @click="openGraphStage"><Maximize2 :size="16" /></button>
+              </div>
               <FocusKnowledgeGraphCanvas
                 :graph="graph"
                 :selected-entity-ids="editingKind === 'entity' && entityForm.id ? [entityForm.id] : []"
-                :focused-entity-id="editingKind === 'entity' ? entityForm.id : relationForm.subject_entity_id"
                 :selected-relation-id="editingKind === 'relation' ? relationForm.id : ''"
+                :max-nodes="graph.entities.length || 18"
+                variant="map"
                 aria-label="知识图谱配置预览"
                 @select-node="selectGraphNode"
                 @focus-node="selectGraphNode"
@@ -148,7 +153,6 @@
             </section>
           </div>
         </section>
-
         <section v-else-if="activeTab === 'import'" class="knowledge-config-split">
           <section class="config-detail-pane">
             <div class="config-detail-head"><strong>JSON 导入</strong><span>粘贴或上传图谱 JSON，先预览差异再合并</span></div>
@@ -176,14 +180,42 @@
           <details v-for="record in retrievals" :key="record.id" class="curriculum-retrieval-row"><summary>{{ record.query || '空查询' }}<small>{{ modeLabel(record.mode) }} · {{ formatDate(record.created_at) }}</small></summary><p v-if="record.vector_error" class="curriculum-error">{{ record.vector_error }}</p><div v-for="hit in record.records" :key="`${record.id}-${hit.chunk_id}`" class="retrieval-hit"><strong>{{ hit.source }} · 片段 {{ hit.source_index }}</strong><span>综合 {{ score(hit.score) }} · 向量 {{ score(hit.vector_score) }} · BM25 {{ score(hit.bm25_score) }}</span><p>{{ hit.content }}</p></div><p v-if="!record.records.length" class="retrieval-empty">本次没有命中课标片段。</p></details>
           <p v-if="!retrievals.length" class="retrieval-empty">当前还没有课标召回记录</p>
         </section>
+
+        <Teleport to="body">
+          <div v-if="graphExpanded" class="graph-stage-overlay" role="dialog" aria-modal="true" aria-label="图谱配置大幕布" @keydown.esc.prevent="closeGraphStage">
+            <section class="graph-stage-panel">
+              <header class="graph-stage-head">
+                <div>
+                  <strong>图谱配置预览</strong>
+                  <span>{{ graph.entities.length }} 个节点 · {{ graph.relations.length }} 条关系</span>
+                </div>
+                <button ref="graphStageCloseRef" type="button" @click="closeGraphStage"><X :size="16" />关闭</button>
+              </header>
+              <div class="graph-stage-body">
+                <FocusKnowledgeGraphCanvas
+                  :graph="graph"
+                  :selected-entity-ids="editingKind === 'entity' && entityForm.id ? [entityForm.id] : []"
+                  :selected-relation-id="editingKind === 'relation' ? relationForm.id : ''"
+                  :max-nodes="graph.entities.length || 18"
+                  variant="map"
+                  :fullscreen="true"
+                  aria-label="图谱配置大幕布"
+                  @select-node="selectGraphNode"
+                  @focus-node="selectGraphNode"
+                  @select-relation="selectGraphRelation"
+                />
+              </div>
+            </section>
+          </div>
+        </Teleport>
       </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
-import { BookOpen, Database, Download, GitBranch, History, Plus, RefreshCw, ShieldCheck, Trash2, Upload, X } from "lucide-vue-next";
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { BookOpen, Database, Download, GitBranch, History, Maximize2, Plus, RefreshCw, ShieldCheck, Trash2, Upload, X } from "lucide-vue-next";
 import FocusKnowledgeGraphCanvas from "@/components/FocusKnowledgeGraphCanvas.vue";
 import type { Component } from "vue";
 import type { CurriculumFileItem, CurriculumRetrievalRecord, CurriculumVectorStatus, ExpertAgentItem, KnowledgeEntity, KnowledgeGraphImportPreview, KnowledgeGraphPayload, KnowledgeRelation } from "@/types";
@@ -251,6 +283,8 @@ const tabs: { id: TabId; label: string; icon: Component }[] = [
 const activeTab = ref<TabId>("files");
 const graphSearch = ref("");
 const graphListMode = ref<"entities" | "relations">("entities");
+const graphExpanded = ref(false);
+const graphStageCloseRef = ref<HTMLButtonElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const bundleInput = ref<HTMLInputElement | null>(null);
 const jsonFileInput = ref<HTMLInputElement | null>(null);
@@ -300,9 +334,37 @@ const filteredRelations = computed(() => {
 watch(() => props.visible, (visible) => {
   if (visible) {
     if (!props.editingSource && props.files[0]) emit("edit-permissions", props.files[0]);
-    if (!entityOriginalId.value && props.graph.entities[0]) editEntity(props.graph.entities[0]);
   }
 });
+
+let graphStageReturnFocus: HTMLElement | null = null;
+let graphStagePreviousOverflow = "";
+
+watch(graphExpanded, async (expanded) => {
+  if (expanded) {
+    graphStageReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    graphStagePreviousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    await nextTick();
+    graphStageCloseRef.value?.focus();
+    return;
+  }
+  document.body.style.overflow = graphStagePreviousOverflow;
+  graphStageReturnFocus?.focus();
+  graphStageReturnFocus = null;
+});
+
+onBeforeUnmount(() => {
+  document.body.style.overflow = graphStagePreviousOverflow;
+});
+
+function openGraphStage() {
+  graphExpanded.value = true;
+}
+
+function closeGraphStage() {
+  graphExpanded.value = false;
+}
 
 function selectPermissionFile(file: CurriculumFileItem) {
   emit("edit-permissions", file);

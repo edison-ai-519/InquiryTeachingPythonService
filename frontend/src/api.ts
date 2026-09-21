@@ -400,6 +400,7 @@ export async function getKnowledgeGraphCandidates(
   sessionId: string,
   message: string,
   expertId?: string,
+  signal?: AbortSignal,
 ): Promise<KnowledgeGraphPayload> {
   const payload = await readJson<ApiEnvelope<KnowledgeGraphPayload>>(`${API_BASE}/api/knowledge/graph/candidates`, {
     method: "POST",
@@ -409,6 +410,7 @@ export async function getKnowledgeGraphCandidates(
       message,
       expert_id: expertId || undefined,
     }),
+    signal,
   });
   return payload.data;
 }
@@ -518,9 +520,10 @@ export async function importKnowledgeGraphJson(payload: unknown): Promise<{ enti
   return response.data;
 }
 
-export async function getKnowledgeGraphNeighbors(entityId: string, hops = 1): Promise<KnowledgeGraphPayload> {
+export async function getKnowledgeGraphNeighbors(entityId: string, hops = 1, signal?: AbortSignal): Promise<KnowledgeGraphPayload> {
   const payload = await readJson<ApiEnvelope<KnowledgeGraphPayload>>(
     `${API_BASE}/api/knowledge/graph/entities/${encodeURIComponent(entityId)}/neighbors?hops=${hops}`,
+    { signal },
   );
   return payload.data;
 }

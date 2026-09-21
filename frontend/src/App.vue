@@ -142,14 +142,17 @@
         v-if="isInsectOrNatureExpert && showGraphInRightPanel"
         :graph="knowledgeGraph"
         :selected-entity-ids="selectedGraphEntityIds"
-        :focused-entity-id="focusedGraphEntityId"
+        :selected-relation-id="selectedGraphRelationId"
         :loading="isLoadingKnowledgeGraph"
         :expanding="isExpandingGraphNode"
+        :expanding-node-id="expandingGraphEntityId"
         :streaming="isStreaming"
         :agent-name="selectedExpert?.name || ''"
-        @close="showGraphInRightPanel = false"
+        :layout-revision="knowledgeGraphLayoutRevision"
+        :expansion="lastKnowledgeGraphExpansion"
         @toggle-node="toggleGraphEntity"
         @focus-node="focusKnowledgeGraphNode"
+        @select-relation="selectGraphRelation"
         @answer="sendGraphSelectedChat"
       />
     </div>
@@ -528,7 +531,6 @@ const curriculumUploadResults = ref<Array<{
   status: "pending" | "success" | "failed";
   message: string;
 }>>([]);
-const showKnowledgeGraphPanel = ref(false);
 const showGraphInRightPanel = ref(false);
 const isSavingGraphNode = ref(false);
 const isImportingGraphJson = ref(false);
@@ -547,9 +549,15 @@ const knowledgeGraph = ref<KnowledgeGraphPayload>({
   recommended_path_ids: [],
 });
 const selectedGraphEntityIds = ref<string[]>([]);
-const focusedGraphEntityId = ref("");
+const selectedGraphRelationId = ref("");
 const expandedGraphCache = ref(new Map<string, KnowledgeGraphPayload>());
 const isExpandingGraphNode = ref(false);
+const expandingGraphEntityId = ref("");
+const knowledgeGraphLayoutRevision = ref(0);
+const lastKnowledgeGraphExpansion = ref<{ sourceId: string; addedEntityIds: string[]; revision: number } | null>(null);
+let knowledgeGraphRequestGeneration = 0;
+let knowledgeGraphCandidateController: AbortController | null = null;
+let knowledgeGraphExpansionController: AbortController | null = null;
 const currentDraftCursorLine = ref(1);
 const draftEditorScrollTop = ref(0);
 const draftEditorMeasureWidth = ref(0);
@@ -564,7 +572,7 @@ let draftMeasureCanvas: HTMLCanvasElement | null = null;
 const showNewSessionModal = ref(false);
 
 function resetKnowledgeGraphState() {
-  showKnowledgeGraphPanel.value = false;
+  cancelKnowledgeGraphRequests();
   isLoadingKnowledgeGraph.value = false;
   knowledgeGraph.value = {
     entities: [],
@@ -573,9 +581,12 @@ function resetKnowledgeGraphState() {
     recommended_path_ids: [],
   };
   selectedGraphEntityIds.value = [];
-  focusedGraphEntityId.value = "";
+  selectedGraphRelationId.value = "";
   expandedGraphCache.value = new Map();
   isExpandingGraphNode.value = false;
+  expandingGraphEntityId.value = "";
+  knowledgeGraphLayoutRevision.value += 1;
+  lastKnowledgeGraphExpansion.value = null;
 }
 
 function applyTheme(mode: "dark" | "light") {
@@ -1706,21 +1717,32 @@ async function openKnowledgeGraphPanel() {
     return;
   }
   const message = chatInput.value.trim();
+  knowledgeGraphCandidateController?.abort();
+  knowledgeGraphExpansionController?.abort();
+  isExpandingGraphNode.value = false;
+  expandingGraphEntityId.value = "";
+  const requestGeneration = ++knowledgeGraphRequestGeneration;
+  const controller = new AbortController();
+  knowledgeGraphCandidateController = controller;
   showGraphInRightPanel.value = true;
   isLoadingKnowledgeGraph.value = true;
   streamWarning.value = "";
   try {
-    const graph = await getKnowledgeGraphCandidates(currentSession.value.id, message, selectedExpertId.value || undefined);
+    const graph = await getKnowledgeGraphCandidates(currentSession.value.id, message, selectedExpertId.value || undefined, controller.signal);
+    if (requestGeneration !== knowledgeGraphRequestGeneration) return;
     knowledgeGraph.value = graph;
     selectedGraphEntityIds.value = [];
-    focusedGraphEntityId.value = graph.entities[0]?.id || "";
+    selectedGraphRelationId.value = "";
     expandedGraphCache.value = new Map();
+    knowledgeGraphLayoutRevision.value += 1;
+    lastKnowledgeGraphExpansion.value = null;
     statusText.value = graph.entities.length ? "已生成局部知识图谱，请选择回答节点" : "没有找到相关图谱关系";
   } catch (error: any) {
+    if (error?.name === "AbortError" || requestGeneration !== knowledgeGraphRequestGeneration) return;
     streamWarning.value = error.message || String(error);
     statusText.value = "知识图谱解析失败";
   } finally {
-    isLoadingKnowledgeGraph.value = false;
+    if (requestGeneration === knowledgeGraphRequestGeneration) isLoadingKnowledgeGraph.value = false;
   }
 }
 
@@ -1735,8 +1757,9 @@ async function openGraphAdmin() {
   }
 }
 
-function mergeKnowledgeGraph(base: KnowledgeGraphPayload, addition: KnowledgeGraphPayload): KnowledgeGraphPayload {
+function mergeKnowledgeGraph(base: KnowledgeGraphPayload, addition: KnowledgeGraphPayload): { graph: KnowledgeGraphPayload; addedEntityIds: string[] } {
   const entityMap = new Map(base.entities.map((entity) => [entity.id, entity]));
+  const addedEntityIds = addition.entities.filter((entity) => !entityMap.has(entity.id)).map((entity) => entity.id);
   for (const entity of addition.entities) {
     entityMap.set(entity.id, entity);
   }
@@ -1749,36 +1772,60 @@ function mergeKnowledgeGraph(base: KnowledgeGraphPayload, addition: KnowledgeGra
     pathMap.set(path.id, path);
   }
   return {
+    addedEntityIds,
+    graph: {
+      ...base,
     entities: Array.from(entityMap.values()),
     relations: Array.from(relationMap.values()),
     paths: Array.from(pathMap.values()),
     recommended_path_ids: Array.from(new Set([...base.recommended_path_ids, ...addition.recommended_path_ids])),
+    },
   };
 }
 
 async function focusKnowledgeGraphNode(entityId: string) {
   if (!entityId || isExpandingGraphNode.value) return;
-  focusedGraphEntityId.value = entityId;
+  const requestGeneration = knowledgeGraphRequestGeneration;
   const cacheKey = `${entityId}:1`;
   const cached = expandedGraphCache.value.get(cacheKey);
   if (cached) {
-    knowledgeGraph.value = mergeKnowledgeGraph(knowledgeGraph.value, cached);
+    const merged = mergeKnowledgeGraph(knowledgeGraph.value, cached);
+    knowledgeGraph.value = merged.graph;
+    lastKnowledgeGraphExpansion.value = { sourceId: entityId, addedEntityIds: merged.addedEntityIds, revision: requestGeneration };
     statusText.value = "已切换到缓存中的图谱邻域";
     return;
   }
   isExpandingGraphNode.value = true;
+  expandingGraphEntityId.value = entityId;
+  const controller = new AbortController();
+  knowledgeGraphExpansionController = controller;
   try {
-    const neighbors = await getKnowledgeGraphNeighbors(entityId, 1);
+    const neighbors = await getKnowledgeGraphNeighbors(entityId, 1, controller.signal);
+    if (requestGeneration !== knowledgeGraphRequestGeneration) return;
     const nextCache = new Map(expandedGraphCache.value);
     nextCache.set(cacheKey, neighbors);
     expandedGraphCache.value = nextCache;
-    knowledgeGraph.value = mergeKnowledgeGraph(knowledgeGraph.value, neighbors);
+    const merged = mergeKnowledgeGraph(knowledgeGraph.value, neighbors);
+    knowledgeGraph.value = merged.graph;
+    lastKnowledgeGraphExpansion.value = { sourceId: entityId, addedEntityIds: merged.addedEntityIds, revision: requestGeneration };
     statusText.value = neighbors.entities.length ? "已展开节点邻域" : "该节点暂无更多邻接关系";
   } catch (error: any) {
+    if (error?.name === "AbortError" || requestGeneration !== knowledgeGraphRequestGeneration) return;
     streamWarning.value = error.message || String(error);
   } finally {
-    isExpandingGraphNode.value = false;
+    if (requestGeneration === knowledgeGraphRequestGeneration) {
+      isExpandingGraphNode.value = false;
+      expandingGraphEntityId.value = "";
+    }
   }
+}
+
+function cancelKnowledgeGraphRequests() {
+  knowledgeGraphRequestGeneration += 1;
+  knowledgeGraphCandidateController?.abort();
+  knowledgeGraphExpansionController?.abort();
+  knowledgeGraphCandidateController = null;
+  knowledgeGraphExpansionController = null;
 }
 
 function upsertGraphEntity(entity: any) {
@@ -1855,8 +1902,10 @@ async function deleteGraph() {
     graphAdminData.value = { entities: [], relations: [], paths: [], recommended_path_ids: [] };
     knowledgeGraph.value = { entities: [], relations: [], paths: [], recommended_path_ids: [] };
     selectedGraphEntityIds.value = [];
-    focusedGraphEntityId.value = "";
+    selectedGraphRelationId.value = "";
     expandedGraphCache.value = new Map();
+    knowledgeGraphLayoutRevision.value += 1;
+    lastKnowledgeGraphExpansion.value = null;
     graphImportPreview.value = null;
     statusText.value = `图谱已删除：${result.deleted_entity_count} 个节点，${result.deleted_relation_count} 条关系`;
   } catch (error: any) {
@@ -1939,6 +1988,10 @@ function toggleGraphEntity(entityId: string) {
     : [...current, entityId];
 }
 
+function selectGraphRelation(relationId: string) {
+  selectedGraphRelationId.value = relationId;
+}
+
 function buildGraphSelection(): GraphSelectionPayload {
   return {
     entity_ids: [...selectedGraphEntityIds.value],
@@ -1953,7 +2006,6 @@ async function sendGraphSelectedChat() {
     return;
   }
   await sendChat(buildGraphSelection());
-  showKnowledgeGraphPanel.value = false;
 }
 
 async function interruptChat() {

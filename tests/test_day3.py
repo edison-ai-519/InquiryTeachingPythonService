@@ -2019,6 +2019,68 @@ class AgentArchitectureApiTests(unittest.TestCase):
         finally:
             self.delete_session(session_id)
 
+    def test_graph_candidates_limit_dense_results_and_report_truncation(self):
+        session_id, _ = self.create_session(topic="图谱候选上限")
+        try:
+            with SessionLocal() as db:
+                service = KnowledgeGraphService(db)
+                root_id = "candidate_limit_root"
+                entities = [
+                    {
+                        "id": root_id,
+                        "name": "候选中心节点",
+                        "entity_type": "concept",
+                        "aliases": [],
+                        "description": "用于验证候选图谱上限。",
+                        "source": "test",
+                    }
+                ]
+                relations = []
+                for index in range(30):
+                    entity_id = f"candidate_limit_leaf_{index}"
+                    entities.append(
+                        {
+                            "id": entity_id,
+                            "name": f"候选叶节点{index}",
+                            "entity_type": "concept",
+                            "aliases": [],
+                            "description": "候选图谱测试节点。",
+                            "source": "test",
+                        }
+                    )
+                    relations.append(
+                        {
+                            "id": f"candidate_limit_relation_{index}",
+                            "subject_entity_id": root_id,
+                            "predicate": "关联",
+                            "object_entity_id": entity_id,
+                            "description": "候选图谱测试关系。",
+                            "evidence_source": "test",
+                            "confidence": "high",
+                        }
+                    )
+                service.import_graph_json({"entities": entities, "relations": relations})
+                db.commit()
+
+            response = self.client.post(
+                "/api/knowledge/graph/candidates",
+                json={
+                    "session_id": session_id,
+                    "message": "候选中心节点",
+                    "expert_id": "insect_agent",
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            data = response.json()["data"]
+            self.assertLessEqual(len(data["entities"]), 24)
+            self.assertLessEqual(len(data["relations"]), 48)
+            self.assertTrue(data["truncated"])
+            self.assertIn(root_id, data["anchor_entity_ids"])
+            self.assertGreater(data["total_entity_count"], len(data["entities"]))
+            self.assertGreater(data["total_relation_count"], len(data["relations"]))
+        finally:
+            self.delete_session(session_id)
+
     def test_knowledge_entity_rag_sources_are_persisted(self):
         with SessionLocal() as db:
             entity = KnowledgeEntityModel(

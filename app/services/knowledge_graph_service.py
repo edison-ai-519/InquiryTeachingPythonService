@@ -32,6 +32,9 @@ PREDICATE_LABELS = {
     "attracted_by": "被吸引",
     "performs": "进行",
 }
+DEFAULT_CANDIDATE_ANCHOR_LIMIT = 3
+DEFAULT_CANDIDATE_NODE_LIMIT = 24
+DEFAULT_CANDIDATE_RELATION_LIMIT = 48
 
 
 def _now_iso() -> str:
@@ -407,44 +410,62 @@ class KnowledgeGraphService:
                 )
                 anchors = self.match_entities(query_text)
         if not anchors:
-            anchors = self.db.query(KnowledgeEntityModel).order_by(KnowledgeEntityModel.name.asc()).limit(3).all()
+            anchors = self.db.query(KnowledgeEntityModel).order_by(KnowledgeEntityModel.name.asc()).limit(DEFAULT_CANDIDATE_ANCHOR_LIMIT).all()
 
-        relation_map: dict[str, KnowledgeRelationModel] = {}
-        for entity in anchors:
-            for relation in self._relations_for_entity(entity.id):
-                relation_map[relation.id] = relation
-                for next_id in (relation.subject_entity_id, relation.object_entity_id):
-                    if next_id == entity.id:
-                        continue
-                    for second in self._relations_for_entity(next_id):
-                        relation_map[second.id] = second
+        all_anchor_ids = [entity.id for entity in anchors]
+        anchors = anchors[:DEFAULT_CANDIDATE_ANCHOR_LIMIT]
+        anchor_ids = {entity.id for entity in anchors}
+        first_hop_relations = self._relations_for_entities(anchor_ids)
+        first_hop_entity_ids = {
+            entity_id
+            for relation in first_hop_relations
+            for entity_id in (relation.subject_entity_id, relation.object_entity_id)
+        }
+        candidate_relations = self._dedupe_relations(
+            [*first_hop_relations, *self._relations_for_entities(first_hop_entity_ids)]
+        )
+        candidate_entity_ids = set(anchor_ids)
+        for relation in candidate_relations:
+            candidate_entity_ids.add(relation.subject_entity_id)
+            candidate_entity_ids.add(relation.object_entity_id)
 
-        entity_ids = {entity.id for entity in anchors}
-        for relation in relation_map.values():
-            entity_ids.add(relation.subject_entity_id)
-            entity_ids.add(relation.object_entity_id)
+        selected_entity_ids = set(anchor_ids)
+        relations: list[KnowledgeRelationModel] = []
+        for relation in candidate_relations:
+            if len(relations) >= DEFAULT_CANDIDATE_RELATION_LIMIT:
+                break
+            next_entity_ids = selected_entity_ids | {relation.subject_entity_id, relation.object_entity_id}
+            if len(next_entity_ids) > DEFAULT_CANDIDATE_NODE_LIMIT:
+                continue
+            relations.append(relation)
+            selected_entity_ids = next_entity_ids
+
         entities = (
             self.db.query(KnowledgeEntityModel)
-            .filter(KnowledgeEntityModel.id.in_(list(entity_ids)))
+            .filter(KnowledgeEntityModel.id.in_(list(selected_entity_ids)))
+            .order_by(KnowledgeEntityModel.name.asc())
             .all()
-            if entity_ids
+            if selected_entity_ids
             else []
         )
-        relations = list(relation_map.values())
         paths = self._build_paths(anchors, relations)
         recommended_path_ids = [path["id"] for path in paths[:3]]
         return {
-            "entities": [self.serialize_entity(entity) for entity in entities],
+            "entities": self.serialize_entities(entities),
             "relations": [self.serialize_relation(relation) for relation in relations],
             "paths": paths,
             "recommended_path_ids": recommended_path_ids,
+            "anchor_entity_ids": [entity.id for entity in anchors],
+            "truncated": len(all_anchor_ids) > len(anchors) or len(candidate_entity_ids) > len(entities) or len(candidate_relations) > len(relations),
+            "total_entity_count": len(candidate_entity_ids),
+            "total_relation_count": len(candidate_relations),
         }
 
     def all_graph(self) -> dict:
         entities = self.db.query(KnowledgeEntityModel).order_by(KnowledgeEntityModel.name.asc()).all()
         relations = self.db.query(KnowledgeRelationModel).order_by(KnowledgeRelationModel.id.asc()).all()
         return {
-            "entities": [self.serialize_entity(entity) for entity in entities],
+            "entities": self.serialize_entities(entities),
             "relations": [self.serialize_relation(relation) for relation in relations],
             "paths": self._build_paths(entities, relations),
             "recommended_path_ids": [],
@@ -467,17 +488,14 @@ class KnowledgeGraphService:
         relation_map: dict[str, KnowledgeRelationModel] = {}
         for _ in range(max_hops):
             next_frontier: set[str] = set()
-            for current_id in sorted(frontier):
-                for relation in self._relations_for_entity(current_id, predicates):
-                    if len(relation_map) >= relation_limit:
-                        break
-                    relation_map[relation.id] = relation
-                    for next_id in (relation.subject_entity_id, relation.object_entity_id):
-                        if next_id not in seen_entities and len(seen_entities) < node_limit:
-                            seen_entities.add(next_id)
-                            next_frontier.add(next_id)
+            for relation in self._relations_for_entities(frontier, predicates):
                 if len(relation_map) >= relation_limit:
                     break
+                relation_map[relation.id] = relation
+                for next_id in (relation.subject_entity_id, relation.object_entity_id):
+                    if next_id not in seen_entities and len(seen_entities) < node_limit:
+                        seen_entities.add(next_id)
+                        next_frontier.add(next_id)
             frontier = next_frontier
             if not frontier or len(relation_map) >= relation_limit:
                 break
@@ -488,7 +506,7 @@ class KnowledgeGraphService:
         )
         relations = list(relation_map.values())
         return {
-            "entities": [self.serialize_entity(entity) for entity in entities],
+            "entities": self.serialize_entities(entities),
             "relations": [self.serialize_relation(relation) for relation in relations],
             "paths": self._build_paths([self.db.get(KnowledgeEntityModel, entity_id)], relations),
             "recommended_path_ids": [],
@@ -648,10 +666,19 @@ class KnowledgeGraphService:
         entity_id: str,
         predicates: list[str] | None = None,
     ) -> list[KnowledgeRelationModel]:
+        return self._relations_for_entities({entity_id}, predicates)
+
+    def _relations_for_entities(
+        self,
+        entity_ids: set[str],
+        predicates: list[str] | None = None,
+    ) -> list[KnowledgeRelationModel]:
+        if not entity_ids:
+            return []
         query = self.db.query(KnowledgeRelationModel).filter(
             or_(
-                KnowledgeRelationModel.subject_entity_id == entity_id,
-                KnowledgeRelationModel.object_entity_id == entity_id,
+                KnowledgeRelationModel.subject_entity_id.in_(entity_ids),
+                KnowledgeRelationModel.object_entity_id.in_(entity_ids),
             )
         )
         if predicates:
@@ -659,6 +686,17 @@ class KnowledgeGraphService:
         rows = query.all()
         return sorted(
             rows,
+            key=lambda row: (
+                -CONFIDENCE_WEIGHT.get(row.confidence, 0),
+                row.predicate,
+                row.id,
+            ),
+        )
+
+    def _dedupe_relations(self, relations: list[KnowledgeRelationModel]) -> list[KnowledgeRelationModel]:
+        by_id = {relation.id: relation for relation in relations}
+        return sorted(
+            by_id.values(),
             key=lambda row: (
                 -CONFIDENCE_WEIGHT.get(row.confidence, 0),
                 row.predicate,
@@ -676,7 +714,6 @@ class KnowledgeGraphService:
         return relation_ids
 
     def _build_paths(self, anchors: list[KnowledgeEntityModel | None], relations: list[KnowledgeRelationModel]) -> list[dict]:
-        relation_by_id = {relation.id: relation for relation in relations}
         paths: list[dict] = []
         seen: set[str] = set()
         for relation in relations:
@@ -685,23 +722,26 @@ class KnowledgeGraphService:
                 paths.append({"id": path_id, "relation_ids": [relation.id], "score": self._relation_score(relation)})
                 seen.add(path_id)
 
+        adjacency: dict[str, list[KnowledgeRelationModel]] = {}
+        for relation in relations:
+            adjacency.setdefault(relation.subject_entity_id, []).append(relation)
+            adjacency.setdefault(relation.object_entity_id, []).append(relation)
+
         anchor_ids = {entity.id for entity in anchors if entity is not None}
         for first in relations:
             if anchor_ids and first.subject_entity_id not in anchor_ids and first.object_entity_id not in anchor_ids:
                 continue
-            middle_ids = {first.subject_entity_id, first.object_entity_id}
-            for second in relations:
-                if first.id == second.id:
-                    continue
-                if not middle_ids.intersection({second.subject_entity_id, second.object_entity_id}):
-                    continue
-                relation_ids = [first.id, second.id]
-                path_id = "path_" + "__".join(relation_ids)
-                if path_id in seen:
-                    continue
-                score = self._relation_score(first) + self._relation_score(relation_by_id[second.id])
-                paths.append({"id": path_id, "relation_ids": relation_ids, "score": score})
-                seen.add(path_id)
+            for middle_id in (first.subject_entity_id, first.object_entity_id):
+                for second in adjacency.get(middle_id, []):
+                    if first.id == second.id:
+                        continue
+                    relation_ids = [first.id, second.id]
+                    path_id = "path_" + "__".join(relation_ids)
+                    if path_id in seen:
+                        continue
+                    score = self._relation_score(first) + self._relation_score(second)
+                    paths.append({"id": path_id, "relation_ids": relation_ids, "score": score})
+                    seen.add(path_id)
         paths.sort(key=lambda item: (-item["score"], len(item["relation_ids"]), item["id"]))
         return paths[:10]
 
@@ -751,7 +791,11 @@ class KnowledgeGraphService:
         relation.updated_at = timestamp
         self.db.flush()
 
-    def serialize_entity(self, entity: KnowledgeEntityModel) -> dict:
+    def serialize_entities(self, entities: list[KnowledgeEntityModel]) -> list[dict]:
+        sources_by_entity = self.rag_sources_for_entities([entity.id for entity in entities])
+        return [self.serialize_entity(entity, sources_by_entity.get(entity.id, [])) for entity in entities]
+
+    def serialize_entity(self, entity: KnowledgeEntityModel, rag_sources: list[str] | None = None) -> dict:
         return {
             "id": entity.id,
             "name": entity.name,
@@ -759,7 +803,7 @@ class KnowledgeGraphService:
             "aliases": self.aliases(entity),
             "description": entity.description,
             "source": entity.source,
-            "rag_sources": self.rag_sources_for_entity(entity.id),
+            "rag_sources": self.rag_sources_for_entity(entity.id) if rag_sources is None else rag_sources,
         }
 
     def serialize_relation(self, relation: KnowledgeRelationModel) -> dict:
