@@ -30,10 +30,14 @@ class UserModel(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True)
-    username = Column(String, nullable=False, unique=True, index=True)
+    username = Column(String, nullable=False, index=True)
     password_hash = Column(Text, nullable=False)
     is_admin = Column(Integer, nullable=False, default=0)
     created_at = Column(String, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("username", "is_admin", name="uq_users_username_is_admin"),
+    )
 
 
 class AuthSessionModel(Base):
