@@ -8,7 +8,10 @@ import type {
   ExpertAgentItem,
   FlowInfo,
   GraphSelectionPayload,
+  KnowledgeEntity,
   KnowledgeGraphPayload,
+  KnowledgeGraphImportPreview,
+  KnowledgeRelation,
   MessageItem,
   SessionDetail,
   SessionFileItem,
@@ -397,6 +400,7 @@ export async function getKnowledgeGraphCandidates(
   sessionId: string,
   message: string,
   expertId?: string,
+  signal?: AbortSignal,
 ): Promise<KnowledgeGraphPayload> {
   const payload = await readJson<ApiEnvelope<KnowledgeGraphPayload>>(`${API_BASE}/api/knowledge/graph/candidates`, {
     method: "POST",
@@ -406,6 +410,7 @@ export async function getKnowledgeGraphCandidates(
       message,
       expert_id: expertId || undefined,
     }),
+    signal,
   });
   return payload.data;
 }
@@ -427,9 +432,98 @@ export async function updateKnowledgeGraphEntityRagSources(entityId: string, sou
   return payload.data.sources;
 }
 
-export async function getKnowledgeGraphNeighbors(entityId: string, hops = 1): Promise<KnowledgeGraphPayload> {
+export async function createKnowledgeGraphEntity(entity: Partial<KnowledgeEntity>): Promise<KnowledgeEntity> {
+  const payload = await readJson<ApiEnvelope<KnowledgeEntity>>(`${API_BASE}/api/knowledge/graph/entities`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entity),
+  });
+  return payload.data;
+}
+
+export async function updateKnowledgeGraphEntity(entityId: string, entity: Partial<KnowledgeEntity>): Promise<KnowledgeEntity> {
+  const payload = await readJson<ApiEnvelope<KnowledgeEntity>>(
+    `${API_BASE}/api/knowledge/graph/entities/${encodeURIComponent(entityId)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entity),
+    },
+  );
+  return payload.data;
+}
+
+export async function deleteKnowledgeGraphEntity(entityId: string): Promise<{ deleted_relation_count: number }> {
+  const payload = await readJson<ApiEnvelope<{ deleted_relation_count: number }>>(
+    `${API_BASE}/api/knowledge/graph/entities/${encodeURIComponent(entityId)}`,
+    { method: "DELETE" },
+  );
+  return payload.data;
+}
+
+export async function createKnowledgeGraphRelation(relation: Partial<KnowledgeRelation>): Promise<KnowledgeRelation> {
+  const payload = await readJson<ApiEnvelope<KnowledgeRelation>>(`${API_BASE}/api/knowledge/graph/relations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(relation),
+  });
+  return payload.data;
+}
+
+export async function updateKnowledgeGraphRelation(relationId: string, relation: Partial<KnowledgeRelation>): Promise<KnowledgeRelation> {
+  const payload = await readJson<ApiEnvelope<KnowledgeRelation>>(
+    `${API_BASE}/api/knowledge/graph/relations/${encodeURIComponent(relationId)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(relation),
+    },
+  );
+  return payload.data;
+}
+
+export async function deleteKnowledgeGraphRelation(relationId: string): Promise<void> {
+  await readJson<ApiEnvelope<null>>(
+    `${API_BASE}/api/knowledge/graph/relations/${encodeURIComponent(relationId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function deleteKnowledgeGraph(): Promise<{
+  deleted_entity_count: number;
+  deleted_relation_count: number;
+  deleted_binding_count: number;
+}> {
+  const payload = await readJson<ApiEnvelope<{
+    deleted_entity_count: number;
+    deleted_relation_count: number;
+    deleted_binding_count: number;
+  }>>(`${API_BASE}/api/knowledge/graph`, { method: "DELETE" });
+  return payload.data;
+}
+
+export async function previewKnowledgeGraphImport(payload: unknown): Promise<KnowledgeGraphImportPreview> {
+  const response = await readJson<ApiEnvelope<KnowledgeGraphImportPreview>>(`${API_BASE}/api/knowledge/graph/import/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return response.data;
+}
+
+export async function importKnowledgeGraphJson(payload: unknown): Promise<{ entity_count: number; relation_count: number }> {
+  const response = await readJson<ApiEnvelope<{ entity_count: number; relation_count: number }>>(`${API_BASE}/api/knowledge/graph/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return response.data;
+}
+
+export async function getKnowledgeGraphNeighbors(entityId: string, hops = 1, signal?: AbortSignal): Promise<KnowledgeGraphPayload> {
   const payload = await readJson<ApiEnvelope<KnowledgeGraphPayload>>(
     `${API_BASE}/api/knowledge/graph/entities/${encodeURIComponent(entityId)}/neighbors?hops=${hops}`,
+    { signal },
   );
   return payload.data;
 }

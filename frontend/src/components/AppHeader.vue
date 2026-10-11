@@ -20,7 +20,7 @@
 
     <div class="header-actions">
       <ExpertSelector v-model="expertId" :experts="experts" :disabled="streaming || !session" />
-      <button v-if="user?.is_admin" class="header-admin-button" type="button" @click="$emit('open-graph-admin')">图谱管理</button>
+      <button v-if="user?.is_admin" class="header-admin-button" type="button" @click="$emit('open-graph-admin')">配置中心</button>
       <span class="connection-status" :class="{ streaming }"><i></i>{{ streaming ? '正在生成' : '已连接' }}</span>
       <button class="header-icon-button" type="button" :title="themeMode === 'light' ? '切换深色模式' : '切换浅色模式'" @click="$emit('toggle-theme')">
         <Moon v-if="themeMode === 'light'" :size="17" />

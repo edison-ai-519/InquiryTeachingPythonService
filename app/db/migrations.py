@@ -38,6 +38,51 @@ def ensure_schema_compatibility() -> None:
                 connection.execute(
                     text("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
                 )
+            unique_constraints = inspector.get_unique_constraints("users")
+            unique_indexes = inspector.get_indexes("users")
+            has_global_username_unique = any(
+                constraint.get("column_names") == ["username"]
+                for constraint in unique_constraints
+            ) or any(
+                index.get("unique") and index.get("column_names") == ["username"]
+                for index in unique_indexes
+            )
+            has_role_username_unique = any(
+                constraint.get("column_names") == ["username", "is_admin"]
+                for constraint in unique_constraints
+            ) or any(
+                index.get("unique") and index.get("column_names") == ["username", "is_admin"]
+                for index in unique_indexes
+            )
+            if has_global_username_unique and not has_role_username_unique:
+                connection.execute(text("ALTER TABLE users RENAME TO users_legacy_unique_username"))
+                connection.execute(
+                    text(
+                        """
+                        CREATE TABLE users (
+                            id VARCHAR PRIMARY KEY,
+                            username VARCHAR NOT NULL,
+                            password_hash TEXT NOT NULL,
+                            is_admin INTEGER NOT NULL DEFAULT 0,
+                            created_at VARCHAR NOT NULL,
+                            CONSTRAINT uq_users_username_is_admin UNIQUE (username, is_admin)
+                        )
+                        """
+                    )
+                )
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO users (id, username, password_hash, is_admin, created_at)
+                        SELECT id, username, password_hash, is_admin, created_at
+                        FROM users_legacy_unique_username
+                        """
+                    )
+                )
+                connection.execute(text("DROP TABLE users_legacy_unique_username"))
+                connection.execute(
+                    text("CREATE INDEX IF NOT EXISTS ix_users_username ON users (username)")
+                )
 
         connection.execute(
             text(

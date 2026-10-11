@@ -8,6 +8,11 @@ from app.agents.prompt_loader import AgentPromptError, load_agent_prompt
 from app.core.config import get_settings
 
 
+AGENT_ID_ALIASES = {
+    "insect_agent": "nature_agent",
+}
+
+
 class AgentRegistryError(RuntimeError):
     pass
 
@@ -75,7 +80,8 @@ class AgentRegistry:
         return agents
 
     def get(self, agent_id: str) -> AgentDefinition | None:
-        return self._agents.get(agent_id)
+        canonical_id = AGENT_ID_ALIASES.get(agent_id, agent_id)
+        return self._agents.get(canonical_id)
 
     def require(self, agent_id: str) -> AgentDefinition:
         agent = self.get(agent_id)

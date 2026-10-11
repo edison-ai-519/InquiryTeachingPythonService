@@ -142,11 +142,17 @@
         v-if="isInsectOrNatureExpert && showGraphInRightPanel"
         :graph="knowledgeGraph"
         :selected-entity-ids="selectedGraphEntityIds"
+        :selected-relation-id="selectedGraphRelationId"
         :loading="isLoadingKnowledgeGraph"
+        :expanding="isExpandingGraphNode"
+        :expanding-node-id="expandingGraphEntityId"
         :streaming="isStreaming"
         :agent-name="selectedExpert?.name || ''"
-        @close="showGraphInRightPanel = false"
+        :layout-revision="knowledgeGraphLayoutRevision"
+        :expansion="lastKnowledgeGraphExpansion"
         @toggle-node="toggleGraphEntity"
+        @focus-node="focusKnowledgeGraphNode"
+        @select-relation="selectGraphRelation"
         @answer="sendGraphSelectedChat"
       />
     </div>
@@ -305,10 +311,9 @@
       </div>
     </div>
 
-    <CurriculumModal
+    <KnowledgeConfigCenterModal
       ref="curriculumModalRef"
       :visible="showCurriculumModal"
-      :admin="Boolean(currentUser?.is_admin)"
       :files="curriculumFiles"
       :total-chunks="curriculumTotalChunks"
       :status="curriculumStatus"
@@ -330,6 +335,10 @@
       :expert-name="expertName"
       :mode-label="retrievalModeLabel"
       :score="formatScore"
+      :graph="graphAdminData"
+      :saving-graph="isSavingGraphNode"
+      :importing-graph="isImportingGraphJson"
+      :json-preview="graphImportPreview"
       @close="showCurriculumModal = false"
       @rebuild="handleRebuildCurriculumVectors"
       @export="handleExportCurriculum"
@@ -344,215 +353,14 @@
       @edit-permissions="openPermissionEditor"
       @delete-file="removeCurriculumSource"
       @refresh-admin="refreshCurriculumAdminData"
+      @save-entity="saveGraphEntity"
+      @delete-entity="deleteGraphEntity"
+      @delete-graph="deleteGraph"
+      @save-relation="saveGraphRelation"
+      @delete-relation="deleteGraphRelation"
+      @preview-graph-json="previewGraphJson"
+      @import-graph-json="importGraphJson"
     />
-    <KnowledgeGraphAdminModal
-      v-if="showGraphAdminModal"
-      :graph="graphAdminData"
-      :files="curriculumFiles"
-      :saving="isSavingGraphNode"
-      @close="showGraphAdminModal = false"
-      @save="saveGraphNodeSources"
-    />
-    <div v-if="showCurriculumModal" class="modal-overlay legacy-hidden" @click.self="showCurriculumModal = false">
-      <section class="modal-content curriculum-modal glass" role="dialog" aria-modal="true" aria-labelledby="curriculum-title">
-        <div class="curriculum-modal-head">
-          <div>
-            <h3 id="curriculum-title">课标知识库</h3>
-            <p>{{ currentUser?.is_admin ? "管理员管理" : "只读查看" }} · {{ curriculumFiles.length }} 个文件 · {{ curriculumTotalChunks }} 个片段</p>
-          </div>
-          <button class="icon-button compact" type="button" title="关闭" aria-label="关闭课标知识库" @click="showCurriculumModal = false">
-            <X :size="18" />
-          </button>
-        </div>
-
-        <div v-if="currentUser?.is_admin" class="curriculum-vector-panel">
-          <div class="curriculum-vector-summary">
-            <Database :size="20" />
-            <div>
-              <strong>{{ curriculumStatusLabel }}</strong>
-              <span v-if="curriculumStatus">
-                {{ curriculumStatus.model }} · {{ curriculumStatus.vector_count }}/{{ curriculumStatus.database_chunk_count }} 个向量
-              </span>
-              <span v-else>正在读取向量服务状态</span>
-              <small v-if="curriculumStatus?.error" :title="curriculumStatus.error">{{ curriculumStatus.error }}</small>
-            </div>
-          </div>
-          <div class="curriculum-admin-actions">
-            <button
-              class="ghost-button compact"
-              type="button"
-              :disabled="Boolean(curriculumAdminOperation) || isLoadingCurriculumAdmin"
-              @click="handleRebuildCurriculumVectors"
-            >
-              <LoaderCircle v-if="curriculumAdminOperation === 'rebuild'" class="spin-icon" :size="15" />
-              <RefreshCw v-else :size="15" />
-              重建索引
-            </button>
-            <button
-              class="ghost-button compact"
-              type="button"
-              :disabled="Boolean(curriculumAdminOperation)"
-              @click="handleExportCurriculum"
-            >
-              <LoaderCircle v-if="curriculumAdminOperation === 'export'" class="spin-icon" :size="15" />
-              <Download v-else :size="15" />
-              导出知识库
-            </button>
-            <button
-              class="ghost-button compact"
-              type="button"
-              :disabled="Boolean(curriculumAdminOperation)"
-              @click="curriculumBundleInputRef?.click()"
-            >
-              <LoaderCircle v-if="curriculumAdminOperation === 'import'" class="spin-icon" :size="15" />
-              <Upload v-else :size="15" />
-              导入知识库
-            </button>
-          </div>
-          <input
-            ref="curriculumBundleInputRef"
-            class="visually-hidden"
-            type="file"
-            accept=".zip,application/zip"
-            @change="handleCurriculumBundleSelection"
-          />
-        </div>
-
-        <button
-          v-if="currentUser?.is_admin"
-          class="curriculum-dropzone"
-          type="button"
-          :disabled="isUploadingCurriculum"
-          @click="openCurriculumFilePicker"
-          @dragover.prevent
-          @drop.prevent="handleCurriculumDrop"
-        >
-          <LoaderCircle v-if="isUploadingCurriculum" class="spin-icon" :size="22" />
-          <Upload v-else :size="22" />
-          <strong>{{ isUploadingCurriculum ? "正在导入课标" : "上传课标" }}</strong>
-          <span>PDF / DOCX / TXT / MD，单文件最大 20 MB</span>
-        </button>
-        <input
-          v-if="currentUser?.is_admin"
-          ref="curriculumFileInputRef"
-          class="visually-hidden"
-          type="file"
-          multiple
-          accept=".pdf,.docx,.txt,.md"
-          @change="handleCurriculumFileSelection"
-        />
-
-        <div v-if="curriculumUploadResults.length" class="curriculum-upload-results" aria-live="polite">
-          <span
-            v-for="result in curriculumUploadResults"
-            :key="result.name"
-            :class="`status-${result.status}`"
-            :title="result.message"
-          >
-            {{ result.name }} · {{ result.status === "pending" ? "等待" : result.status === "success" ? "完成" : "失败" }}
-          </span>
-        </div>
-        <p v-if="curriculumError" class="curriculum-error" role="alert">{{ curriculumError }}</p>
-
-        <div v-if="isLoadingCurriculum" class="curriculum-empty">
-          <LoaderCircle class="spin-icon" :size="20" />
-          <span>正在读取课标列表</span>
-        </div>
-        <div v-else-if="curriculumFiles.length" class="curriculum-file-list">
-          <div v-for="item in curriculumFiles" :key="item.source" class="curriculum-file-row">
-            <div class="curriculum-file-icon" aria-hidden="true"><FileText :size="20" /></div>
-            <div class="curriculum-file-copy">
-              <strong :title="item.source">{{ item.source }}</strong>
-              <span>{{ item.extension.replace('.', '').toUpperCase() }} · {{ item.chunk_count }} 个片段 · {{ formatCurriculumDate(item.updated_at) }}</span>
-              <small :class="`vector-status-${item.vector_status}`" :title="item.last_error">
-                {{ curriculumFileVectorLabel(item) }}
-              </small>
-              <div class="curriculum-permission-tags">
-                <span v-if="!item.allowed_expert_ids.length" class="permission-unassigned">尚未授权专家</span>
-                <span v-for="expertId in item.allowed_expert_ids" :key="expertId" class="permission-tag">
-                  {{ expertName(expertId) }}
-                </span>
-              </div>
-              <div v-if="permissionEditingSource === item.source" class="curriculum-permission-editor">
-                <label v-for="expert in experts" :key="expert.id">
-                  <input v-model="permissionDraftExpertIds" type="checkbox" :value="expert.id" />
-                  <span>{{ expert.name }} · {{ expert.role }}</span>
-                </label>
-                <div class="curriculum-permission-actions">
-                  <button class="primary-button compact" type="button" :disabled="savingPermissionSource === item.source" @click="saveCurriculumPermissions(item)">
-                    {{ savingPermissionSource === item.source ? "保存中" : "保存权限" }}
-                  </button>
-                  <button class="ghost-button compact" type="button" :disabled="savingPermissionSource === item.source" @click="closePermissionEditor">取消</button>
-                </div>
-              </div>
-            </div>
-            <button
-              v-if="currentUser?.is_admin"
-              class="ghost-button compact"
-              type="button"
-              :disabled="isUploadingCurriculum"
-              @click="openPermissionEditor(item)"
-            >
-              配置权限
-            </button>
-            <button
-              v-if="currentUser?.is_admin"
-              class="reference-delete-button"
-              type="button"
-              :disabled="deletingCurriculumSources.includes(item.source) || isUploadingCurriculum"
-              :title="`删除 ${item.source}`"
-              :aria-label="`删除 ${item.source}`"
-              @click="removeCurriculumSource(item)"
-            >
-              <LoaderCircle v-if="deletingCurriculumSources.includes(item.source)" class="spin-icon" :size="14" />
-              <X v-else :size="18" />
-            </button>
-          </div>
-        </div>
-        <div v-else class="curriculum-empty">
-          <BookOpen :size="24" />
-          <span>当前还没有导入课标</span>
-        </div>
-
-        <section v-if="currentUser?.is_admin" class="curriculum-retrieval-section">
-          <div class="curriculum-section-head">
-            <div>
-              <History :size="18" />
-              <strong>最近召回</strong>
-            </div>
-            <button
-              class="icon-button compact"
-              type="button"
-              title="刷新召回记录"
-              aria-label="刷新召回记录"
-              :disabled="isLoadingCurriculumAdmin"
-              @click="refreshCurriculumAdminData"
-            >
-              <RefreshCw :size="15" />
-            </button>
-          </div>
-          <div v-if="curriculumRetrievals.length" class="curriculum-retrieval-list">
-            <details v-for="record in curriculumRetrievals" :key="record.id" class="curriculum-retrieval-row">
-              <summary>
-                <span>{{ record.query || '空查询' }}</span>
-                <small>{{ retrievalModeLabel(record.mode) }} · {{ formatCurriculumDate(record.created_at) }}</small>
-              </summary>
-              <p v-if="record.vector_error" class="curriculum-retrieval-warning">{{ record.vector_error }}</p>
-              <div v-if="record.records.length" class="curriculum-hit-list">
-                <article v-for="hit in record.records" :key="`${record.id}-${hit.chunk_id}`">
-                  <strong>{{ hit.source }} · 片段 {{ hit.source_index }}</strong>
-                  <span>综合 {{ formatScore(hit.score) }} · 余弦相似度 {{ formatScore(hit.vector_score) }} · BM25 原始分 {{ formatScore(hit.bm25_score) }}</span>
-                  <p>{{ hit.content }}</p>
-                </article>
-              </div>
-              <p v-else class="curriculum-retrieval-warning">本次没有命中课标片段。</p>
-            </details>
-          </div>
-          <div v-else class="curriculum-retrieval-empty">当前还没有课标召回记录</div>
-        </section>
-      </section>
-    </div>
-
     <!-- New Session Modal -->
     <div v-if="showNewSessionModal" class="modal-overlay" @click.self="showNewSessionModal = false">
       <div class="modal-content glass">
@@ -590,16 +398,19 @@ import AuthPanel from "@/components/AuthPanel.vue";
 import AppHeader from "@/components/AppHeader.vue";
 import ChatComposer from "@/components/ChatComposer.vue";
 import ConversationPanel from "@/components/ConversationPanel.vue";
-import CurriculumModal from "@/components/CurriculumModal.vue";
 import DocumentWorkbench from "@/components/DocumentWorkbench.vue";
 import DraftReviewOverlay from "@/components/DraftReviewOverlay.vue";
+import KnowledgeConfigCenterModal from "@/components/KnowledgeConfigCenterModal.vue";
 import KnowledgeGraphPanel from "@/components/KnowledgeGraphPanel.vue";
-import KnowledgeGraphAdminModal from "@/components/KnowledgeGraphAdminModal.vue";
 import WorkspaceSidebar from "@/components/WorkspaceSidebar.vue";
-import { BookOpen, Database, Download, FileText, History, LoaderCircle, RefreshCw, Upload, X } from "lucide-vue-next";
 import {
   createSession,
+  createKnowledgeGraphEntity,
+  createKnowledgeGraphRelation,
   deleteCurriculumFile,
+  deleteKnowledgeGraph,
+  deleteKnowledgeGraphEntity,
+  deleteKnowledgeGraphRelation,
   downloadCurriculumBundle,
   deleteSession,
   deleteSessionFile,
@@ -613,6 +424,7 @@ import {
   getCurriculumStatus,
   getKnowledgeGraphCandidates,
   getKnowledgeGraphAdmin,
+  getKnowledgeGraphNeighbors,
   exportSession,
   getFlows,
   getMessages,
@@ -621,13 +433,16 @@ import {
   getSessions,
   logoutUser,
   importCurriculumBundle,
+  importKnowledgeGraphJson,
+  previewKnowledgeGraphImport,
   rebuildCurriculumVectors,
   rollbackSession,
   saveDraft,
   setDraftMode,
   streamChat,
   updateCurriculumPermissions,
-  updateKnowledgeGraphEntityRagSources,
+  updateKnowledgeGraphEntity,
+  updateKnowledgeGraphRelation,
   uploadCurriculumFile,
   uploadSessionFile,
 } from "@/api";
@@ -644,6 +459,7 @@ import type {
   FlowStage,
   GraphSelectionPayload,
   KnowledgeGraphPayload,
+  KnowledgeGraphImportPreview,
   MessageItem,
   SessionDetail,
   SessionFileItem,
@@ -690,8 +506,6 @@ const rightSidebarVisible = ref(true);
 const feedRef = ref<HTMLElement | null>(null);
 const chatInputRef = ref<HTMLTextAreaElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
-const curriculumFileInputRef = ref<HTMLInputElement | null>(null);
-const curriculumBundleInputRef = ref<HTMLInputElement | null>(null);
 const curriculumModalRef = ref<any>(null);
 const draftEditorRef = ref<HTMLTextAreaElement | null>(null);
 const reviewPreviewRef = ref<HTMLElement | null>(null);
@@ -717,10 +531,10 @@ const curriculumUploadResults = ref<Array<{
   status: "pending" | "success" | "failed";
   message: string;
 }>>([]);
-const showKnowledgeGraphPanel = ref(false);
 const showGraphInRightPanel = ref(false);
-const showGraphAdminModal = ref(false);
 const isSavingGraphNode = ref(false);
+const isImportingGraphJson = ref(false);
+const graphImportPreview = ref<KnowledgeGraphImportPreview | null>(null);
 const graphAdminData = ref<KnowledgeGraphPayload>({
   entities: [],
   relations: [],
@@ -735,6 +549,15 @@ const knowledgeGraph = ref<KnowledgeGraphPayload>({
   recommended_path_ids: [],
 });
 const selectedGraphEntityIds = ref<string[]>([]);
+const selectedGraphRelationId = ref("");
+const expandedGraphCache = ref(new Map<string, KnowledgeGraphPayload>());
+const isExpandingGraphNode = ref(false);
+const expandingGraphEntityId = ref("");
+const knowledgeGraphLayoutRevision = ref(0);
+const lastKnowledgeGraphExpansion = ref<{ sourceId: string; addedEntityIds: string[]; revision: number } | null>(null);
+let knowledgeGraphRequestGeneration = 0;
+let knowledgeGraphCandidateController: AbortController | null = null;
+let knowledgeGraphExpansionController: AbortController | null = null;
 const currentDraftCursorLine = ref(1);
 const draftEditorScrollTop = ref(0);
 const draftEditorMeasureWidth = ref(0);
@@ -749,7 +572,7 @@ let draftMeasureCanvas: HTMLCanvasElement | null = null;
 const showNewSessionModal = ref(false);
 
 function resetKnowledgeGraphState() {
-  showKnowledgeGraphPanel.value = false;
+  cancelKnowledgeGraphRequests();
   isLoadingKnowledgeGraph.value = false;
   knowledgeGraph.value = {
     entities: [],
@@ -758,6 +581,12 @@ function resetKnowledgeGraphState() {
     recommended_path_ids: [],
   };
   selectedGraphEntityIds.value = [];
+  selectedGraphRelationId.value = "";
+  expandedGraphCache.value = new Map();
+  isExpandingGraphNode.value = false;
+  expandingGraphEntityId.value = "";
+  knowledgeGraphLayoutRevision.value += 1;
+  lastKnowledgeGraphExpansion.value = null;
 }
 
 function applyTheme(mode: "dark" | "light") {
@@ -1429,30 +1258,28 @@ async function refreshCurriculumAdminData() {
   isLoadingCurriculumAdmin.value = false;
 }
 
+async function refreshGraphAdminData() {
+  if (!currentUser.value?.is_admin) return;
+  graphAdminData.value = await getKnowledgeGraphAdmin();
+}
+
 async function openCurriculumPanel() {
   showCurriculumModal.value = true;
   curriculumUploadResults.value = [];
-  await Promise.all([refreshCurriculumFiles(), refreshCurriculumAdminData()]);
+  graphImportPreview.value = null;
+  await Promise.all([refreshCurriculumFiles(), refreshCurriculumAdminData(), refreshGraphAdminData()]);
 }
 
 function openCurriculumFilePicker() {
   if (!currentUser.value?.is_admin || isUploadingCurriculum.value) {
     return;
   }
-  if (curriculumModalRef.value?.openFilePicker) {
-    curriculumModalRef.value.openFilePicker();
-    return;
-  }
-  curriculumFileInputRef.value?.click();
+  curriculumModalRef.value?.openFilePicker?.();
 }
 
 function openCurriculumBundlePicker() {
   if (!currentUser.value?.is_admin || curriculumAdminOperation.value) return;
-  if (curriculumModalRef.value?.openBundlePicker) {
-    curriculumModalRef.value.openBundlePicker();
-    return;
-  }
-  curriculumBundleInputRef.value?.click();
+  curriculumModalRef.value?.openBundlePicker?.();
 }
 
 async function importCurriculumFiles(files: File[]) {
@@ -1890,44 +1717,265 @@ async function openKnowledgeGraphPanel() {
     return;
   }
   const message = chatInput.value.trim();
+  knowledgeGraphCandidateController?.abort();
+  knowledgeGraphExpansionController?.abort();
+  isExpandingGraphNode.value = false;
+  expandingGraphEntityId.value = "";
+  const requestGeneration = ++knowledgeGraphRequestGeneration;
+  const controller = new AbortController();
+  knowledgeGraphCandidateController = controller;
   showGraphInRightPanel.value = true;
   isLoadingKnowledgeGraph.value = true;
   streamWarning.value = "";
   try {
-    const graph = await getKnowledgeGraphCandidates(currentSession.value.id, message, selectedExpertId.value || undefined);
+    const graph = await getKnowledgeGraphCandidates(currentSession.value.id, message, selectedExpertId.value || undefined, controller.signal);
+    if (requestGeneration !== knowledgeGraphRequestGeneration) return;
     knowledgeGraph.value = graph;
     selectedGraphEntityIds.value = [];
+    selectedGraphRelationId.value = "";
+    expandedGraphCache.value = new Map();
+    knowledgeGraphLayoutRevision.value += 1;
+    lastKnowledgeGraphExpansion.value = null;
     statusText.value = graph.entities.length ? "已生成局部知识图谱，请选择回答节点" : "没有找到相关图谱关系";
   } catch (error: any) {
+    if (error?.name === "AbortError" || requestGeneration !== knowledgeGraphRequestGeneration) return;
     streamWarning.value = error.message || String(error);
     statusText.value = "知识图谱解析失败";
   } finally {
-    isLoadingKnowledgeGraph.value = false;
+    if (requestGeneration === knowledgeGraphRequestGeneration) isLoadingKnowledgeGraph.value = false;
   }
 }
 
 async function openGraphAdmin() {
   if (!currentUser.value?.is_admin) return;
   try {
-    graphAdminData.value = await getKnowledgeGraphAdmin();
-    showGraphAdminModal.value = true;
+    showCurriculumModal.value = true;
+    graphImportPreview.value = null;
+    await Promise.all([refreshCurriculumFiles(), refreshCurriculumAdminData(), refreshGraphAdminData()]);
   } catch (error: any) {
     streamWarning.value = error.message || String(error);
   }
 }
 
-async function saveGraphNodeSources(entityId: string, sources: string[]) {
+function mergeKnowledgeGraph(base: KnowledgeGraphPayload, addition: KnowledgeGraphPayload): { graph: KnowledgeGraphPayload; addedEntityIds: string[] } {
+  const entityMap = new Map(base.entities.map((entity) => [entity.id, entity]));
+  const addedEntityIds = addition.entities.filter((entity) => !entityMap.has(entity.id)).map((entity) => entity.id);
+  for (const entity of addition.entities) {
+    entityMap.set(entity.id, entity);
+  }
+  const relationMap = new Map(base.relations.map((relation) => [relation.id, relation]));
+  for (const relation of addition.relations) {
+    relationMap.set(relation.id, relation);
+  }
+  const pathMap = new Map(base.paths.map((path) => [path.id, path]));
+  for (const path of addition.paths) {
+    pathMap.set(path.id, path);
+  }
+  return {
+    addedEntityIds,
+    graph: {
+      ...base,
+    entities: Array.from(entityMap.values()),
+    relations: Array.from(relationMap.values()),
+    paths: Array.from(pathMap.values()),
+    recommended_path_ids: Array.from(new Set([...base.recommended_path_ids, ...addition.recommended_path_ids])),
+    },
+  };
+}
+
+async function focusKnowledgeGraphNode(entityId: string) {
+  if (!entityId || isExpandingGraphNode.value) return;
+  const requestGeneration = knowledgeGraphRequestGeneration;
+  const cacheKey = `${entityId}:1`;
+  const cached = expandedGraphCache.value.get(cacheKey);
+  if (cached) {
+    const merged = mergeKnowledgeGraph(knowledgeGraph.value, cached);
+    knowledgeGraph.value = merged.graph;
+    lastKnowledgeGraphExpansion.value = { sourceId: entityId, addedEntityIds: merged.addedEntityIds, revision: requestGeneration };
+    statusText.value = "已切换到缓存中的图谱邻域";
+    return;
+  }
+  isExpandingGraphNode.value = true;
+  expandingGraphEntityId.value = entityId;
+  const controller = new AbortController();
+  knowledgeGraphExpansionController = controller;
+  try {
+    const neighbors = await getKnowledgeGraphNeighbors(entityId, 1, controller.signal);
+    if (requestGeneration !== knowledgeGraphRequestGeneration) return;
+    const nextCache = new Map(expandedGraphCache.value);
+    nextCache.set(cacheKey, neighbors);
+    expandedGraphCache.value = nextCache;
+    const merged = mergeKnowledgeGraph(knowledgeGraph.value, neighbors);
+    knowledgeGraph.value = merged.graph;
+    lastKnowledgeGraphExpansion.value = { sourceId: entityId, addedEntityIds: merged.addedEntityIds, revision: requestGeneration };
+    statusText.value = neighbors.entities.length ? "已展开节点邻域" : "该节点暂无更多邻接关系";
+  } catch (error: any) {
+    if (error?.name === "AbortError" || requestGeneration !== knowledgeGraphRequestGeneration) return;
+    streamWarning.value = error.message || String(error);
+  } finally {
+    if (requestGeneration === knowledgeGraphRequestGeneration) {
+      isExpandingGraphNode.value = false;
+      expandingGraphEntityId.value = "";
+    }
+  }
+}
+
+function cancelKnowledgeGraphRequests() {
+  knowledgeGraphRequestGeneration += 1;
+  knowledgeGraphCandidateController?.abort();
+  knowledgeGraphExpansionController?.abort();
+  knowledgeGraphCandidateController = null;
+  knowledgeGraphExpansionController = null;
+}
+
+function upsertGraphEntity(entity: any) {
+  graphAdminData.value = {
+    ...graphAdminData.value,
+    entities: [
+      entity,
+      ...graphAdminData.value.entities.filter((item) => item.id !== entity.id),
+    ].sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN")),
+  };
+}
+
+function upsertGraphRelation(relation: any) {
+  graphAdminData.value = {
+    ...graphAdminData.value,
+    relations: [
+      relation,
+      ...graphAdminData.value.relations.filter((item) => item.id !== relation.id),
+    ].sort((a, b) => a.id.localeCompare(b.id)),
+  };
+}
+
+async function saveGraphEntity(payload: Record<string, unknown>) {
   if (!currentUser.value?.is_admin || isSavingGraphNode.value) return;
   isSavingGraphNode.value = true;
   try {
-    const savedSources = await updateKnowledgeGraphEntityRagSources(entityId, sources);
-    const entity = graphAdminData.value.entities.find((item) => item.id === entityId);
-    if (entity) entity.rag_sources = savedSources;
-    statusText.value = "节点知识库配置已保存";
+    const entityId = String(payload.id || "");
+    const existing = entityId
+      ? graphAdminData.value.entities.find((entity) => entity.id === entityId)
+      : null;
+    const saved = existing
+      ? await updateKnowledgeGraphEntity(entityId, payload as any)
+      : await createKnowledgeGraphEntity(payload as any);
+    upsertGraphEntity(saved);
+    statusText.value = "图谱节点已保存";
   } catch (error: any) {
     streamWarning.value = error.message || String(error);
   } finally {
     isSavingGraphNode.value = false;
+  }
+}
+
+async function deleteGraphEntity(entityId: string, relationCount: number) {
+  if (!currentUser.value?.is_admin || isSavingGraphNode.value) return;
+  const suffix = relationCount ? `，并同步删除 ${relationCount} 条相关关系` : "";
+  if (!confirm(`确认删除该图谱节点${suffix}吗？`)) return;
+  isSavingGraphNode.value = true;
+  try {
+    await deleteKnowledgeGraphEntity(entityId);
+    graphAdminData.value = {
+      ...graphAdminData.value,
+      entities: graphAdminData.value.entities.filter((entity) => entity.id !== entityId),
+      relations: graphAdminData.value.relations.filter(
+        (relation) => relation.subject_entity_id !== entityId && relation.object_entity_id !== entityId,
+      ),
+    };
+    statusText.value = "图谱节点已删除";
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+  } finally {
+    isSavingGraphNode.value = false;
+  }
+}
+
+async function deleteGraph() {
+  if (!currentUser.value?.is_admin || isSavingGraphNode.value) return;
+  const entityCount = graphAdminData.value.entities.length;
+  const relationCount = graphAdminData.value.relations.length;
+  if (!entityCount && !relationCount) return;
+  if (!confirm(`确认删除整个知识图谱吗？将删除 ${entityCount} 个节点和 ${relationCount} 条关系。`)) return;
+  isSavingGraphNode.value = true;
+  try {
+    const result = await deleteKnowledgeGraph();
+    graphAdminData.value = { entities: [], relations: [], paths: [], recommended_path_ids: [] };
+    knowledgeGraph.value = { entities: [], relations: [], paths: [], recommended_path_ids: [] };
+    selectedGraphEntityIds.value = [];
+    selectedGraphRelationId.value = "";
+    expandedGraphCache.value = new Map();
+    knowledgeGraphLayoutRevision.value += 1;
+    lastKnowledgeGraphExpansion.value = null;
+    graphImportPreview.value = null;
+    statusText.value = `图谱已删除：${result.deleted_entity_count} 个节点，${result.deleted_relation_count} 条关系`;
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+  } finally {
+    isSavingGraphNode.value = false;
+  }
+}
+
+async function saveGraphRelation(payload: Record<string, unknown>) {
+  if (!currentUser.value?.is_admin || isSavingGraphNode.value) return;
+  isSavingGraphNode.value = true;
+  try {
+    const relationId = String(payload.id || "");
+    const existing = relationId
+      ? graphAdminData.value.relations.find((relation) => relation.id === relationId)
+      : null;
+    const saved = existing
+      ? await updateKnowledgeGraphRelation(relationId, payload as any)
+      : await createKnowledgeGraphRelation(payload as any);
+    upsertGraphRelation(saved);
+    statusText.value = "图谱关系已保存";
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+  } finally {
+    isSavingGraphNode.value = false;
+  }
+}
+
+async function deleteGraphRelation(relationId: string) {
+  if (!currentUser.value?.is_admin || isSavingGraphNode.value) return;
+  if (!confirm("确认删除该图谱关系吗？")) return;
+  isSavingGraphNode.value = true;
+  try {
+    await deleteKnowledgeGraphRelation(relationId);
+    graphAdminData.value = {
+      ...graphAdminData.value,
+      relations: graphAdminData.value.relations.filter((relation) => relation.id !== relationId),
+    };
+    statusText.value = "图谱关系已删除";
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+  } finally {
+    isSavingGraphNode.value = false;
+  }
+}
+
+async function previewGraphJson(payload: unknown) {
+  if (!currentUser.value?.is_admin) return;
+  try {
+    graphImportPreview.value = await previewKnowledgeGraphImport(payload);
+    statusText.value = graphImportPreview.value.can_import ? "图谱 JSON 预览通过" : "图谱 JSON 需要调整";
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+  }
+}
+
+async function importGraphJson(payload: unknown) {
+  if (!currentUser.value?.is_admin || isImportingGraphJson.value) return;
+  if (!graphImportPreview.value?.can_import) return;
+  isImportingGraphJson.value = true;
+  try {
+    const result = await importKnowledgeGraphJson(payload);
+    await refreshGraphAdminData();
+    graphImportPreview.value = null;
+    statusText.value = `图谱已合并：新增 ${result.entity_count} 个节点、${result.relation_count} 条关系`;
+  } catch (error: any) {
+    streamWarning.value = error.message || String(error);
+  } finally {
+    isImportingGraphJson.value = false;
   }
 }
 
@@ -1938,6 +1986,10 @@ function toggleGraphEntity(entityId: string) {
   selectedGraphEntityIds.value = current.includes(entityId)
     ? current.filter((item) => item !== entityId)
     : [...current, entityId];
+}
+
+function selectGraphRelation(relationId: string) {
+  selectedGraphRelationId.value = relationId;
 }
 
 function buildGraphSelection(): GraphSelectionPayload {
@@ -1954,7 +2006,6 @@ async function sendGraphSelectedChat() {
     return;
   }
   await sendChat(buildGraphSelection());
-  showKnowledgeGraphPanel.value = false;
 }
 
 async function interruptChat() {

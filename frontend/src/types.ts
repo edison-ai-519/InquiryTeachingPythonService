@@ -111,6 +111,21 @@ export type KnowledgeGraphPayload = {
   relations: KnowledgeRelation[];
   paths: KnowledgePath[];
   recommended_path_ids: string[];
+  anchor_entity_ids?: string[];
+  truncated?: boolean;
+  total_entity_count?: number;
+  total_relation_count?: number;
+};
+
+export type KnowledgeGraphImportPreview = {
+  new_entity_count: number;
+  updated_entity_count: number;
+  new_relation_count: number;
+  updated_relation_count: number;
+  missing_sources: string[];
+  errors: string[];
+  affected_relation_ids: string[];
+  can_import: boolean;
 };
 
 export type GraphSelectionPayload = {
