@@ -39,6 +39,7 @@ EXPORT_VERSION = 3
 class CurriculumPermissionRequest(BaseModel):
     source: str = Field(min_length=1, max_length=255)
     expert_ids: list[str] = Field(default_factory=list)
+    role_category: str = Field(default="teacher", pattern="^(teacher|study_travel)$")
 
 
 def serialize_source(row: CurriculumSourceModel, allowed_expert_ids: list[str]) -> dict:
@@ -168,6 +169,7 @@ def update_curriculum_permissions(
             db,
             source,
             payload.expert_ids,
+            role_category=payload.role_category,
         )
         db.commit()
     except CurriculumFileError as exc:

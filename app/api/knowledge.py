@@ -24,7 +24,7 @@ from app.services.knowledge_graph_service import KnowledgeGraphService
 from app.services.ecology_graph_sync_service import EcologyGraphSyncService
 from app.services.globi_import_service import GlobiImportOptions, GlobiImportService
 from app.services.globi_runtime_service import GlobiRuntimeService, SUPPORTED_EXPERTS
-from app.services.session_access_service import get_owned_session
+from app.services.session_access_service import get_owned_workspace_session
 from app.workflow.flows import get_flow
 
 
@@ -35,6 +35,7 @@ class GraphCandidateRequest(BaseModel):
     session_id: str = Field(min_length=1)
     message: str = Field(default="")
     expert_id: str | None = Field(default=None, max_length=128)
+    role_category: str | None = None
 
 
 class EcologyGraphSyncRequest(BaseModel):
@@ -98,7 +99,7 @@ async def graph_candidates(
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    sess = get_owned_session(db, payload.session_id, user.id)
+    sess = get_owned_workspace_session(db, payload.session_id, user, payload.role_category)
     flow = get_flow(sess.flow_name)
     stage = (
         flow["stages"][sess.current_stage_index]
@@ -107,7 +108,7 @@ async def graph_candidates(
     )
     if (
         payload.expert_id
-        and get_agent_registry().selectable_expert(payload.expert_id) is None
+        and get_agent_registry().selectable_expert(payload.expert_id, sess.role_category) is None
     ):
         raise HTTPException(status_code=400, detail="未知或不可选择的专家 Agent")
     service = KnowledgeGraphService(db)
@@ -137,14 +138,14 @@ async def stream_graph_candidates(
     user: UserModel = Depends(get_current_user),
 ):
     """Stream local/GloBI graph progress for explicit graph refreshes."""
-    sess = get_owned_session(db, payload.session_id, user.id)
+    sess = get_owned_workspace_session(db, payload.session_id, user, payload.role_category)
     flow = get_flow(sess.flow_name)
     stage = (
         flow["stages"][sess.current_stage_index]
         if sess.current_stage_index < len(flow["stages"])
         else {}
     )
-    if payload.expert_id and get_agent_registry().selectable_expert(payload.expert_id) is None:
+    if payload.expert_id and get_agent_registry().selectable_expert(payload.expert_id, sess.role_category) is None:
         raise HTTPException(status_code=400, detail="未知或不可选择的专家 Agent")
     local_data = KnowledgeGraphService(db).find_candidate_graph(
         message=payload.message,

@@ -10,6 +10,7 @@ export type AuthUser = {
   username: string;
   is_admin: boolean;
   user_role: UserRole;
+  workspace_roles: UserRole[];
 };
 
 export type UserRole = "teacher" | "study_travel";

@@ -45,7 +45,7 @@ class AgentRegistry:
                 raise AgentRegistryError(f"Agent {agent_id} 的 capabilities 必须是列表")
             agent = AgentDefinition(
                 id=agent_id,
-                kind=kind,
+                kind=kind,  # type: ignore[arg-type]
                 name=str(item.get("name") or "").strip(),
                 role=str(item.get("role") or "").strip(),
                 description=str(item.get("description") or "").strip(),
@@ -56,6 +56,7 @@ class AgentRegistry:
                 ),
                 prompt_file=str(item.get("prompt_file") or "").strip(),
                 selectable=bool(item.get("selectable", False)),
+                role_category=str(item.get("role_category") or "teacher").strip(),
             )
             if not agent.name or not agent.role or not agent.prompt_file:
                 raise AgentRegistryError(f"Agent {agent_id} 缺少 name、role 或 prompt_file")
@@ -70,8 +71,9 @@ class AgentRegistry:
             agents[agent_id] = agent
 
         main_agents = [agent for agent in agents.values() if agent.kind == "main"]
-        if len(main_agents) != 1 or main_agents[0].id != "main_tutor":
-            raise AgentRegistryError("必须且只能配置一个 id=main_tutor 的主导师")
+        main_ids = {a.id for a in main_agents}
+        if main_ids != {"main_tutor", "study_travel_main_tutor"}:
+            raise AgentRegistryError("必须配置 main_tutor 和 study_travel_main_tutor 两个主导师")
         return agents
 
     def get(self, agent_id: str) -> AgentDefinition | None:
@@ -83,19 +85,30 @@ class AgentRegistry:
             raise AgentRegistryError(f"Agent 不存在：{agent_id}")
         return agent
 
-    def main_tutor(self) -> AgentDefinition:
+    def main_tutor(self, role_category: str = "teacher") -> AgentDefinition:
+        if role_category == "study_travel":
+            return self.require("study_travel_main_tutor")
         return self.require("main_tutor")
 
-    def experts(self) -> list[AgentDefinition]:
+    def experts(self, role_category: str | None = None) -> list[AgentDefinition]:
         return [
             agent
             for agent in self._agents.values()
-            if agent.kind == "expert" and agent.selectable
+            if agent.kind == "expert"
+            and agent.selectable
+            and (role_category is None or agent.role_category == role_category)
         ]
 
-    def selectable_expert(self, agent_id: str) -> AgentDefinition | None:
+    def selectable_expert(
+        self, agent_id: str, role_category: str | None = None
+    ) -> AgentDefinition | None:
         agent = self.get(agent_id)
-        if not agent or agent.kind != "expert" or not agent.selectable:
+        if (
+            not agent
+            or agent.kind != "expert"
+            or not agent.selectable
+            or (role_category is not None and agent.role_category != role_category)
+        ):
             return None
         return agent
 

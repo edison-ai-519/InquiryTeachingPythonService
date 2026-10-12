@@ -33,30 +33,45 @@ class CurriculumPermissionService:
         return result
 
     @staticmethod
-    def allowed_expert_ids(db: Session, source: str) -> list[str]:
-        rows = (
+    def allowed_expert_ids(
+        db: Session,
+        source: str,
+        role_category: str | None = None,
+    ) -> list[str]:
+        query = (
             db.query(CurriculumSourceAgentPermissionModel)
             .filter(CurriculumSourceAgentPermissionModel.source == source)
-            .order_by(CurriculumSourceAgentPermissionModel.agent_id.asc())
-            .all()
         )
-        return [row.agent_id for row in rows]
+        if role_category is not None:
+            query = query.filter(
+                CurriculumSourceAgentPermissionModel.role_category == role_category
+            )
+        query = query.order_by(CurriculumSourceAgentPermissionModel.agent_id.asc())
+        return [str(row.agent_id) for row in query.all()]
 
     @staticmethod
-    def allowed_sources(db: Session, expert_id: str) -> list[str]:
-        rows = (
+    def allowed_sources(
+        db: Session,
+        expert_id: str,
+        role_category: str | None = None,
+    ) -> list[str]:
+        query = (
             db.query(CurriculumSourceAgentPermissionModel)
             .filter(CurriculumSourceAgentPermissionModel.agent_id == expert_id)
-            .order_by(CurriculumSourceAgentPermissionModel.source.asc())
-            .all()
         )
-        return [row.source for row in rows]
+        if role_category is not None:
+            query = query.filter(
+                CurriculumSourceAgentPermissionModel.role_category == role_category
+            )
+        query = query.order_by(CurriculumSourceAgentPermissionModel.source.asc())
+        return [str(row.source) for row in query.all()]
 
     @staticmethod
     def permissions_by_source(db: Session) -> dict[str, list[str]]:
         result: dict[str, list[str]] = {}
         rows = (
             db.query(CurriculumSourceAgentPermissionModel)
+            .filter(CurriculumSourceAgentPermissionModel.role_category == "teacher")
             .order_by(
                 CurriculumSourceAgentPermissionModel.source.asc(),
                 CurriculumSourceAgentPermissionModel.agent_id.asc(),
@@ -64,11 +79,16 @@ class CurriculumPermissionService:
             .all()
         )
         for row in rows:
-            result.setdefault(row.source, []).append(row.agent_id)
+            result.setdefault(str(row.source), []).append(str(row.agent_id))
         return result
 
     @staticmethod
-    def replace_permissions(db: Session, source: str, expert_ids: list[str]) -> list[str]:
+    def replace_permissions(
+        db: Session,
+        source: str,
+        expert_ids: list[str],
+        role_category: str = "teacher",
+    ) -> list[str]:
         normalized = CurriculumPermissionService.validate_expert_ids(expert_ids)
         exists = (
             db.query(CurriculumSourceModel)
@@ -79,7 +99,8 @@ class CurriculumPermissionService:
             raise LookupError("知识文件不存在")
 
         db.query(CurriculumSourceAgentPermissionModel).filter(
-            CurriculumSourceAgentPermissionModel.source == source
+            CurriculumSourceAgentPermissionModel.source == source,
+            CurriculumSourceAgentPermissionModel.role_category == role_category,
         ).delete(synchronize_session=False)
         timestamp = _now_iso()
         for agent_id in normalized:
@@ -87,6 +108,7 @@ class CurriculumPermissionService:
                 CurriculumSourceAgentPermissionModel(
                     source=source,
                     agent_id=agent_id,
+                    role_category=role_category,
                     created_at=timestamp,
                 )
             )

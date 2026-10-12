@@ -90,36 +90,36 @@ export async function getSession(sessionId: string, roleCategory: RoleCategory =
   return payload.data;
 }
 
-export async function deleteSession(sessionId: string): Promise<void> {
-  await readJson<ApiEnvelope<null>>(`${API_BASE}/api/sessions/${sessionId}`, {
+export async function deleteSession(sessionId: string, roleCategory: RoleCategory): Promise<void> {
+  await readJson<ApiEnvelope<null>>(`${API_BASE}/api/sessions/${sessionId}?role_category=${roleCategory}`, {
     method: "DELETE",
   });
 }
 
-export async function getMessages(sessionId: string): Promise<MessageItem[]> {
-  const payload = await readJson<ApiEnvelope<MessageItem[]>>(`${API_BASE}/api/sessions/${sessionId}/messages`);
+export async function getMessages(sessionId: string, roleCategory: RoleCategory): Promise<MessageItem[]> {
+  const payload = await readJson<ApiEnvelope<MessageItem[]>>(`${API_BASE}/api/sessions/${sessionId}/messages?role_category=${roleCategory}`);
   return payload.data || [];
 }
 
-export async function getExperts(_roleCategory?: RoleCategory): Promise<ExpertAgentItem[]> {
+export async function getExperts(roleCategory: RoleCategory = "teacher"): Promise<ExpertAgentItem[]> {
   const payload = await readJson<ApiEnvelope<ExpertAgentItem[]>>(
-    `${API_BASE}/api/experts`,
+    `${API_BASE}/api/experts?role_category=${roleCategory}`,
   );
   return payload.data || [];
 }
 
-export async function getSessionFiles(sessionId: string): Promise<SessionFileItem[]> {
+export async function getSessionFiles(sessionId: string, roleCategory: RoleCategory): Promise<SessionFileItem[]> {
   const payload = await readJson<ApiEnvelope<SessionFileItem[]>>(
-    `${API_BASE}/api/sessions/${sessionId}/files`,
+    `${API_BASE}/api/sessions/${sessionId}/files?role_category=${roleCategory}`,
   );
   return payload.data || [];
 }
 
-export async function uploadSessionFile(sessionId: string, file: File): Promise<SessionFileItem> {
+export async function uploadSessionFile(sessionId: string, file: File, roleCategory: RoleCategory): Promise<SessionFileItem> {
   const formData = new FormData();
   formData.append("file", file);
   const payload = await readJson<ApiEnvelope<SessionFileItem>>(
-    `${API_BASE}/api/sessions/${sessionId}/files`,
+    `${API_BASE}/api/sessions/${sessionId}/files?role_category=${roleCategory}`,
     {
       method: "POST",
       body: formData,
@@ -128,9 +128,9 @@ export async function uploadSessionFile(sessionId: string, file: File): Promise<
   return payload.data;
 }
 
-export async function deleteSessionFile(sessionId: string, fileId: string): Promise<void> {
+export async function deleteSessionFile(sessionId: string, fileId: string, roleCategory: RoleCategory): Promise<void> {
   await readJson<ApiEnvelope<null>>(
-    `${API_BASE}/api/sessions/${sessionId}/files/${fileId}`,
+    `${API_BASE}/api/sessions/${sessionId}/files/${fileId}?role_category=${roleCategory}`,
     { method: "DELETE" },
   );
 }
@@ -180,8 +180,8 @@ export async function logoutUser(): Promise<void> {
   await readJson<ApiEnvelope<null>>(`${API_BASE}/api/auth/logout`, { method: "POST" });
 }
 
-export async function setDraftMode(sessionId: string, enabled: boolean): Promise<SessionDetail> {
-  const payload = await readJson<ApiEnvelope<SessionDetail>>(`${API_BASE}/api/sessions/${sessionId}/draft-mode`, {
+export async function setDraftMode(sessionId: string, enabled: boolean, roleCategory: RoleCategory): Promise<SessionDetail> {
+  const payload = await readJson<ApiEnvelope<SessionDetail>>(`${API_BASE}/api/sessions/${sessionId}/draft-mode?role_category=${roleCategory}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ enabled }),
@@ -189,9 +189,9 @@ export async function setDraftMode(sessionId: string, enabled: boolean): Promise
   return payload.data;
 }
 
-export async function getDraftProposal(sessionId: string, stageId: string): Promise<DraftProposal | null> {
+export async function getDraftProposal(sessionId: string, stageId: string, roleCategory: RoleCategory): Promise<DraftProposal | null> {
   const payload = await readJson<ApiEnvelope<DraftProposal | null>>(
-    `${API_BASE}/api/sessions/${sessionId}/draft-proposal?stage_id=${encodeURIComponent(stageId)}`,
+    `${API_BASE}/api/sessions/${sessionId}/draft-proposal?stage_id=${encodeURIComponent(stageId)}&role_category=${roleCategory}`,
   );
   return payload.data || null;
 }
@@ -200,9 +200,10 @@ export async function applyDraftProposalActions(
   sessionId: string,
   proposalId: string,
   actions: { hunk_id: string; action: "accept" | "reject" }[],
+  roleCategory: RoleCategory,
 ): Promise<DraftProposal> {
   const payload = await readJson<ApiEnvelope<DraftProposal>>(
-    `${API_BASE}/api/sessions/${sessionId}/draft-proposals/${proposalId}/actions`,
+    `${API_BASE}/api/sessions/${sessionId}/draft-proposals/${proposalId}/actions?role_category=${roleCategory}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -218,7 +219,7 @@ export async function saveDraft(
   draftContent: string,
   roleCategory: RoleCategory = "teacher"
 ): Promise<void> {
-  await readJson(`${API_BASE}/api/sessions/${sessionId}/stages/${stageId}/draft`, {
+  await readJson(`${API_BASE}/api/sessions/${sessionId}/stages/${stageId}/draft?role_category=${roleCategory}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ draft_content: draftContent, role_category: roleCategory }),
@@ -228,9 +229,10 @@ export async function saveDraft(
 export async function rollbackSession(
   sessionId: string,
   payload: { steps: number; stage_back: boolean },
+  roleCategory: RoleCategory,
 ): Promise<SessionDetail> {
   const response = await readJson<ApiEnvelope<{ session: SessionDetail }>>(
-    `${API_BASE}/api/sessions/${sessionId}/rollback`,
+    `${API_BASE}/api/sessions/${sessionId}/rollback?role_category=${roleCategory}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -240,8 +242,8 @@ export async function rollbackSession(
   return response.data.session;
 }
 
-export async function exportSession(sessionId: string): Promise<Blob> {
-  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/export`, {
+export async function exportSession(sessionId: string, roleCategory: RoleCategory): Promise<Blob> {
+  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/export?role_category=${roleCategory}`, {
     credentials: "include",
   });
   if (!response.ok) {
@@ -272,7 +274,6 @@ export type StreamChatPayload = {
   final_content?: string;
   expert_id?: string;
   draft_request_kind?: "generate" | "edit";
-  role_category?: "teacher" | "study_travel";
   selection?: DraftSelection | null;
   graph_selection?: GraphSelectionPayload | null;
 };
@@ -281,9 +282,10 @@ export async function streamChat(
   sessionId: string,
   payload: StreamChatPayload,
   handlers: StreamHandlers,
+  roleCategory: RoleCategory,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/chat`, {
+  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/chat?role_category=${roleCategory}`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -518,9 +520,9 @@ export async function importCurriculumBundle(file: File): Promise<{ source_count
   return payload.data;
 }
 
-export async function cancelChat(sessionId: string, requestId: string): Promise<boolean> {
+export async function cancelChat(sessionId: string, requestId: string, roleCategory: RoleCategory): Promise<boolean> {
   const payload = await readJson<ApiEnvelope<{ cancelled: boolean }>>(
-    `${API_BASE}/api/sessions/${sessionId}/chat/${encodeURIComponent(requestId)}/cancel`,
+    `${API_BASE}/api/sessions/${sessionId}/chat/${encodeURIComponent(requestId)}/cancel?role_category=${roleCategory}`,
     { method: "POST" },
   );
   return Boolean(payload.data?.cancelled);
@@ -529,7 +531,8 @@ export async function cancelChat(sessionId: string, requestId: string): Promise<
 export async function getKnowledgeGraphCandidates(
   sessionId: string,
   message: string,
-  expertId?: string,
+  expertId: string | undefined,
+  roleCategory: RoleCategory,
 ): Promise<KnowledgeGraphPayload> {
   const payload = await readJson<ApiEnvelope<KnowledgeGraphPayload>>(`${API_BASE}/api/knowledge/graph/candidates`, {
     method: "POST",
@@ -538,6 +541,7 @@ export async function getKnowledgeGraphCandidates(
       session_id: sessionId,
       message,
       expert_id: expertId || undefined,
+      role_category: roleCategory,
     }),
   });
   return payload.data;
@@ -548,13 +552,14 @@ export async function streamKnowledgeGraphCandidates(
   message: string,
   expertId: string,
   handlers: Pick<StreamHandlers, "graph" | "graph_progress">,
+  roleCategory: RoleCategory,
   signal?: AbortSignal,
 ): Promise<void> {
   const response = await fetch(`${API_BASE}/api/knowledge/graph/candidates/stream`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ session_id: sessionId, message, expert_id: expertId }),
+    body: JSON.stringify({ session_id: sessionId, message, expert_id: expertId, role_category: roleCategory }),
     signal,
   });
   if (!response.ok || !response.body) throw new Error(await response.text());

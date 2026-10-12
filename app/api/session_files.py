@@ -11,7 +11,7 @@ from app.core.auth import get_current_user
 from app.core.config import get_settings
 from app.db.database import get_db
 from app.db.models import SessionFileModel, UserModel
-from app.services.session_access_service import get_owned_session
+from app.services.session_access_service import get_owned_workspace_session
 from app.services.session_file_service import FileExtractionError, SessionFileService
 
 
@@ -39,10 +39,11 @@ def serialize_file(item: SessionFileModel) -> dict:
 @router.get("/{session_id}/files")
 def list_session_files(
     session_id: str,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    get_owned_session(db, session_id, user.id)
+    get_owned_workspace_session(db, session_id, user, role_category)
     files = (
         db.query(SessionFileModel)
         .filter(SessionFileModel.session_id == session_id)
@@ -59,11 +60,12 @@ def list_session_files(
 @router.post("/{session_id}/files")
 async def upload_session_file(
     session_id: str,
+    role_category: str | None = None,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    get_owned_session(db, session_id, user.id)
+    get_owned_workspace_session(db, session_id, user, role_category)
     settings = get_settings()
     file_count = (
         db.query(func.count(SessionFileModel.id))
@@ -156,10 +158,11 @@ async def upload_session_file(
 def delete_session_file(
     session_id: str,
     file_id: str,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    get_owned_session(db, session_id, user.id)
+    get_owned_workspace_session(db, session_id, user, role_category)
     record = (
         db.query(SessionFileModel)
         .filter(

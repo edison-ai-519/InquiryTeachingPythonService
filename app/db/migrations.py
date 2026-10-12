@@ -27,6 +27,10 @@ def ensure_schema_compatibility() -> None:
                 connection.execute(
                     text("ALTER TABLE sessions ADD COLUMN owner_user_id VARCHAR")
                 )
+            if "role_category" not in session_columns:
+                connection.execute(
+                    text("ALTER TABLE sessions ADD COLUMN role_category VARCHAR NOT NULL DEFAULT 'teacher'")
+                )
             connection.execute(
                 text(
                     "CREATE INDEX IF NOT EXISTS ix_sessions_owner_user_id "
@@ -34,12 +38,75 @@ def ensure_schema_compatibility() -> None:
                 )
             )
 
+        if "stage_outputs" in table_names:
+            stage_output_columns = {column["name"] for column in inspector.get_columns("stage_outputs")}
+            if "role_category" not in stage_output_columns:
+                connection.execute(
+                    text("ALTER TABLE stage_outputs ADD COLUMN role_category VARCHAR NOT NULL DEFAULT 'teacher'")
+                )
+            # 修改唯一约束（SQLite 不支持直接修改约束，需要重建表）
+            # 这里仅添加字段，唯一约束在应用层保证
+
         if "users" in table_names:
             user_columns = {column["name"] for column in inspector.get_columns("users")}
             if "is_admin" not in user_columns:
                 connection.execute(
                     text("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
                 )
+            if "user_role" not in user_columns:
+                connection.execute(
+                    text("ALTER TABLE users ADD COLUMN user_role VARCHAR NOT NULL DEFAULT 'teacher'")
+                )
+
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS user_workspace_roles (
+                    user_id VARCHAR NOT NULL,
+                    role_category VARCHAR NOT NULL,
+                    created_at VARCHAR NOT NULL,
+                    PRIMARY KEY (user_id, role_category)
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_user_workspace_roles_user_id "
+                "ON user_workspace_roles (user_id)"
+            )
+        )
+        if "users" in table_names:
+            connection.execute(
+                text(
+                    """
+                    INSERT OR IGNORE INTO user_workspace_roles (user_id, role_category, created_at)
+                    SELECT id,
+                        CASE WHEN user_role IN ('teacher', 'study_travel') THEN user_role ELSE 'teacher' END,
+                        datetime('now')
+                    FROM users
+                    """
+                )
+            )
+        if "sessions" in table_names:
+            connection.execute(
+                text(
+                    """
+                    INSERT OR IGNORE INTO user_workspace_roles (user_id, role_category, created_at)
+                    SELECT owner_user_id,
+                        CASE WHEN role_category IN ('teacher', 'study_travel') THEN role_category ELSE 'teacher' END,
+                        datetime('now')
+                    FROM sessions
+                    WHERE owner_user_id IS NOT NULL AND owner_user_id != ''
+                    """
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_sessions_owner_role_updated "
+                    "ON sessions (owner_user_id, role_category, updated_at)"
+                )
+            )
 
         if "knowledge_entities" in table_names:
             entity_columns = {
@@ -283,6 +350,7 @@ def ensure_schema_compatibility() -> None:
                 CREATE TABLE IF NOT EXISTS curriculum_source_agent_permissions (
                     source VARCHAR NOT NULL,
                     agent_id VARCHAR NOT NULL,
+                    role_category VARCHAR NOT NULL DEFAULT 'teacher',
                     created_at VARCHAR NOT NULL,
                     PRIMARY KEY (source, agent_id),
                     FOREIGN KEY(source) REFERENCES curriculum_sources(source) ON DELETE CASCADE
@@ -296,6 +364,18 @@ def ensure_schema_compatibility() -> None:
                 "ON curriculum_source_agent_permissions (agent_id)"
             )
         )
+        if "curriculum_source_agent_permissions" in table_names:
+            perm_columns = {
+                column["name"]
+                for column in inspector.get_columns("curriculum_source_agent_permissions")
+            }
+            if "role_category" not in perm_columns:
+                connection.execute(
+                    text(
+                        "ALTER TABLE curriculum_source_agent_permissions "
+                        "ADD COLUMN role_category VARCHAR NOT NULL DEFAULT 'teacher'"
+                    )
+                )
         connection.execute(
             text(
                 """
@@ -672,8 +752,8 @@ def ensure_schema_compatibility() -> None:
                 text(
                     """
                     INSERT OR IGNORE INTO curriculum_source_agent_permissions
-                        (source, agent_id, created_at)
-                    SELECT source, 'physics_teacher_agent', datetime('now')
+                        (source, agent_id, role_category, created_at)
+                    SELECT source, 'physics_teacher_agent', 'teacher', datetime('now')
                     FROM curriculum_sources
                     WHERE source = '义务教育物理课程标准（2022年版）.docx'
                     """
@@ -683,8 +763,8 @@ def ensure_schema_compatibility() -> None:
                 text(
                     """
                     INSERT OR IGNORE INTO curriculum_source_agent_permissions
-                        (source, agent_id, created_at)
-                    SELECT source, 'mathematics_teacher_agent', datetime('now')
+                        (source, agent_id, role_category, created_at)
+                    SELECT source, 'mathematics_teacher_agent', 'teacher', datetime('now')
                     FROM curriculum_sources
                     WHERE source = '义务教育数学课程标准（2022年版）.docx'
                     """

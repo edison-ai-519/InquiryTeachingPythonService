@@ -12,6 +12,8 @@
     :streaming="isStreaming"
     :sidebar-collapsed="!leftSidebarVisible"
     :theme-mode="themeMode"
+    :current-role="currentRole"
+    :workspace-roles="currentUser?.workspace_roles || []"
     @toggle-sidebar="toggleLeftSidebar"
     @toggle-theme="toggleTheme"
     @logout="logout"
@@ -850,7 +852,7 @@ async function handleRoleSwitch(role: "teacher" | "study_travel") {
 
   const [flowList, expertList] = await Promise.all([
     getFlows(role),
-    getExperts(),
+    getExperts(role),
   ]);
   flows.value = flowList;
   experts.value = expertList;
@@ -1311,7 +1313,7 @@ async function refreshDraftProposal() {
     draftWorkbenchState.value = draftContent.value.trim() ? "save_ready" : "idle";
     return;
   }
-  const proposal = await getDraftProposal(currentSession.value.id, selectedStageId.value);
+  const proposal = await getDraftProposal(currentSession.value.id, selectedStageId.value, currentRole.value);
   draftProposal.value = proposal;
   activeReviewSegmentId.value = pickInitialReviewSegmentId(proposal);
   expandedReviewSegmentIds.value = activeReviewSegmentId.value ? [activeReviewSegmentId.value] : [];
@@ -1363,7 +1365,7 @@ async function refreshWorkspace() {
   const [flowList, sessionList, expertList] = await Promise.all([
     getFlows(currentRole.value),
     getSessions(currentRole.value),
-    getExperts(),
+    getExperts(currentRole.value),
   ]);
   flows.value = flowList;
   sessions.value = sessionList;
@@ -1381,6 +1383,11 @@ async function refreshWorkspace() {
 
 async function handleAuthenticated(user: AuthUser) {
   currentUser.value = user;
+  const savedRole = localStorage.getItem("user_role") as "teacher" | "study_travel" | null;
+  currentRole.value = user.workspace_roles.includes(savedRole as "teacher" | "study_travel")
+    ? savedRole as "teacher" | "study_travel"
+    : user.workspace_roles[0] || user.user_role;
+  localStorage.setItem("user_role", currentRole.value);
   await Promise.all([refreshWorkspace(), refreshCurriculumFiles()]);
   if (sessions.value[0]) {
     await loadSession(sessions.value[0].id, true);
@@ -1442,7 +1449,7 @@ async function loadSession(
     && (preserveGraphContext || !loadMessages);
   const [session, files] = await Promise.all([
     getSession(sessionId, roleCategory as "teacher" | "study_travel"),
-    getSessionFiles(sessionId),
+    getSessionFiles(sessionId, roleCategory as "teacher" | "study_travel"),
   ]);
   if (!preserveWarning) {
     streamWarning.value = "";
@@ -1455,7 +1462,7 @@ async function loadSession(
   selectedStageId.value = pickStageIdFromSession(session);
   if (!keepGraphContext) resetKnowledgeGraphState();
   if (loadMessages) {
-    messages.value = await getMessages(sessionId);
+    messages.value = await getMessages(sessionId, roleCategory as "teacher" | "study_travel");
   }
   const restoredGraphContext = !keepGraphContext
     && loadMessages
@@ -1824,7 +1831,7 @@ async function handleFileSelection(event: Event) {
   try {
     for (const selectedFile of selectedFiles) {
       try {
-        const uploaded = await uploadSessionFile(sessionId, selectedFile);
+        const uploaded = await uploadSessionFile(sessionId, selectedFile, currentRole.value);
         if (currentSession.value?.id === sessionId) {
           sessionFiles.value = [
             ...sessionFiles.value.filter((item) => item.id !== uploaded.id),
@@ -1859,7 +1866,7 @@ async function removeReferenceFile(item: SessionFileItem) {
   deletingFileIds.value = [...deletingFileIds.value, item.id];
   fileOperationError.value = "";
   try {
-    await deleteSessionFile(sessionId, item.id);
+    await deleteSessionFile(sessionId, item.id, currentRole.value);
     if (currentSession.value?.id === sessionId) {
       sessionFiles.value = sessionFiles.value.filter((file) => file.id !== item.id);
     }
@@ -1877,7 +1884,7 @@ async function toggleDraftMode() {
     return;
   }
   try {
-    const updated = await setDraftMode(currentSession.value.id, !currentSession.value.draft_mode_enabled);
+    const updated = await setDraftMode(currentSession.value.id, !currentSession.value.draft_mode_enabled, currentRole.value);
     currentSession.value = updated;
     await nextTick();
     if (updated.draft_mode_enabled) {
@@ -1904,7 +1911,7 @@ async function handleDeleteSession() {
   }
   try {
     statusText.value = `正在删除会话《${topic}》...`;
-    await deleteSession(currentSession.value.id);
+    await deleteSession(currentSession.value.id, currentRole.value);
     sessions.value = sessions.value.filter((item) => item.id !== currentSession.value!.id);
     if (sessions.value.length > 0) {
       await loadSession(sessions.value[0].id, true);
@@ -2049,7 +2056,7 @@ async function applyDraftProposalAction(hunkId: string, action: "accept" | "reje
   }
   const updated = await applyDraftProposalActions(currentSession.value.id, draftProposal.value.id, [
     { hunk_id: hunkId, action },
-  ]);
+  ], currentRole.value);
   draftProposal.value = updated.status === "pending" ? updated : null;
   await loadSession(currentSession.value.id, false, true);
   await refreshDraftProposal();
@@ -2065,7 +2072,7 @@ async function applyAllDraftProposalActions(action: "accept" | "reject") {
   if (!actions.length) {
     return;
   }
-  const updated = await applyDraftProposalActions(currentSession.value.id, draftProposal.value.id, actions);
+  const updated = await applyDraftProposalActions(currentSession.value.id, draftProposal.value.id, actions, currentRole.value);
   draftProposal.value = updated.status === "pending" ? updated : null;
   await loadSession(currentSession.value.id, false, true);
   await refreshDraftProposal();
@@ -2110,7 +2117,7 @@ async function refreshKnowledgeGraph(query: string, expertId: string, sessionId:
         selectedGraphRelationIds.value = recommendedPath?.relation_ids?.length ? [...recommendedPath.relation_ids] : [];
         knowledgeGraphProgress.value = { phase: "complete", percent: 100, message: "图谱加载完成" };
       },
-    });
+    }, currentRole.value);
   } catch (error: any) {
     if (requestSequence !== knowledgeGraphRequestSequence) return;
     clearKnowledgeGraphPayload();
@@ -2241,7 +2248,7 @@ async function interruptChat() {
   statusText.value = "正在停止生成，本轮内容不会保存...";
   activeStreamAbortController.value?.abort();
   try {
-    await cancelChat(sessionId, requestId);
+    await cancelChat(sessionId, requestId, currentRole.value);
   } catch {
     // The browser abort itself also closes the SSE connection and lets the backend clean up.
   }
@@ -2549,6 +2556,7 @@ async function sendChat(options: SendChatOptions = {}) {
           }
         },
       },
+      currentRole.value,
     );
   } catch (err: any) {
     if (graphRequestSequence && graphRequestSequence === knowledgeGraphRequestSequence) {
@@ -2624,6 +2632,7 @@ async function goNextStage() {
           statusText.value = "已进入下一阶段";
         },
       },
+      currentRole.value,
     );
   } finally {
     isStreaming.value = false;
@@ -2637,7 +2646,7 @@ async function goPreviousStage() {
   statusText.value = "正在回退到上一阶段...";
   isStreaming.value = true;
   try {
-    await rollbackSession(currentSession.value.id, { steps: 1, stage_back: true });
+    await rollbackSession(currentSession.value.id, { steps: 1, stage_back: true }, currentRole.value);
     await loadSession(currentSession.value.id, true);
     statusText.value = "已回到上一阶段";
   } finally {
@@ -2650,7 +2659,7 @@ async function rollbackRecent() {
     return;
   }
   statusText.value = "正在回滚最近一轮对话...";
-  await rollbackSession(currentSession.value.id, { steps: 1, stage_back: false });
+  await rollbackSession(currentSession.value.id, { steps: 1, stage_back: false }, currentRole.value);
   await loadSession(currentSession.value.id, true);
   statusText.value = "最近一轮对话已回滚";
 }
@@ -2659,11 +2668,11 @@ async function exportCurrentPlan() {
   if (!currentSession.value) {
     return;
   }
-  const blob = await exportSession(currentSession.value.id);
+  const blob = await exportSession(currentSession.value.id, currentRole.value);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${currentSession.value.topic}-探究式教案.md`;
+  anchor.download = `${currentSession.value.topic}-${currentRole.value === "study_travel" ? "研学方案" : "探究式教案"}.md`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
