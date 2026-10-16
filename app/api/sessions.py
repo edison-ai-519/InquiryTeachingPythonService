@@ -26,7 +26,10 @@ from app.schemas import (
     SessionCreate,
 )
 from app.services.draft_proposal_service import DraftProposalService
-from app.services.session_access_service import get_owned_session
+from app.services.session_access_service import (
+    get_owned_workspace_session,
+    resolve_workspace_role,
+)
 from app.services.session_file_service import SessionFileService
 from app.workflow.flows import get_flow, get_stage
 
@@ -42,7 +45,7 @@ def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-def create_stage_outputs(db: Session, session_id: str, flow_name: str) -> None:
+def create_stage_outputs(db: Session, session_id: str, flow_name: str, role_category: str = "teacher") -> None:
     flow = get_flow(flow_name)
     timestamp = now_iso()
     for index, stage in enumerate(flow["stages"]):
@@ -57,6 +60,7 @@ def create_stage_outputs(db: Session, session_id: str, flow_name: str) -> None:
                 draft_content="",
                 final_content="",
                 confirmed=0,
+                role_category=role_category,
                 created_at=timestamp,
                 updated_at=timestamp,
             )
@@ -72,6 +76,7 @@ def serialize_session(sess: SessionModel, db: Session) -> dict:
     outputs = (
         db.query(StageOutputModel)
         .filter(StageOutputModel.session_id == sess.id)
+        .filter(StageOutputModel.role_category == sess.role_category)
         .order_by(StageOutputModel.order_index.asc())
         .all()
     )
@@ -85,6 +90,7 @@ def serialize_session(sess: SessionModel, db: Session) -> dict:
         "current_stage": current_stage,
         "status": sess.status,
         "draft_mode_enabled": bool(sess.draft_mode_enabled),
+        "role_category": sess.role_category,
         "outputs": [
             {
                 "stage_id": item.stage_id,
@@ -110,6 +116,10 @@ def create_session(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+    role_category = resolve_workspace_role(db, user, payload.role_category)
+    if flow.get("role_category", "teacher") != role_category:
+        raise HTTPException(status_code=400, detail="Flow does not belong to workspace")
+
     timestamp = now_iso()
     session_id = new_id("sess")
     sess = SessionModel(
@@ -121,11 +131,12 @@ def create_session(
         current_stage_index=0,
         status="active",
         draft_mode_enabled=0,
+        role_category=role_category,
         created_at=timestamp,
         updated_at=timestamp,
     )
     db.add(sess)
-    create_stage_outputs(db, session_id, payload.flow_name)
+    create_stage_outputs(db, session_id, payload.flow_name, role_category)
     db.commit()
     return {
         "code": 0,
@@ -143,13 +154,16 @@ def create_session(
 
 @router.get("")
 def list_sessions(
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     limit: int = 20,
     user: UserModel = Depends(get_current_user),
 ):
+    role_category = resolve_workspace_role(db, user, role_category)
     sessions = (
         db.query(SessionModel)
         .filter(SessionModel.owner_user_id == user.id)
+        .filter(SessionModel.role_category == role_category)
         .order_by(SessionModel.updated_at.desc())
         .limit(max(1, min(limit, 100)))
         .all()
@@ -177,20 +191,22 @@ def list_sessions(
 @router.get("/{session_id}")
 def get_session(
     session_id: str,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    sess = get_owned_session(db, session_id, user.id)
+    sess = get_owned_workspace_session(db, session_id, user, role_category)
     return {"code": 0, "message": "success", "data": serialize_session(sess, db)}
 
 
 @router.delete("/{session_id}")
 def delete_session(
     session_id: str,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    sess = get_owned_session(db, session_id, user.id)
+    sess = get_owned_workspace_session(db, session_id, user, role_category)
 
     # Cascade delete all related data to keep DB clean
     db.query(StageOutputModel).filter(
@@ -212,10 +228,11 @@ def delete_session(
 @router.get("/{session_id}/messages")
 def get_messages(
     session_id: str,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    get_owned_session(db, session_id, user.id)
+    get_owned_workspace_session(db, session_id, user, role_category)
     messages = (
         db.query(MessageModel)
         .filter(MessageModel.session_id == session_id)
@@ -255,10 +272,11 @@ def get_messages(
 def select_flow(
     session_id: str,
     payload: SelectFlowRequest,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    get_owned_session(db, session_id, user.id)
+    get_owned_workspace_session(db, session_id, user, role_category)
     raise HTTPException(
         status_code=409,
         detail="流程不可修改，请新建会话",
@@ -269,10 +287,11 @@ def select_flow(
 def confirm_stage(
     session_id: str,
     payload: ConfirmStageRequest,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    sess = get_owned_session(db, session_id, user.id)
+    sess = get_owned_workspace_session(db, session_id, user, role_category)
     flow = get_flow(sess.flow_name)
     if sess.current_stage_index >= len(flow["stages"]):
         raise HTTPException(status_code=400, detail="Workflow already completed")
@@ -283,6 +302,7 @@ def confirm_stage(
         .filter(
             StageOutputModel.session_id == session_id,
             StageOutputModel.stage_id == stage["id"],
+            StageOutputModel.role_category == sess.role_category,
         )
         .first()
     )
@@ -312,10 +332,11 @@ def confirm_stage(
 def set_draft_mode(
     session_id: str,
     payload: DraftModeRequest,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    sess = get_owned_session(db, session_id, user.id)
+    sess = get_owned_workspace_session(db, session_id, user, role_category)
 
     sess.draft_mode_enabled = 1 if payload.enabled else 0
     sess.updated_at = now_iso()
@@ -328,10 +349,11 @@ def set_draft_mode(
 def get_draft_proposal(
     session_id: str,
     stage_id: str,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    get_owned_session(db, session_id, user.id)
+    sess = get_owned_workspace_session(db, session_id, user, role_category)
     proposal = DraftProposalService.get_active_proposal(db, session_id, stage_id)
     return {
         "code": 0,
@@ -345,10 +367,11 @@ def apply_draft_proposal_actions(
     session_id: str,
     proposal_id: str,
     payload: DraftProposalActionRequest,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    get_owned_session(db, session_id, user.id)
+    sess = get_owned_workspace_session(db, session_id, user, role_category)
     proposal = (
         db.query(DraftProposalModel)
         .filter(
@@ -365,6 +388,7 @@ def apply_draft_proposal_actions(
         .filter(
             StageOutputModel.session_id == session_id,
             StageOutputModel.stage_id == proposal.stage_id,
+            StageOutputModel.role_category == sess.role_category,
         )
         .first()
     )
@@ -387,10 +411,11 @@ def apply_draft_proposal_actions(
 def rollback(
     session_id: str,
     payload: RollbackRequest,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    sess = get_owned_session(db, session_id, user.id)
+    sess = get_owned_workspace_session(db, session_id, user, role_category)
 
     if payload.stage_back:
         sess.current_stage_index = max(0, sess.current_stage_index - 1)
@@ -401,6 +426,7 @@ def rollback(
             .filter(
                 StageOutputModel.session_id == session_id,
                 StageOutputModel.stage_id == stage["id"],
+                StageOutputModel.role_category == sess.role_category,
             )
             .first()
         )
@@ -449,6 +475,7 @@ def rollback(
                     .filter(
                         StageOutputModel.session_id == session_id,
                         StageOutputModel.stage_id == stage_id,
+                        StageOutputModel.role_category == sess.role_category,
                     )
                     .first()
                 )
@@ -488,15 +515,19 @@ def update_stage_draft(
     session_id: str,
     stage_id: str,
     payload: DraftUpdateRequest,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    get_owned_session(db, session_id, user.id)
+    sess = get_owned_workspace_session(db, session_id, user, role_category)
+    if role_category is not None and payload.role_category != role_category:
+        raise HTTPException(status_code=404, detail="Session not found")
     output = (
         db.query(StageOutputModel)
         .filter(
             StageOutputModel.session_id == session_id,
             StageOutputModel.stage_id == stage_id,
+            StageOutputModel.role_category == sess.role_category,
         )
         .first()
     )

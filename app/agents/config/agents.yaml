@@ -12,6 +12,7 @@ agents:
       - stage_summary
     prompt_file: prompts/main_tutor.md
     selectable: false
+    role_category: teacher
 
   - id: insect_agent
     kind: expert
@@ -25,6 +26,7 @@ agents:
       - non_intrusive_guidance
     prompt_file: prompts/experts/insect.md
     selectable: true
+    role_category: teacher
 
   - id: nature_agent
     kind: expert
@@ -37,6 +39,7 @@ agents:
       - plant_soil_water_analysis
     prompt_file: prompts/experts/nature_ecology.md
     selectable: true
+    role_category: teacher
 
   - id: mathematics_teacher_agent
     kind: expert
@@ -51,6 +54,7 @@ agents:
       - data_interpretation
     prompt_file: prompts/experts/mathematics.md
     selectable: true
+    role_category: teacher
 
   - id: safety_agent
     kind: expert
@@ -64,6 +68,7 @@ agents:
       - biological_ethics
     prompt_file: prompts/experts/safety_ethics.md
     selectable: true
+    role_category: teacher
 
   - id: physics_teacher_agent
     kind: expert
@@ -78,3 +83,60 @@ agents:
       - physics_explanation
     prompt_file: prompts/experts/physics.md
     selectable: true
+    role_category: teacher
+
+  - id: study_travel_main_tutor
+    kind: main
+    name: 研学主导师 Agent
+    role: 研学基地培训主导师
+    description: 负责研学基地培训完整流程引导、阶段推进、方案生成与编辑。
+    capabilities:
+      - study_flow_guidance
+      - study_coaching
+      - plan_generation
+      - plan_editing
+    prompt_file: prompts/study_travel_main_tutor.md
+    selectable: false
+    role_category: study_travel
+
+  - id: village_secretary_agent
+    kind: expert
+    name: 村书记 Agent
+    role: 乡村资源协调专家
+    description: 乡村资源介绍、在地知识、人员协调、文化背景。
+    capabilities:
+      - local_resources
+      - community_coordination
+      - cultural_context
+      - field_site_info
+    prompt_file: prompts/experts/village_secretary.md
+    selectable: true
+    role_category: study_travel
+
+  - id: study_travel_planner_agent
+    kind: expert
+    name: 研学策划 Agent
+    role: 研学课程设计专家
+    description: 研学课程设计、活动流程安排、时间规划、跨学科整合。
+    capabilities:
+      - itinerary_design
+      - activity_planning
+      - cross_subject_integration
+      - schedule_optimization
+    prompt_file: prompts/experts/study_travel_planner.md
+    selectable: true
+    role_category: study_travel
+
+  - id: base_manager_agent
+    kind: expert
+    name: 研学基地负责人 Agent
+    role: 基地运营专家
+    description: 基地设施介绍、场地安排、接待能力、后勤保障。
+    capabilities:
+      - facility_info
+      - logistics_support
+      - capacity_planning
+      - booking_coordination
+    prompt_file: prompts/experts/base_manager.md
+    selectable: true
+    role_category: study_travel

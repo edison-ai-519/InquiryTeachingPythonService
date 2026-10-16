@@ -19,7 +19,7 @@
     <div v-else class="header-context header-context-empty">创建一个课题，开始协同设计</div>
 
     <div class="header-actions">
-      <div class="role-switcher">
+      <div v-if="workspaceRoles.length > 1" class="role-switcher">
         <button
           :class="{ active: currentRole === 'teacher' }"
           @click="switchRole('teacher')"
@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { ChevronDown, GraduationCap, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Sun } from "lucide-vue-next";
 import ExpertSelector from "@/components/ExpertSelector.vue";
 import type { AuthUser, ExpertAgentItem, FlowStage, SessionDetail, UserRole } from "@/types";
@@ -64,6 +64,8 @@ const props = defineProps<{
   streaming: boolean;
   sidebarCollapsed: boolean;
   themeMode: 'light' | 'dark';
+  currentRole: UserRole;
+  workspaceRoles: UserRole[];
 }>();
 
 const emit = defineEmits<{
@@ -75,18 +77,13 @@ const emit = defineEmits<{
   'switch-role': [role: UserRole];
 }>();
 
-const currentRole = ref<UserRole>(
-  (localStorage.getItem('user_role') as UserRole) || 'teacher'
-);
-
 function switchRole(role: UserRole) {
-  currentRole.value = role;
-  localStorage.setItem('user_role', role);
+  if (!props.workspaceRoles.includes(role)) return;
   emit('switch-role', role);
 }
 
 const labels = computed(() => {
-  if (currentRole.value === "study_travel") {
+  if (props.currentRole === "study_travel") {
     return {
       brandTitle: "研学基地工作台",
       brandSubtitle: "Study Travel Studio",

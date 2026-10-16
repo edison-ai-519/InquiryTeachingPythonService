@@ -15,6 +15,7 @@ class AgentDefinition:
     capabilities: tuple[str, ...]
     prompt_file: str
     selectable: bool = False
+    role_category: str = "teacher"
 
     def public_dict(self) -> dict:
         return {
@@ -23,4 +24,5 @@ class AgentDefinition:
             "role": self.role,
             "description": self.description,
             "capabilities": list(self.capabilities),
+            "role_category": self.role_category,
         }

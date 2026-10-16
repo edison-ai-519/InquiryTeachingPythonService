@@ -126,19 +126,25 @@ class LLMService:
     async def _mock_guide_stream(system_prompt: str, new_message: str):
         stage_name = LLMService._between(system_prompt, "【当前阶段】", "\n") or "当前阶段"
         stage_goal = LLMService._between(system_prompt, "【阶段目标】", "\n\n") or "阶段目标"
-        selection_text = LLMService._between(system_prompt, "【教师当前选中的草案内容】", "【本轮教师输入】")
+
+        is_study_travel = "研学" in system_prompt or "基地人员" in system_prompt
+        user_label = "基地老师" if is_study_travel else "老师"
+        selection_label = "【基地人员当前选中的草案内容】" if is_study_travel else "【教师当前选中的草案内容】"
+        input_label = "【本轮基地人员输入】" if is_study_travel else "【本轮教师输入】"
+        selection_text = LLMService._between(system_prompt, selection_label, input_label)
+
         if selection_text and selection_text != "本轮无选区。":
             guide_hint = "我会先围绕你选中的这段内容来推进，重点看它和当前阶段目标是否对齐、还缺少哪些证据或追问。"
             full_reply = (
-                f"【主导师 Agent】：老师，我收到你的想法：“{new_message}”。\n\n"
+                f"【主导师 Agent】：{user_label}，我收到你的想法：“{new_message}”。\n\n"
                 f"你刚刚选中的这段内容很关键。站在“{stage_name}”这一阶段，我们要先把它和{stage_goal}更紧地扣在一起。\n\n"
                 f"{guide_hint}\n\n"
-                "你可以继续补充这段想解决的课堂问题、学生反应或你最担心的地方，我会继续围绕这段帮你收紧。"
+                "你可以继续补充这段想解决的问题、学生反应或你最担心的地方，我会继续围绕这段帮你收紧。"
             )
         else:
             guide_hint = "你可以先补充一个更具体的课堂情境，或者说明希望学生优先观察什么现象。"
             full_reply = (
-                f"【主导师 Agent】：老师，我收到你的想法：“{new_message}”。\n\n"
+                f"【主导师 Agent】：{user_label}，我收到你的想法：“{new_message}”。\n\n"
                 f"站在“{stage_name}”这一阶段，我们要先把{stage_goal}落到可观察、可追问、可推进的课堂动作上。\n\n"
                 f"{guide_hint}\n\n"
                 "你可以继续补充课堂材料、学生已有基础或预期现象，我会继续帮你把方向收紧。"
@@ -153,15 +159,29 @@ class LLMService:
         stage_name = LLMService._between(system_prompt, "【当前阶段】", "\n") or "当前阶段"
         stage_goal = LLMService._between(system_prompt, "【阶段目标】", "\n\n") or "阶段目标"
 
-        draft = (
-            f"### {stage_name}设计草案\n\n"
-            f"**阶段目标**：{stage_goal}\n\n"
-            f"**流程引导承接**：基于教师输入“{new_message}”继续推进课堂设计。\n\n"
-            "1. **核心活动**：围绕教师提出的课堂设想，设计一个学生能够直接观察、讨论并形成证据的探究活动。\n"
-            "2. **教学意图与探究价值**：让学生从现象进入问题，再通过证据形成解释，避免直接接受结论。\n"
-            "3. **学生探究任务**：学生以小组为单位记录现象、提出猜想、整理证据，并用简短语言表达推理过程。\n"
-            "4. **草案优化提示**：如果课堂材料或学生基础发生变化，可以进一步细化变量、步骤和记录方式。"
-        )
+        is_study_travel = "研学" in system_prompt or "基地人员" in system_prompt
+
+        if is_study_travel:
+            draft = (
+                f"### {stage_name}研学方案草案\n\n"
+                f"**阶段目标**：{stage_goal}\n\n"
+                f"**流程引导承接**：基于基地人员输入“{new_message}”继续推进研学方案设计。\n\n"
+                "1. **研学目标**：围绕基地特色资源，设计一个学生能够直接观察、体验并形成认知的研学活动。\n"
+                "2. **基地接待流程**：明确接待时间、人数、分组方式、讲解路线和互动环节。\n"
+                "3. **课程设计**：结合基地资源设计跨学科课程，突出体验性和探究性。\n"
+                "4. **场地安排**：明确活动场地、设施使用、安全通道和应急集合点。\n"
+                "5. **安全预案**：识别潜在风险，制定预防措施和应急处置流程。"
+            )
+        else:
+            draft = (
+                f"### {stage_name}设计草案\n\n"
+                f"**阶段目标**：{stage_goal}\n\n"
+                f"**流程引导承接**：基于教师输入“{new_message}”继续推进课堂设计。\n\n"
+                "1. **核心活动**：围绕教师提出的课堂设想，设计一个学生能够直接观察、讨论并形成证据的探究活动。\n"
+                "2. **教学意图与探究价值**：让学生从现象进入问题，再通过证据形成解释，避免直接接受结论。\n"
+                "3. **学生探究任务**：学生以小组为单位记录现象、提出猜想、整理证据，并用简短语言表达推理过程。\n"
+                "4. **草案优化提示**：如果课堂材料或学生基础发生变化，可以进一步细化变量、步骤和记录方式。"
+            )
 
         for index in range(0, len(draft), 12):
             await asyncio.sleep(0.01)

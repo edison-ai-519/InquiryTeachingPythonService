@@ -18,6 +18,7 @@ class DraftGenerateService:
         current_draft: str,
         user_message: str,
         llm_history: list[dict],
+        role_category: str = "teacher",
     ) -> AsyncIterator[tuple[str, str]]:
         prompt = PromptService.build_draft_generate_prompt(
             topic=topic,
@@ -27,6 +28,7 @@ class DraftGenerateService:
             doc_input=doc_input,
             current_draft=current_draft,
             user_message=user_message,
+            role_category=role_category,
         )
         candidate = ""
         async for chunk in LLMService.chat_stream(

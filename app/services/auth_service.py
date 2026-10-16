@@ -9,7 +9,7 @@ from fastapi import Response
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.db.models import AuthSessionModel, SessionModel, UserModel
+from app.db.models import AuthSessionModel, SessionModel, UserModel, UserWorkspaceRoleModel
 
 
 AUTH_COOKIE_NAME = "inquiry_auth"
@@ -68,11 +68,25 @@ def verify_password(password: str, encoded: str) -> bool:
         return False
 
 
-def serialize_user(user: UserModel) -> dict:
+def workspace_roles_for_user(db: Session, user: UserModel) -> list[str]:
+    roles = [
+        str(row.role_category)
+        for row in db.query(UserWorkspaceRoleModel)
+        .filter(UserWorkspaceRoleModel.user_id == user.id)
+        .order_by(UserWorkspaceRoleModel.role_category.asc())
+        .all()
+    ]
+    return roles or [user.user_role if user.user_role in {"teacher", "study_travel"} else "teacher"]
+
+
+def serialize_user(user: UserModel, workspace_roles: list[str] | None = None) -> dict:
+    roles = workspace_roles or [user.user_role if user.user_role in {"teacher", "study_travel"} else "teacher"]
     return {
         "id": user.id,
         "username": user.username,
         "is_admin": bool(user.is_admin),
+        "user_role": user.user_role,
+        "workspace_roles": sorted(set(roles)),
     }
 
 
@@ -117,6 +131,13 @@ def register_user(
     )
     db.add(user)
     db.flush()
+    db.add(
+        UserWorkspaceRoleModel(
+            user_id=user.id,
+            role_category="teacher",
+            created_at=now_iso(),
+        )
+    )
 
     if is_first_user:
         (

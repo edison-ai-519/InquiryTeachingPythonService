@@ -41,7 +41,7 @@ from app.services.knowledge_graph_service import KnowledgeGraphService
 from app.services.llm_service import LLMService
 from app.services.prompt_service import PromptService
 from app.services.rag_service import RagService
-from app.services.session_access_service import get_owned_session
+from app.services.session_access_service import get_owned_workspace_session
 from app.workflow.flows import get_flow
 
 
@@ -59,9 +59,10 @@ def new_id(prefix: str) -> str:
 def get_current_context(
     db: Session,
     session_id: str,
-    user_id: str,
+    user: UserModel,
+    role_category: str | None,
 ) -> tuple[SessionModel, dict, dict, StageOutputModel | None]:
-    sess = get_owned_session(db, session_id, user_id)
+    sess = get_owned_workspace_session(db, session_id, user, role_category)
 
     flow = get_flow(sess.flow_name)
     if sess.current_stage_index >= len(flow["stages"]):
@@ -73,6 +74,7 @@ def get_current_context(
         .filter(
             StageOutputModel.session_id == session_id,
             StageOutputModel.stage_id == stage["id"],
+            StageOutputModel.role_category == sess.role_category,
         )
         .first()
     )
@@ -168,11 +170,15 @@ def save_chat_result(
                 )
             )
 
+        sess = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+        if not sess:
+            raise LookupError("Session not found")
         output = (
             db.query(StageOutputModel)
             .filter(
                 StageOutputModel.session_id == session_id,
                 StageOutputModel.stage_id == stage_id,
+                StageOutputModel.role_category == sess.role_category,
             )
             .first()
         )
@@ -212,7 +218,6 @@ def save_chat_result(
             )
         )
 
-        sess = db.query(SessionModel).filter(SessionModel.id == session_id).first()
         if sess:
             sess.updated_at = main_timestamp
 
@@ -244,10 +249,20 @@ def get_selection_text(payload: ChatRequest) -> str:
     return (payload.selection.selected_text or "").strip()
 
 
-def apply_stage_action(session_id: str, payload: ChatRequest, user_id: str) -> dict:
+def apply_stage_action(
+    session_id: str,
+    payload: ChatRequest,
+    user_id: str,
+    role_category: str | None,
+) -> dict:
     db = SessionLocal()
     try:
-        sess, flow, stage, stage_output = get_current_context(db, session_id, user_id)
+        user = db.query(UserModel).filter(UserModel.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        sess, flow, stage, stage_output = get_current_context(
+            db, session_id, user, role_category
+        )
         action = payload.action or "intro"
 
         if action in {"next_stage", "confirm_stage"}:
@@ -294,16 +309,19 @@ def apply_stage_action(session_id: str, payload: ChatRequest, user_id: str) -> d
 async def chat(
     session_id: str,
     payload: ChatRequest,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    sess, flow, stage, stage_output = get_current_context(db, session_id, user.id)
+    sess, flow, stage, stage_output = get_current_context(
+        db, session_id, user, role_category
+    )
     request_id = payload.request_id or new_id("chat")
 
     if payload.type == "sys_action":
         try:
             chat_interruptions.register(request_id, session_id, user.id)
-            action_result = apply_stage_action(session_id, payload, user.id)
+            action_result = apply_stage_action(session_id, payload, user.id, role_category)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -368,15 +386,19 @@ async def chat(
     registry = get_agent_registry()
     selected_expert = None
     if payload.expert_id:
-        selected_expert = registry.selectable_expert(payload.expert_id)
+        selected_expert = registry.selectable_expert(payload.expert_id, sess.role_category)
         if selected_expert is None:
             raise HTTPException(status_code=400, detail="未知或不可选择的专家 Agent")
 
     all_messages = ContextService.load_messages(db, session_id)
-    dialog_history = ContextService.format_dialog_history(all_messages)
+    dialog_history = ContextService.format_dialog_history(
+        all_messages, role_category=sess.role_category
+    )
     llm_history = ContextService.to_llm_history(all_messages)
     current_draft = stage_output.draft_content if stage_output else ""
-    base_doc_input = ContextService.build_doc_input(db, session_id, stage["id"])
+    base_doc_input = ContextService.build_doc_input(
+        db, session_id, stage["id"], sess.role_category
+    )
     curriculum_context = ""
     curriculum_source: dict = {}
     local_graph_context = ""
@@ -738,6 +760,7 @@ async def chat(
                         current_draft=session_snapshot["current_draft"],
                         user_message=payload.message,
                         llm_history=session_snapshot["llm_history"],
+                        role_category=sess.role_category,
                     ):
                         await ensure_chat_active()
                         draft_text = candidate_content
@@ -783,7 +806,7 @@ async def chat(
                                 proposal_kind = "generate"
                                 final_draft = draft_text
                                 draft_updated = True
-                                draft_status_text = "右侧草案已经整理好了，老师可以直接审阅或继续修改。"
+                                draft_status_text = f"右侧草案已经整理好了，{'基地老师' if sess.role_category == 'study_travel' else '老师'}可以直接审阅或继续修改。"
                                 yield format_sse("proposal", {"proposal": proposal_payload})
                             else:
                                 proposal_kind = "generate"
@@ -888,7 +911,7 @@ async def chat(
                             proposal_kind = "edit"
                             final_draft = draft_text
                             draft_updated = True
-                            draft_status_text = "右侧草案已经整理好了，老师可以直接审阅或继续修改。"
+                            draft_status_text = f"右侧草案已经整理好了，{'基地老师' if sess.role_category == 'study_travel' else '老师'}可以直接审阅或继续修改。"
                             yield format_sse("proposal", {"proposal": proposal_payload})
                         else:
                             proposal_kind = "edit"
@@ -1033,7 +1056,7 @@ async def chat(
             async for event in chat_body():
                 yield event
         except ChatInterrupted:
-            interrupted_agent = selected_expert or get_agent_registry().main_tutor()
+            interrupted_agent = selected_expert or get_agent_registry().main_tutor(sess.role_category)
             yield format_sse(
                 "interrupted",
                 {
@@ -1063,10 +1086,11 @@ async def chat(
 def cancel_chat(
     session_id: str,
     request_id: str,
+    role_category: str | None = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
-    get_owned_session(db, session_id, user.id)
+    get_owned_workspace_session(db, session_id, user, role_category)
     cancelled = chat_interruptions.cancel(request_id, session_id, user.id)
     return {
         "code": 0,

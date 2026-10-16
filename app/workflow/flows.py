@@ -92,7 +92,35 @@ STAGE_DIRECTIONS: dict[str, str] = {
         "1. 基于入住情况、活动痕迹和传感数据，判断哪些结构、材料或摆放条件值得保留，哪些需要调整。\n"
         "2. 鼓励学生提出有依据的优化方案，如调整孔径、改变朝向、增加遮挡、替换材料或改进记录方式。\n"
         "3. 帮助教师把成果表达成可展示、可分享的项目总结，包括设计思路、观察证据、改进判断和生态反思。\n"
-        "4. 保留下一轮继续追问的问题，让项目形成“搭建—观测—优化”的持续迭代闭环。 "
+        "4. 保留下一轮继续追问的问题，让项目形成'搭建—观测—优化'的持续迭代闭环。"
+    ),
+    "study_plan_design": (
+        "你要帮助教师围绕研学目标与基地资源，设计完整的研学方案框架。\n"
+        "1. 明确研学主题、学习目标、适用年级与课时安排，确保方案与课程标准对接。\n"
+        "2. 结合基地特色资源（如自然生态、农业科技、历史文化等），设计核心探究任务与学习活动。\n"
+        "3. 规划方案的整体结构：前期准备、实地活动、成果展示等各阶段的时间与内容安排。\n"
+        "4. 预设学习产出形式（如研究报告、实践作品、汇报展示等），为后续阶段提供明确目标。"
+    ),
+    "study_docking_process": (
+        "你要帮助教师完成研学方案与基地课程、学校教学需求的对接。\n"
+        "1. 梳理基地现有课程资源与学校教学计划的匹配点，明确哪些内容可以整合、哪些需要调整。\n"
+        "2. 设计详细的行程安排：交通方式、时间节点、分组方式、用餐与休息安排等。\n"
+        "3. 制定安全预案：明确安全责任分工、应急处理流程、特殊学生关注事项等。\n"
+        "4. 建立协作机制：学校教师、基地导师、学生小组之间的沟通方式与协作分工。"
+    ),
+    "study_project_implementation": (
+        "你要帮助教师组织学生参与研学活动，并记录过程性证据。\n"
+        "1. 引导学生按照方案开展实地活动，观察、记录、体验、探究，积累第一手学习证据。\n"
+        "2. 关注学生的参与度、合作情况、问题解决表现，及时给予指导与反馈。\n"
+        "3. 记录过程中的突发情况、学生反应、环境变化等，为后续总结提供真实素材。\n"
+        "4. 收集学生的学习产出：观察记录、实验数据、访谈资料、照片视频等。"
+    ),
+    "study_result_summary": (
+        "你要帮助教师整理研学成果与过程证据，形成总结报告与改进建议。\n"
+        "1. 汇总学生在各阶段的学习产出，按照研学目标进行整理、分类与提炼。\n"
+        "2. 组织学生进行成果展示与汇报，鼓励多样化的表达形式（如报告、作品、演讲等）。\n"
+        "3. 引导学生进行反思：学到了什么、遇到了什么问题、如何解决的、还有哪些改进空间。\n"
+        "4. 帮助教师形成研学总结报告，包括活动成效、经验提炼、改进建议，为后续研学提供参考。"
     ),
 }
 
@@ -111,6 +139,10 @@ STAGE_DISPLAY_DIRECTIONS: dict[str, str] = {
     "insect_build_and_sensing": "完成搭建并部署温湿度等传感器，组织可持续的环境数据采集。",
     "insect_settlement_observation": "在不干扰昆虫的前提下，结合现场观察和传感数据记录自然入住情况。",
     "insect_iteration_sharing": "根据观察与数据优化旅馆设计，并形成展示分享与下一轮改进问题。",
+    "study_plan_design": "围绕研学目标与基地资源，设计完整的研学方案框架与学习任务。",
+    "study_docking_process": "对接基地课程与学校教学需求，明确行程安排、安全预案与协作分工。",
+    "study_project_implementation": "组织学生参与研学活动，记录过程表现、突发情况与学习证据。",
+    "study_result_summary": "整理研学成果与过程证据，形成总结报告与改进建议。",
 }
 
 
@@ -133,6 +165,7 @@ FLOW_TEMPLATES: dict[str, dict[str, Any]] = {
         "name": "inquiry_7_stage",
         "display_name": "七阶段科学探究流",
         "description": "从观察起点到延伸新问题，完整支撑探究式科学课设计。",
+        "role_category": "teacher",
         "stages": [
             stage_item(
                 id="observation_start",
@@ -175,6 +208,7 @@ FLOW_TEMPLATES: dict[str, dict[str, Any]] = {
         "name": "three_step_inquiry",
         "display_name": "三步快速探究流",
         "description": "适合短课时或快速备课：观察起点、问题提出、科学探究。",
+        "role_category": "teacher",
         "stages": [
             stage_item(
                 id="observe",
@@ -197,6 +231,7 @@ FLOW_TEMPLATES: dict[str, dict[str, Any]] = {
         "name": "steam_project",
         "display_name": "STEAM 项目化探究流",
         "description": "面向跨学科项目制课堂，强调原型制作、证据迭代和成果展示。",
+        "role_category": "teacher",
         "stages": [
             stage_item(
                 id="scenario",
@@ -224,6 +259,7 @@ FLOW_TEMPLATES: dict[str, dict[str, Any]] = {
         "name": "insect_hotel_project",
         "display_name": "昆虫旅馆项目探究流",
         "description": "面向本地昆虫开放观察，结合自然取材、旅馆搭建、传感监测与持续优化。",
+        "role_category": "teacher",
         "stages": [
             stage_item(
                 id="natural_materials",
@@ -257,20 +293,53 @@ FLOW_TEMPLATES: dict[str, dict[str, Any]] = {
             ),
         ],
     },
+    "study_travel_project": {
+        "name": "study_travel_project",
+        "display_name": "研学方案设计流",
+        "description": "面向研学基地工作台，从方案设计到结果总结的完整研学项目管理流程。",
+        "role_category": "study_travel",
+        "stages": [
+            stage_item(
+                id="plan_design",
+                name="方案设计",
+                direction_key="study_plan_design",
+            ),
+            stage_item(
+                id="docking_process",
+                name="对接流程",
+                direction_key="study_docking_process",
+            ),
+            stage_item(
+                id="project_implementation",
+                name="项目实施",
+                direction_key="study_project_implementation",
+            ),
+            stage_item(
+                id="result_summary",
+                name="结果总结",
+                direction_key="study_result_summary",
+            ),
+        ],
+    },
 }
 
 
-def list_flows() -> list[dict[str, Any]]:
-    return [
-        {
-            "name": flow["name"],
-            "display_name": flow["display_name"],
-            "description": flow["description"],
-            "stage_count": len(flow["stages"]),
-            "stages": deepcopy(flow["stages"]),
-        }
-        for flow in FLOW_TEMPLATES.values()
-    ]
+def list_flows(role_category: str = "teacher") -> list[dict[str, Any]]:
+    # 根据角色分类过滤流程
+    # 教师工作台：inquiry_7_stage, three_step_inquiry, steam_project, insect_hotel_project
+    # 研学基地工作台：study_travel_project
+    result = []
+    for flow in FLOW_TEMPLATES.values():
+        flow_role = flow.get("role_category", "teacher")
+        if flow_role == role_category:
+            result.append({
+                "name": flow["name"],
+                "display_name": flow["display_name"],
+                "description": flow["description"],
+                "stage_count": len(flow["stages"]),
+                "stages": deepcopy(flow["stages"]),
+            })
+    return result
 
 
 def get_flow(flow_name: str) -> dict[str, Any]:

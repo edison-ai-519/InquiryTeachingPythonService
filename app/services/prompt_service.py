@@ -20,12 +20,20 @@ class PromptService:
         current_draft: str = "",
         user_message: str = "",
         selection_text: str = "",
+        role_category: str = "teacher",
     ) -> str:
-        main_prompt = load_agent_prompt(get_agent_registry().main_tutor())
+        if role_category == "study_travel":
+            main_prompt = load_agent_prompt(get_agent_registry().main_tutor(role_category="study_travel"))
+            flow_label = "研学流程"
+            user_label = "基地人员"
+        else:
+            main_prompt = load_agent_prompt(get_agent_registry().main_tutor())
+            flow_label = "教学流"
+            user_label = "教师"
         return f"""{main_prompt}
 
 【课题】{topic}
-【教学流】{flow_display_name}
+【{flow_label}】{flow_display_name}
 【当前阶段】{stage["name"]}
 【阶段目标】{stage["direction"]}
 
@@ -38,17 +46,17 @@ class PromptService:
 【右侧现有草案】
 {current_draft or "暂无草案。"}
 
-【教师当前选中的草案内容】
+【{user_label}当前选中的草案内容】
 {PromptService._selection_block(selection_text)}
 
-【本轮教师输入】
+【本轮{user_label}输入】
 {user_message or "请结合当前阶段给出引导建议。"}
 
 【工作方式】
 1. 你是主导师 Agent，负责吸收当前阶段的完整能力要求并持续推进流程，但不要在普通引导回复中输出完整草案。
 2. 采用 Human-in-the-loop 方式，不要一次性包办整份教案。
- 3. 如果本轮有选区，默认先围绕这段内容给出引导，指出它与当前阶段目标的关系、问题和下一步建议。
-4. 语言要连贯、友好、具体，尽量把教师的想法推进到下一步。
+3. 如果本轮有选区，默认先围绕这段内容给出引导，指出它与当前阶段目标的关系、问题和下一步建议。
+4. 语言要连贯、友好、具体，尽量把{user_label}的想法推进到下一步。
 5. 不要输出草案标记块，不要输出 Markdown 草案正文。
 """
 
@@ -63,11 +71,20 @@ class PromptService:
         doc_input: str,
         current_draft: str = "",
         user_message: str = "",
+        role_category: str = "teacher",
     ) -> str:
-        return f"""你是主导师 Agent，当前正在执行内部草案撰写能力，把当前阶段的教学设计整理成可直接保存的 Markdown 草案。
+        if role_category == "study_travel":
+            flow_label = "研学流程"
+            user_label = "基地人员"
+            draft_subject = "研学方案设计"
+        else:
+            flow_label = "教学流"
+            user_label = "教师"
+            draft_subject = "教学设计"
+        return f"""你是主导师 Agent，当前正在执行内部草案撰写能力，把当前阶段的{draft_subject}整理成可直接保存的 Markdown 草案。
 
 【课题】{topic}
-【教学流】{flow_display_name}
+【{flow_label}】{flow_display_name}
 【当前阶段】{stage["name"]}
 【阶段目标】{stage["direction"]}
 
@@ -85,12 +102,12 @@ class PromptService:
 【右侧现有草案】
 {current_draft or "暂无草案。"}
 
-【本轮教师输入】
+【本轮{user_label}输入】
 {user_message or "请根据当前上下文生成草案。"}
 
 【输出要求】
 1. 只输出 Markdown 草案正文，不要输出解释、寒暄、前缀或代码块。
-2. 草案要和当前阶段目标、教师输入、流程引导回复一致，避免写成空泛模板。
+2. 草案要和当前阶段目标、{user_label}输入、流程引导回复一致，避免写成空泛模板。
 3. 结构清晰，适合在右侧直接编辑。
 4. 保持简洁但完整，优先使用标题、编号和要点列表。
 5. 不要输出任何草案标记块。
@@ -106,11 +123,22 @@ class PromptService:
         doc_input: str,
         current_draft: str = "",
         user_message: str = "",
+        role_category: str = "teacher",
     ) -> str:
-        return f"""你是主导师 Agent，当前正在执行内部草案生成能力。请根据教师输入和阶段上下文，整理出一份可直接审阅的 Markdown 草案。
+        if role_category == "study_travel":
+            flow_label = "研学流程"
+            user_label = "基地人员"
+            draft_type = "研学方案草案"
+            output_requirement = """2. 草案结构：研学目标 → 基地接待流程 → 课程设计 → 场地安排 → 安全预案"""
+        else:
+            flow_label = "教学流"
+            user_label = "教师"
+            draft_type = "草案"
+            output_requirement = """2. 如果当前已采纳草案为空，就直接生成初稿；如果已有内容，可在其基础上吸收教师的新想法，但仍输出完整草案。"""
+        return f"""你是主导师 Agent，当前正在执行内部草案生成能力。请根据{user_label}输入和阶段上下文，整理出一份可直接审阅的 Markdown {draft_type}。
 
 【课题】{topic}
-【教学流】{flow_display_name}
+【{flow_label}】{flow_display_name}
 【当前阶段】{stage["name"]}
 【阶段目标】{stage["direction"]}
 
@@ -123,12 +151,12 @@ class PromptService:
 【当前已采纳草案】
 {current_draft or "暂无草案。"}
 
-【本轮教师输入】
+【本轮{user_label}输入】
 {user_message or "请根据当前上下文生成草案。"}
 
 【输出要求】
 1. 只输出完整 Markdown 草案正文，不要输出解释、寒暄、前缀或代码块。
-2. 如果当前已采纳草案为空，就直接生成初稿；如果已有内容，可在其基础上吸收教师的新想法，但仍输出完整草案。
+{output_requirement}
 3. 结构清晰，适合在右侧直接编辑与审阅。
 4. 结果要适合直接进入差异审阅工作流。
 5. 不要输出任何草案标记块。

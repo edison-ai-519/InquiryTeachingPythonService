@@ -22,6 +22,7 @@ class SessionModel(Base):
     current_stage_index = Column(Integer, default=0)
     status = Column(String, default="active")
     draft_mode_enabled = Column(Integer, default=0)
+    role_category = Column(String, nullable=False, default="teacher")
     created_at = Column(String, nullable=False)
     updated_at = Column(String, nullable=False)
 
@@ -33,7 +34,18 @@ class UserModel(Base):
     username = Column(String, nullable=False, unique=True, index=True)
     password_hash = Column(Text, nullable=False)
     is_admin = Column(Integer, nullable=False, default=0)
+    user_role = Column(String, nullable=False, default="teacher")
     created_at = Column(String, nullable=False)
+
+
+class UserWorkspaceRoleModel(Base):
+    __tablename__ = "user_workspace_roles"
+
+    user_id = Column(String, primary_key=True)
+    role_category = Column(String, primary_key=True)
+    created_at = Column(String, nullable=False)
+
+    __table_args__ = (Index("ix_user_workspace_roles_user_id", "user_id"),)
 
 
 class AuthSessionModel(Base):
@@ -104,11 +116,12 @@ class StageOutputModel(Base):
     draft_content = Column(Text, default="")
     final_content = Column(Text, default="")
     confirmed = Column(Integer, default=0)
+    role_category = Column(String, nullable=False, default="teacher")
     created_at = Column(String, nullable=False)
     updated_at = Column(String, nullable=False)
 
     __table_args__ = (
-        UniqueConstraint("session_id", "stage_id", name="uq_session_stage"),
+        UniqueConstraint("session_id", "stage_id", "role_category", name="uq_session_stage_role"),
     )
 
 
@@ -230,6 +243,7 @@ class CurriculumSourceAgentPermissionModel(Base):
         primary_key=True,
     )
     agent_id = Column(String, primary_key=True)
+    role_category = Column(String, nullable=False, default="teacher")
     created_at = Column(String, nullable=False)
 
     __table_args__ = (Index("ix_curriculum_permissions_agent_id", "agent_id"),)

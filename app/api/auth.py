@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import get_admin_user, get_current_user
 from app.core.config import get_settings
 from app.db.database import get_db
-from app.db.models import UserModel
-from app.schemas import LoginRequest, RegisterRequest
+from app.db.models import UserModel, UserWorkspaceRoleModel
+from app.schemas import LoginRequest, RegisterRequest, WorkspaceRolesRequest
 from app.services.auth_service import (
     AUTH_COOKIE_NAME,
     clear_auth_cookie,
@@ -15,6 +15,7 @@ from app.services.auth_service import (
     revoke_token,
     serialize_user,
     set_auth_cookie,
+    workspace_roles_for_user,
 )
 
 
@@ -47,7 +48,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
 
     user, token = result
     set_auth_cookie(response, token)
-    return {"code": 0, "message": "logged in", "data": serialize_user(user)}
+    return {"code": 0, "message": "logged in", "data": serialize_user(user, workspace_roles_for_user(db, user))}
 
 
 @router.post("/admin/register")
@@ -94,7 +95,7 @@ def login_admin(
 
     user, token = result
     set_auth_cookie(response, token)
-    return {"code": 0, "message": "admin logged in", "data": serialize_user(user)}
+    return {"code": 0, "message": "admin logged in", "data": serialize_user(user, workspace_roles_for_user(db, user))}
 
 
 @router.post("/logout")
@@ -105,5 +106,29 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 
 
 @router.get("/me")
-def me(user: UserModel = Depends(get_current_user)):
-    return {"code": 0, "message": "success", "data": serialize_user(user)}
+def me(db: Session = Depends(get_db), user: UserModel = Depends(get_current_user)):
+    return {"code": 0, "message": "success", "data": serialize_user(user, workspace_roles_for_user(db, user))}
+
+
+@router.put("/users/{user_id}/workspace-roles")
+def update_workspace_roles(
+    user_id: str,
+    payload: WorkspaceRolesRequest,
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(get_admin_user),
+):
+    target = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+
+    roles = sorted(set(payload.workspace_roles))
+    db.query(UserWorkspaceRoleModel).filter(
+        UserWorkspaceRoleModel.user_id == target.id
+    ).delete(synchronize_session=False)
+    for role in roles:
+        db.add(UserWorkspaceRoleModel(user_id=target.id, role_category=role, created_at=target.created_at))
+    if target.user_role not in roles:
+        target.user_role = roles[0]
+    db.commit()
+    db.refresh(target)
+    return {"code": 0, "message": "workspace roles updated", "data": serialize_user(target, roles)}

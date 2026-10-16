@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class SessionCreate(BaseModel):
     topic: str = Field(min_length=1)
     flow_name: str = "inquiry_7_stage"
+    role_category: str = "teacher"
 
 
 class RegisterRequest(BaseModel):
@@ -16,6 +17,10 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str = Field(min_length=3, max_length=32)
     password: str = Field(min_length=1, max_length=128)
+
+
+class WorkspaceRolesRequest(BaseModel):
+    workspace_roles: list[Literal["teacher", "study_travel"]] = Field(min_length=1, max_length=2)
 
 
 class SelectFlowRequest(BaseModel):
@@ -104,6 +109,7 @@ class RollbackRequest(BaseModel):
 
 class DraftUpdateRequest(BaseModel):
     draft_content: str
+    role_category: str = "teacher"
 
 
 class DraftProposalActionItem(BaseModel):
