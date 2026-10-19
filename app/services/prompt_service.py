@@ -22,7 +22,11 @@ class PromptService:
         selection_text: str = "",
         role_category: str = "teacher",
     ) -> str:
-        if role_category == "study_travel":
+        if role_category == "parent":
+            main_prompt = load_agent_prompt(get_agent_registry().main_tutor(role_category="parent"))
+            flow_label = "家庭探究流程"
+            user_label = "家长"
+        elif role_category == "study_travel":
             main_prompt = load_agent_prompt(get_agent_registry().main_tutor(role_category="study_travel"))
             flow_label = "研学流程"
             user_label = "基地人员"
@@ -73,7 +77,11 @@ class PromptService:
         user_message: str = "",
         role_category: str = "teacher",
     ) -> str:
-        if role_category == "study_travel":
+        if role_category == "parent":
+            flow_label = "家庭探究流程"
+            user_label = "家长"
+            draft_subject = "家庭探究活动方案"
+        elif role_category == "study_travel":
             flow_label = "研学流程"
             user_label = "基地人员"
             draft_subject = "研学方案设计"
@@ -125,7 +133,12 @@ class PromptService:
         user_message: str = "",
         role_category: str = "teacher",
     ) -> str:
-        if role_category == "study_travel":
+        if role_category == "parent":
+            flow_label = "家庭探究流程"
+            user_label = "家长"
+            draft_type = "家庭探究活动方案草案"
+            output_requirement = """2. 草案结构应包含活动目标、所需材料、家庭实施步骤、亲子引导问题和安全提醒；结合家庭情况及检索到的基地资料，资料需注明出处。强调孩子自主观察；若家庭情况缺失，采用易获取材料并避免假设具体家庭条件。"""
+        elif role_category == "study_travel":
             flow_label = "研学流程"
             user_label = "基地人员"
             draft_type = "研学方案草案"
@@ -174,11 +187,15 @@ class PromptService:
         user_message: str = "",
         target_summary: str = "",
         target_text: str = "",
+        role_category: str = "teacher",
     ) -> str:
+        user_label = "家长" if role_category == "parent" else "基地人员" if role_category == "study_travel" else "教师"
+        flow_label = "家庭探究流程" if role_category == "parent" else "研学流程" if role_category == "study_travel" else "教学流"
+        family_edit_requirement = "5. 家长端内容须符合家庭条件、孩子自主探索和安全边界。" if role_category == "parent" else ""
         return f"""你是主导师 Agent，当前正在执行内部草案编辑能力。不要重写整份草案，只修改指定片段，并输出该片段修改后的完整正文。
 
 【课题】{topic}
-【教学流】{flow_display_name}
+【{flow_label}】{flow_display_name}
 【当前阶段】{stage["name"]}
 【阶段目标】{stage["direction"]}
 
@@ -197,14 +214,15 @@ class PromptService:
 【本次需要修改的原片段正文】
 {target_text or "暂无原片段。"}
 
-【教师修改要求】
-{user_message or "请根据教师要求修改这段内容。"}
+【{user_label}修改要求】
+{user_message or f"请根据{user_label}要求修改这段内容。"}
 
 【输出要求】
 1. 只输出“目标片段修改后的完整正文”，不要输出整份草案。
 2. 不要解释你改了什么，不要输出代码块、标题前缀、寒暄或额外说明。
 3. 必须围绕原片段进行局部修改，保留与当前草案一致的语气和结构。
-4. 如果教师要求不明确，就做最小必要修改，不要扩写到其他片段。
+4. 如果{user_label}要求不明确，就做最小必要修改，不要扩写到其他片段。
+{family_edit_requirement}
 """
 
     @staticmethod
@@ -215,16 +233,19 @@ class PromptService:
         stage: dict,
         current_draft: str = "",
         user_message: str = "",
+        role_category: str = "teacher",
     ) -> str:
-        return f"""你是主导师 Agent，当前正在执行内部草案定位能力。请根据教师输入，从当前草案中判断最可能需要修改的一段。
+        user_label = "家长" if role_category == "parent" else "基地人员" if role_category == "study_travel" else "教师"
+        flow_label = "家庭探究流程" if role_category == "parent" else "研学流程" if role_category == "study_travel" else "教学流"
+        return f"""你是主导师 Agent，当前正在执行内部草案定位能力。请根据{user_label}输入，从当前草案中判断最可能需要修改的一段。
 
 【课题】{topic}
-【教学流】{flow_display_name}
+【{flow_label}】{flow_display_name}
 【当前阶段】{stage["name"]}
 【当前草案】
 {current_draft or "暂无草案。"}
 
-【教师输入】
+【{user_label}输入】
 {user_message or "请判断最可能需要修改的片段。"}
 
 【输出要求】
@@ -239,7 +260,13 @@ class PromptService:
         return PromptService.build_guide_agent_prompt(**kwargs)
 
     @staticmethod
-    def opening_message(topic: str, flow_display_name: str, stage: dict) -> str:
+    def opening_message(topic: str, flow_display_name: str, stage: dict, role_category: str = "teacher") -> str:
+        if role_category == "parent":
+            return (
+                f"【家庭探究主导师】已进入当前阶段：{stage['name']}。\n\n"
+                f"我们正在为《{topic}》设计「{flow_display_name}」。这一阶段的重点是：{stage['direction']}\n\n"
+                "您可以描述孩子感兴趣的现象、家里的空间和可用材料；我会帮助把它变成安全、适龄且由孩子主动参与的家庭探究活动。"
+            )
         return (
             f"【主导师 Agent】已进入当前阶段：{stage['name']}。\n\n"
             f"我们正在为《{topic}》设计「{flow_display_name}」。"

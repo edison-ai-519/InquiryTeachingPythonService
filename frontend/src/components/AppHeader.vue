@@ -16,21 +16,27 @@
       <strong>{{ session.topic }}</strong>
       <span>{{ session.flow_display_name }} · {{ stageProgress }} · {{ stage?.name || '准备开始' }}</span>
     </div>
-    <div v-else class="header-context header-context-empty">创建一个课题，开始协同设计</div>
+    <div v-else class="header-context header-context-empty">{{ currentRole === 'parent' ? '输入探究主题，开始设计家庭活动' : '创建一个课题，开始协同设计' }}</div>
 
     <div class="header-actions">
       <div v-if="workspaceRoles.length > 1" class="role-switcher">
-        <button
+        <button v-if="workspaceRoles.includes('teacher')"
           :class="{ active: currentRole === 'teacher' }"
           @click="switchRole('teacher')"
         >
           教师工作台
         </button>
-        <button
+        <button v-if="workspaceRoles.includes('study_travel')"
           :class="{ active: currentRole === 'study_travel' }"
           @click="switchRole('study_travel')"
         >
           研学基地工作台
+        </button>
+        <button v-if="workspaceRoles.includes('parent')"
+          :class="{ active: currentRole === 'parent' }"
+          @click="switchRole('parent')"
+        >
+          家长工作台
         </button>
       </div>
       <ExpertSelector v-model="expertId" :experts="experts" :role-category="currentRole" :disabled="streaming || !session" />
@@ -88,6 +94,9 @@ const labels = computed(() => {
       brandTitle: "研学基地工作台",
       brandSubtitle: "Study Travel Studio",
     };
+  }
+  if (props.currentRole === "parent") {
+    return { brandTitle: "家庭探究工作台", brandSubtitle: "Family Inquiry Studio" };
   }
   return {
     brandTitle: "探究式教学工作台",

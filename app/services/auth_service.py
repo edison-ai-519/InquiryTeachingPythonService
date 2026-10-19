@@ -76,11 +76,11 @@ def workspace_roles_for_user(db: Session, user: UserModel) -> list[str]:
         .order_by(UserWorkspaceRoleModel.role_category.asc())
         .all()
     ]
-    return roles or [user.user_role if user.user_role in {"teacher", "study_travel"} else "teacher"]
+    return roles or [user.user_role if user.user_role in {"teacher", "study_travel", "parent"} else "teacher"]
 
 
 def serialize_user(user: UserModel, workspace_roles: list[str] | None = None) -> dict:
-    roles = workspace_roles or [user.user_role if user.user_role in {"teacher", "study_travel"} else "teacher"]
+    roles = workspace_roles or [user.user_role if user.user_role in {"teacher", "study_travel", "parent"} else "teacher"]
     return {
         "id": user.id,
         "username": user.username,

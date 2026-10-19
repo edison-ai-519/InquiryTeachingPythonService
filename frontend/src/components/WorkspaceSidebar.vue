@@ -49,7 +49,7 @@ const props = defineProps<{
   progress: string;
   uploading: boolean;
   search: string;
-  role_category?: "teacher" | "study_travel";
+  role_category?: "teacher" | "study_travel" | "parent";
   output: (stageId: string) => StageOutput | undefined;
 }>();
 

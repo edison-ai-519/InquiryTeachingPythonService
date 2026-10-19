@@ -72,8 +72,8 @@ class AgentRegistry:
 
         main_agents = [agent for agent in agents.values() if agent.kind == "main"]
         main_ids = {a.id for a in main_agents}
-        if main_ids != {"main_tutor", "study_travel_main_tutor"}:
-            raise AgentRegistryError("必须配置 main_tutor 和 study_travel_main_tutor 两个主导师")
+        if main_ids != {"main_tutor", "study_travel_main_tutor", "parent_main_tutor"}:
+            raise AgentRegistryError("必须配置教师、研学基地和家长三个工作台主导师")
         return agents
 
     def get(self, agent_id: str) -> AgentDefinition | None:
@@ -88,6 +88,8 @@ class AgentRegistry:
     def main_tutor(self, role_category: str = "teacher") -> AgentDefinition:
         if role_category == "study_travel":
             return self.require("study_travel_main_tutor")
+        if role_category == "parent":
+            return self.require("parent_main_tutor")
         return self.require("main_tutor")
 
     def experts(self, role_category: str | None = None) -> list[AgentDefinition]:

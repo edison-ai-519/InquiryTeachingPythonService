@@ -13,8 +13,16 @@ export type AuthUser = {
   workspace_roles: UserRole[];
 };
 
-export type UserRole = "teacher" | "study_travel";
-export type RoleCategory = "teacher" | "study_travel" | "shared";
+export type UserRole = "teacher" | "study_travel" | "parent";
+export type RoleCategory = "teacher" | "study_travel" | "parent" | "shared";
+
+export type HomeContext = {
+  child_age_grade?: string;
+  available_time?: string;
+  activity_space?: string;
+  available_materials?: string;
+  adult_accompaniment?: string;
+};
 
 export type ExpertAgentItem = {
   id: string;
@@ -395,6 +403,8 @@ export type StageOutput = {
 export type SessionDetail = SessionListItem & {
   current_stage: FlowStage | null;
   outputs: StageOutput[];
+  role_category: UserRole;
+  home_context?: HomeContext;
 };
 
 export type SessionFileItem = {

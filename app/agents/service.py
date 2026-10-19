@@ -22,11 +22,19 @@ class ExpertAgentService:
         selection_text: str = "",
     ) -> str:
         role_prompt = load_agent_prompt(agent)
+        is_parent = agent.role_category == "parent"
+        user_label = "家长" if is_parent else "基地人员" if agent.role_category == "study_travel" else "教师"
+        flow_label = "家庭探究流程" if is_parent else "研学流程" if agent.role_category == "study_travel" else "教学流"
+        scenario_section = (
+            "【家庭场景要求】\n建议必须适合家庭实施，考虑孩子年龄、家庭空间、常见材料、可用时长和成人陪伴；鼓励孩子自主观察，明确安全边界和成人协助环节。\n"
+            if is_parent else ""
+        )
+        advice_context = "适合家庭场景和阶段" if is_parent else "适合当前研学阶段" if agent.role_category == "study_travel" else "适合当前教学阶段"
         return f"""{role_prompt}
 
 【你的身份】{agent.name} / {agent.role}
 【课题】{topic}
-【教学流】{flow_display_name}
+【{flow_label}】{flow_display_name}
 【当前阶段】{stage["name"]}
 【当前阶段目标】{stage["direction"]}
 
@@ -39,17 +47,19 @@ class ExpertAgentService:
 【右侧现有草案】
 {current_draft or "暂无草案。"}
 
-【教师当前选中的草案内容】
+【{user_label}当前选中的草案内容】
 {selection_text.strip() or "本轮无选区。"}
 
-【本轮教师输入】
+【本轮{user_label}输入】
 {user_message}
+
+{scenario_section}
 
 【本轮输出要求】
 1. 直接以你的专业角色回答，不冒充主导师，也不接管完整教学流程。
-2. 优先给出具体、可操作、适合当前教学阶段的专业建议。
+2. 优先给出具体、可操作、{advice_context}的专业建议。
 3. 区分观察事实、合理推断和待验证结论；证据不足时明确说明。
-4. 超出你的专业边界时停止推测，并建议教师改选更合适的专家。
+4. 超出你的专业边界时停止推测，并建议用户改选更合适的专家。
 5. 不输出草案标记块，不编造物种、数据、课标条文或安全结论。
 """
 

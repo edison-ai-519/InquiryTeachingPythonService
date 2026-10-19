@@ -19,6 +19,7 @@ class RagService:
         user_message: str,
         expert_id: str,
         allowed_sources: list[str],
+        role_category: str = "teacher",
     ) -> tuple[str, dict]:
         settings = get_settings()
         query = RagService.build_curriculum_query(
@@ -62,7 +63,7 @@ class RagService:
                 "hit_sources": [],
                 "records": [],
             }
-        return RagService.format_curriculum_context(results), {
+        return RagService.format_curriculum_context(results, role_category), {
             "mode": service.last_retrieval.get("mode", "local_bm25"),
             "query": query,
             "vector_error": service.last_retrieval.get("vector_error", ""),
@@ -83,7 +84,18 @@ class RagService:
         return "\n".join(part for part in parts if part)
 
     @staticmethod
-    def format_curriculum_context(results: list[CurriculumSearchResult]) -> str:
+    def format_curriculum_context(
+        results: list[CurriculumSearchResult], role_category: str = "teacher"
+    ) -> str:
+        if role_category == "parent":
+            sections = [
+                "<study_base_reference>",
+                "以下是研学基地知识库中与主题相关的资料片段。将其作为活动背景依据，并在回答中标注资料出处；不能据此推断资料未说明的家庭条件。",
+            ]
+            for index, result in enumerate(results, start=1):
+                sections.extend(["", f"[{index}] 资料出处：{result.source}", f"相关内容：{result.content}"])
+            sections.extend(["", "请把资料转化为适合家庭空间、常见材料和儿童自主参与的活动建议。", "</study_base_reference>"])
+            return "\n".join(sections)
         sections = [
             "<curriculum_reference>",
             "以下内容仅作为课程标准参考，请结合学生年龄、技术基础和当前教学目标使用。",
@@ -147,10 +159,11 @@ class RagService:
         )
 
     @staticmethod
-    def source_note(sources: list[str]) -> str:
+    def source_note(sources: list[str], role_category: str = "teacher") -> str:
         if not sources:
             return ""
-        return "\n\n参考课标：" + "、".join(sources)
+        label = "研学基地资料" if role_category == "parent" else "研学参考资料" if role_category == "study_travel" else "课标"
+        return f"\n\n参考{label}：" + "、".join(sources)
 
     @staticmethod
     def curriculum_result_to_dict(result: CurriculumSearchResult) -> dict:

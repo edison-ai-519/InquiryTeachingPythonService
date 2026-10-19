@@ -41,7 +41,7 @@ import type { DraftProposal, DraftProposalSegment } from "@/types";
 const props = defineProps<{
   visible: boolean; proposal: DraftProposal | null; description: string; segments: DraftProposalSegment[]; activeSegmentId: string | null; blocks: { id: string; raw: string }[]; activeBlockId: string | null;
   render: (value: string) => string; proposalStatusLabel: (value: DraftProposal['status']) => string; segmentStatusLabel: (value: DraftProposalSegment['status']) => string; segmentLabel: (value: DraftProposalSegment) => string; segmentSummary: (value: DraftProposalSegment) => string;
-  role_category?: "teacher" | "study_travel";
+  role_category?: "teacher" | "study_travel" | "parent";
 }>();
 const emit = defineEmits<{ close: []; 'apply-all': [action: 'accept' | 'reject']; apply: [id: string, action: 'accept' | 'reject']; 'select-segment': [id: string]; 'preview-ready': [element: HTMLElement] }>();
 

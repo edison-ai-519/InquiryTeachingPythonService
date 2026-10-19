@@ -140,3 +140,68 @@ agents:
     prompt_file: prompts/experts/base_manager.md
     selectable: true
     role_category: study_travel
+
+  - id: parent_main_tutor
+    kind: main
+    name: 家庭探究主导师 Agent
+    role: 家庭探究活动主导师
+    description: 负责家庭场景探究流程引导、阶段推进、草案生成与编辑。
+    capabilities:
+      - family_inquiry_guidance
+      - home_activity_planning
+      - safety_guidance
+      - draft_generation
+      - draft_editing
+    prompt_file: prompts/parent_main_tutor.md
+    selectable: false
+    role_category: parent
+
+  - id: parent_insect_agent
+    kind: expert
+    name: 昆虫观察专家
+    role: 家庭昆虫观察与生态专家
+    description: 指导家庭环境下的昆虫观察、识别推理和非侵扰活动。
+    capabilities: [insect_observation, identification_reasoning, non_intrusive_guidance, family_activity]
+    prompt_file: prompts/parent_expert.md
+    selectable: true
+    role_category: parent
+
+  - id: parent_nature_agent
+    kind: expert
+    name: 自然生态专家
+    role: 家庭自然观察专家
+    description: 指导家庭周边植物、土壤、天气与生态关系观察。
+    capabilities: [ecosystem_relationships, seasonal_change, family_activity]
+    prompt_file: prompts/parent_expert.md
+    selectable: true
+    role_category: parent
+
+  - id: parent_mathematics_agent
+    kind: expert
+    name: 数据探究专家
+    role: 家庭数学与数据分析专家
+    description: 指导使用常见家庭工具开展测量、计数、比较和数据表达。
+    capabilities: [measurement, sampling, statistics, family_activity]
+    prompt_file: prompts/parent_expert.md
+    selectable: true
+    role_category: parent
+
+  - id: parent_safety_agent
+    kind: expert
+    name: 家庭活动安全专家
+    role: 家庭探究安全专家
+    description: 评估家庭空间、材料和工具风险，提供适龄安全边界。
+    capabilities: [risk_assessment, tool_safety, biological_ethics, family_activity]
+    prompt_file: prompts/parent_expert.md
+    selectable: true
+    role_category: parent
+
+  - id: parent_physics_agent
+    kind: expert
+    name: 科学探究专家
+    role: 家庭科学探究专家
+    description: 指导低成本家庭实验、变量控制、观察记录和解释。
+    capabilities: [inquiry_question, variable_control, experiment_design, family_activity]
+    prompt_file: prompts/parent_expert.md
+    selectable: true
+    role_category: parent

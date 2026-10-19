@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -91,6 +92,7 @@ def serialize_session(sess: SessionModel, db: Session) -> dict:
         "status": sess.status,
         "draft_mode_enabled": bool(sess.draft_mode_enabled),
         "role_category": sess.role_category,
+        "home_context": json.loads(sess.home_context_json or "{}"),
         "outputs": [
             {
                 "stage_id": item.stage_id,
@@ -117,6 +119,8 @@ def create_session(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     role_category = resolve_workspace_role(db, user, payload.role_category)
+    if payload.home_context and role_category != "parent":
+        raise HTTPException(status_code=400, detail="家庭情况仅适用于家长工作台")
     if flow.get("role_category", "teacher") != role_category:
         raise HTTPException(status_code=400, detail="Flow does not belong to workspace")
 
@@ -125,13 +129,17 @@ def create_session(
     sess = SessionModel(
         id=session_id,
         owner_user_id=user.id,
-        title=f"{payload.topic}-探究式教案",
+        title=f"{payload.topic}-{'家庭探究活动' if role_category == 'parent' else '探究式教案'}",
         topic=payload.topic,
         flow_name=payload.flow_name,
         current_stage_index=0,
         status="active",
         draft_mode_enabled=0,
         role_category=role_category,
+        home_context_json=json.dumps(
+            payload.home_context.model_dump(exclude_unset=True) if payload.home_context else {},
+            ensure_ascii=False,
+        ),
         created_at=timestamp,
         updated_at=timestamp,
     )

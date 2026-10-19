@@ -27,7 +27,7 @@ class ContextService:
         records = []
         for item in messages:
             if item.role == "user":
-                speaker = "基地老师" if role_category == "study_travel" else "教师"
+                speaker = "基地老师" if role_category == "study_travel" else "家长" if role_category == "parent" else "教师"
             elif item.message_type == "expert_advice":
                 speaker = f"领域专家-{item.agent_id or 'unknown'}"
             elif item.message_type == "stage_expert":
@@ -35,7 +35,7 @@ class ContextService:
             elif item.message_type == "draft_tutor":
                 speaker = "草案修订Agent"
             else:
-                speaker = "研学主导师" if role_category == "study_travel" else "主教学导师"
+                speaker = "研学主导师" if role_category == "study_travel" else "家庭探究主导师" if role_category == "parent" else "主教学导师"
             records.append(f"{speaker}: {item.content}\n")
 
         selected = []

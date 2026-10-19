@@ -13,7 +13,7 @@
       </article>
     </div>
     <div class="composer-shell">
-      <textarea ref="inputRef" v-model="inputText" rows="2" placeholder="输入问题、教学想法或修改要求…" @input="$emit('resize')" @keydown="$emit('keydown', $event)" />
+      <textarea ref="inputRef" v-model="inputText" rows="2" :placeholder="session?.role_category === 'parent' ? '描述孩子感兴趣的问题、家庭观察或修改想法…' : '输入问题、教学想法或修改要求…'" @input="$emit('resize')" @keydown="$emit('keydown', $event)" />
       <div class="composer-toolbar">
         <div class="composer-tools">
           <button type="button" title="上传参考资料" :disabled="streaming || uploading || files.length >= 10 || !session" @click="$emit('open-file')"><LoaderCircle v-if="uploading" class="spin-icon" :size="17" /><Paperclip v-else :size="17" /></button>

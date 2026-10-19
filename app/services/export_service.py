@@ -9,20 +9,21 @@ class MarkdownExportService:
         flow = get_flow(flow_name)
         output_map = {item.stage_id: item for item in outputs}
         is_study_travel = role_category == "study_travel"
-        document_title = "研学方案" if is_study_travel else "探究式教学设计"
-        document_type = "研学实践活动" if is_study_travel else "探究式科学课"
-        role_name = "研学主导师" if is_study_travel else "主导师 Agent"
+        is_parent = role_category == "parent"
+        document_title = "研学方案" if is_study_travel else "家庭探究活动方案" if is_parent else "探究式教学设计"
+        document_type = "研学实践活动" if is_study_travel else "家庭亲子探究活动" if is_parent else "探究式科学课"
+        role_name = "研学主导师" if is_study_travel else "家庭探究主导师" if is_parent else "主导师 Agent"
 
         lines = [
             f"# {document_title}：{topic}",
             "",
-            f"> 流程：{flow['display_name']}。本文档由 AI {'研学' if is_study_travel else '教学'}指导服务协同生成。",
+            f"> 流程：{flow['display_name']}。本文档由 AI {'研学' if is_study_travel else '家庭探究' if is_parent else '教学'}指导服务协同生成。",
             "",
             "## 一、项目基本信息",
             "",
-            f"- {'项目名称' if is_study_travel else '课题名称'}：{topic}",
+            f"- {'项目名称' if is_study_travel else '探究主题' if is_parent else '课题名称'}：{topic}",
             f"- 活动类型：{document_type}",
-            f"- {'实施周期：按基地接待与行程安排确定' if is_study_travel else '建议课时：1-2 课时，可按课堂长度裁剪'}",
+            f"- {'实施周期：按基地接待与行程安排确定' if is_study_travel else '实施时长：可根据家庭时间和孩子状态灵活调整' if is_parent else '建议课时：1-2 课时，可按课堂长度裁剪'}",
             "",
             "## 二、阶段化活动设计",
             "",
@@ -43,7 +44,7 @@ class MarkdownExportService:
                     "",
                     content or "_本阶段暂未生成草案。_",
                     "",
-                    "**活动评价建议**：关注参与者是否能提出证据、说明推理过程，并根据同伴反馈修正想法。",
+                    "**活动评价建议**：" + ("关注孩子是否主动观察、提出问题、记录发现并表达自己的解释；家长以陪伴和提问支持，不替孩子完成。" if is_parent else "关注参与者是否能提出证据、说明推理过程，并根据同伴反馈修正想法。"),
                     "",
                 ]
             )

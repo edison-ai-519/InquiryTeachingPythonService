@@ -20,6 +20,7 @@ class DraftEditService:
         user_message: str,
         llm_history: list[dict],
         target: DraftTarget,
+        role_category: str = "teacher",
     ) -> AsyncIterator[tuple[str, str, str]]:
         prompt = PromptService.build_draft_edit_prompt(
             topic=topic,
@@ -31,6 +32,7 @@ class DraftEditService:
             user_message=user_message,
             target_summary=target.target_summary,
             target_text=target.target_text,
+            role_category=role_category,
         )
         replacement = ""
         async for chunk in LLMService.chat_stream(

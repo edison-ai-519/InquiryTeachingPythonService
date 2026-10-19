@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.agents.registry import AgentRegistry, get_agent_registry
 from app.db.models import CurriculumSourceAgentPermissionModel, CurriculumSourceModel
+from sqlalchemy import or_
 
 
 def _now_iso() -> str:
@@ -11,6 +12,27 @@ def _now_iso() -> str:
 
 
 class CurriculumPermissionService:
+    @staticmethod
+    def allowed_sources_for_role(db: Session, role_category: str) -> list[str]:
+        """Return only curated knowledge sources assigned to the given workspace."""
+        rows = (
+            db.query(CurriculumSourceModel.source)
+            .outerjoin(
+                CurriculumSourceAgentPermissionModel,
+                CurriculumSourceAgentPermissionModel.source == CurriculumSourceModel.source,
+            )
+            .filter(
+                or_(
+                    CurriculumSourceModel.category == "rural_revitalization",
+                    CurriculumSourceAgentPermissionModel.role_category == role_category,
+                )
+            )
+            .distinct()
+            .order_by(CurriculumSourceModel.source.asc())
+            .all()
+        )
+        return [str(row[0]) for row in rows]
+
     @staticmethod
     def validate_expert_ids(
         expert_ids: list[str],

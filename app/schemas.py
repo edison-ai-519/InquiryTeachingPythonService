@@ -1,12 +1,23 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class HomeContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    child_age_grade: str = Field(default="", max_length=80)
+    available_time: str = Field(default="", max_length=80)
+    activity_space: str = Field(default="", max_length=200)
+    available_materials: str = Field(default="", max_length=500)
+    adult_accompaniment: str = Field(default="", max_length=120)
 
 
 class SessionCreate(BaseModel):
     topic: str = Field(min_length=1)
     flow_name: str = "inquiry_7_stage"
     role_category: str = "teacher"
+    home_context: HomeContext | None = None
 
 
 class RegisterRequest(BaseModel):
@@ -20,7 +31,7 @@ class LoginRequest(BaseModel):
 
 
 class WorkspaceRolesRequest(BaseModel):
-    workspace_roles: list[Literal["teacher", "study_travel"]] = Field(min_length=1, max_length=2)
+    workspace_roles: list[Literal["teacher", "study_travel", "parent"]] = Field(min_length=1, max_length=3)
 
 
 class SelectFlowRequest(BaseModel):

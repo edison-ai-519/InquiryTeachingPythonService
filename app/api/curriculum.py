@@ -39,7 +39,7 @@ EXPORT_VERSION = 3
 class CurriculumPermissionRequest(BaseModel):
     source: str = Field(min_length=1, max_length=255)
     expert_ids: list[str] = Field(default_factory=list)
-    role_category: str = Field(default="teacher", pattern="^(teacher|study_travel)$")
+    role_category: str = Field(default="teacher", pattern="^(teacher|study_travel|parent)$")
 
 
 def serialize_source(row: CurriculumSourceModel, allowed_expert_ids: list[str]) -> dict:
