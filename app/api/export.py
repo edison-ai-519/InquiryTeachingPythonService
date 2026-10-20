@@ -32,7 +32,7 @@ def export_session(
     markdown = MarkdownExportService.compile_lesson_plan(
         sess.topic, sess.flow_name, outputs, sess.role_category
     )
-    suffix = "研学方案" if sess.role_category == "study_travel" else "探究式教案"
+    suffix = "研学方案" if sess.role_category == "study_travel" else "家庭探究活动方案" if sess.role_category == "parent" else "探究式教案"
     filename = quote(f"{sess.topic}-{suffix}.md")
     headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"}
     return Response(content=markdown, media_type="text/markdown; charset=utf-8", headers=headers)

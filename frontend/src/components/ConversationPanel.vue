@@ -4,7 +4,7 @@
       <div>
         <p class="section-kicker">当前阶段</p>
         <h1>{{ stage?.name || '开始探究' }}</h1>
-        <span>{{ stage?.display_direction || stage?.direction || '创建教案后，主导师会陪您逐步完成教学设计。' }}</span>
+        <span>{{ stage?.display_direction || stage?.direction || (roleCategory === 'parent' ? '创建家庭探究活动后，主导师会陪您逐步设计亲子活动。' : '创建教案后，主导师会陪您逐步完成教学设计。') }}</span>
       </div>
       <button class="text-button" type="button" :disabled="!session || streaming" @click="$emit('rollback')"><Undo2 :size="16" />回滚</button>
     </header>
@@ -23,7 +23,7 @@
           <span v-if="message.interrupted" class="message-interrupted"><Square :size="11" />已停止生成</span>
         </div>
       </article>
-      <div v-if="!messages.length" class="conversation-empty"><GraduationCap :size="28" /><strong>从一个教学问题开始</strong><span>主导师会根据当前阶段，协助您逐步形成教学方案。</span></div>
+      <div v-if="!messages.length" class="conversation-empty"><GraduationCap :size="28" /><strong>{{ roleCategory === 'parent' ? '从孩子感兴趣的主题开始' : '从一个教学问题开始' }}</strong><span>{{ roleCategory === 'parent' ? '主导师会结合家庭条件，陪您逐步设计安全、适龄的亲子探究活动。' : '主导师会根据当前阶段，协助您逐步形成教学方案。' }}</span></div>
     </div>
     <slot />
   </section>
@@ -36,6 +36,7 @@ import type { FlowStage, MessageItem, SessionDetail } from "@/types";
 
 const props = defineProps<{
   session: SessionDetail | null;
+  roleCategory?: string;
   stage: FlowStage | null;
   messages: MessageItem[];
   stageNames: Record<string, string>;

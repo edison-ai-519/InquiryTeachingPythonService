@@ -31,6 +31,10 @@ def ensure_schema_compatibility() -> None:
                 connection.execute(
                     text("ALTER TABLE sessions ADD COLUMN role_category VARCHAR NOT NULL DEFAULT 'teacher'")
                 )
+            if "home_context_json" not in session_columns:
+                connection.execute(
+                    text("ALTER TABLE sessions ADD COLUMN home_context_json TEXT NOT NULL DEFAULT '{}'")
+                )
             connection.execute(
                 text(
                     "CREATE INDEX IF NOT EXISTS ix_sessions_owner_user_id "
@@ -82,7 +86,7 @@ def ensure_schema_compatibility() -> None:
                     """
                     INSERT OR IGNORE INTO user_workspace_roles (user_id, role_category, created_at)
                     SELECT id,
-                        CASE WHEN user_role IN ('teacher', 'study_travel') THEN user_role ELSE 'teacher' END,
+                        CASE WHEN user_role IN ('teacher', 'study_travel', 'parent') THEN user_role ELSE 'teacher' END,
                         datetime('now')
                     FROM users
                     """
@@ -94,7 +98,7 @@ def ensure_schema_compatibility() -> None:
                     """
                     INSERT OR IGNORE INTO user_workspace_roles (user_id, role_category, created_at)
                     SELECT owner_user_id,
-                        CASE WHEN role_category IN ('teacher', 'study_travel') THEN role_category ELSE 'teacher' END,
+                        CASE WHEN role_category IN ('teacher', 'study_travel', 'parent') THEN role_category ELSE 'teacher' END,
                         datetime('now')
                     FROM sessions
                     WHERE owner_user_id IS NOT NULL AND owner_user_id != ''

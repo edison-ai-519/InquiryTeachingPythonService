@@ -6,7 +6,7 @@ from app.db.models import UserModel
 from app.services.auth_service import workspace_roles_for_user
 
 
-WORKSPACE_ROLES = {"teacher", "study_travel"}
+WORKSPACE_ROLES = {"teacher", "study_travel", "parent"}
 
 
 def resolve_workspace_role(db: Session, user: UserModel, requested_role: str | None) -> str:

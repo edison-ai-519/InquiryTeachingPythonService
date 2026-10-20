@@ -42,7 +42,7 @@ type VisualLine = { key: string; label: string; logicalLine: number; continuatio
 const props = defineProps<{
   modelValue: string; session: SessionDetail | null; stage: FlowStage | null; selectedStageId: string; currentStageId: string; stageIndex: number; streaming: boolean; drafting: boolean;
   proposal: DraftProposal | null; proposalLabel: string; visualLines: VisualLine[]; scrollTop: number; lineHeight: number; cursorLine: number; selectionLabel: string; attachedLabel: string;
-  role_category?: "teacher" | "study_travel";
+  role_category?: "teacher" | "study_travel" | "parent";
 }>();
 const emit = defineEmits<{
   'update:modelValue': [value: string]; previous: []; next: []; save: []; export: []; preview: []; 'editor-ready': [element: HTMLTextAreaElement]; 'editor-input': []; 'editor-scroll': []; 'capture-selection': []; 'add-selection': []; 'clear-selection': [];
@@ -51,10 +51,10 @@ const emit = defineEmits<{
 const roleCategory = props.role_category || "teacher";
 
 const labels = computed(() => ({
-  planLabel: "草案制定",
-  selectPrompt: "选择一个阶段开始编辑草案",
-  exportTitle: "导出草案",
-  emptyPrompt: "从左侧选择一个阶段查看草案内容",
+  planLabel: props.role_category === "parent" ? "家庭活动方案" : "草案制定",
+  selectPrompt: props.role_category === "parent" ? "选择一个阶段开始编辑家庭活动方案" : "选择一个阶段开始编辑草案",
+  exportTitle: props.role_category === "parent" ? "导出家庭探究活动方案" : "导出草案",
+  emptyPrompt: props.role_category === "parent" ? "从左侧选择一个阶段查看活动方案" : "从左侧选择一个阶段查看草案内容",
 }));
 
 const content = computed({ get: () => props.modelValue, set: (value: string) => emit('update:modelValue', value) });

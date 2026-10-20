@@ -23,6 +23,7 @@ class SessionModel(Base):
     status = Column(String, default="active")
     draft_mode_enabled = Column(Integer, default=0)
     role_category = Column(String, nullable=False, default="teacher")
+    home_context_json = Column(Text, nullable=False, default="{}")
     created_at = Column(String, nullable=False)
     updated_at = Column(String, nullable=False)
 

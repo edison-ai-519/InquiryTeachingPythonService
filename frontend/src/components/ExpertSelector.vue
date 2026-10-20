@@ -54,7 +54,7 @@ const props = defineProps<{
   modelValue: string;
   experts: ExpertAgentItem[];
   disabled?: boolean;
-  role_category?: "teacher" | "study_travel";
+  role_category?: "teacher" | "study_travel" | "parent";
 }>();
 
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
@@ -62,6 +62,9 @@ const open = ref(false);
 const rootRef = ref<HTMLElement | null>(null);
 const selectedExpert = computed(() => props.experts.find((expert) => expert.id === props.modelValue) || null);
 const defaultMainTutor = computed(() => {
+  if (props.role_category === "parent") {
+    return { label: "家庭探究主导师", description: "家庭活动引导、亲子探究与安全建议" };
+  }
   if (props.role_category === "study_travel") {
     return {
       label: "研学主导师",

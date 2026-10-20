@@ -1,4 +1,5 @@
 import type {
+  HomeContext,
   AuthUser,
   CurriculumFileItem,
   CurriculumRetrievalRecord,
@@ -73,12 +74,13 @@ export async function getSessions(roleCategory: RoleCategory = "teacher"): Promi
 export async function createSession(
   topic: string,
   flowName: string,
-  roleCategory: RoleCategory = "teacher"
+  roleCategory: RoleCategory = "teacher",
+  homeContext?: HomeContext,
 ): Promise<SessionDetail> {
   const payload = await readJson<ApiEnvelope<SessionDetail>>(`${API_BASE}/api/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic, flow_name: flowName, role_category: roleCategory }),
+    body: JSON.stringify({ topic, flow_name: flowName, role_category: roleCategory, ...(homeContext ? { home_context: homeContext } : {}) }),
   });
   return payload.data;
 }

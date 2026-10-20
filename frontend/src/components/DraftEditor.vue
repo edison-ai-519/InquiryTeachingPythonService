@@ -21,7 +21,7 @@ const props = defineProps<{
   cursorLine: number;
   selectionLabel: string;
   attachedLabel: string;
-  role_category?: "teacher" | "study_travel";
+  role_category?: "teacher" | "study_travel" | "parent";
 }>();
 const emit = defineEmits<{
   'update:modelValue': [value: string]; 'editor-ready': [element: HTMLTextAreaElement]; input: []; scroll: []; 'capture-selection': []; 'add-selection': []; 'clear-selection': [];

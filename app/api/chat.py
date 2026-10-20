@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import datetime as dt
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -113,6 +114,10 @@ def save_chat_result(
                 created_at=now_iso(),
             )
         )
+        sess = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+        if not sess:
+            raise LookupError("Session not found")
+        main_agent_id = get_agent_registry().main_tutor(sess.role_category).id
 
         if expert_message:
             expert_msg_id = new_id("msg")
@@ -138,7 +143,7 @@ def save_chat_result(
             main_msg_id = new_id("msg")
             assistant_message_id = main_msg_id
             assistant_message_type = "main_tutor"
-            assistant_message_agent_id = "main_tutor"
+            assistant_message_agent_id = main_agent_id
             db.add(
                 MessageModel(
                     id=main_msg_id,
@@ -146,7 +151,7 @@ def save_chat_result(
                     stage_id=stage_id,
                     role="assistant",
                     content=DraftService.strip_draft_markers(main_message),
-                    agent_id="main_tutor",
+                    agent_id=main_agent_id,
                     message_type="main_tutor",
                     created_at=main_timestamp,
                 )
@@ -156,7 +161,7 @@ def save_chat_result(
             draft_msg_id = new_id("msg")
             assistant_message_id = draft_msg_id
             assistant_message_type = "main_tutor"
-            assistant_message_agent_id = "main_tutor"
+            assistant_message_agent_id = main_agent_id
             db.add(
                 MessageModel(
                     id=draft_msg_id,
@@ -164,15 +169,12 @@ def save_chat_result(
                     stage_id=stage_id,
                     role="assistant",
                     content=DraftService.strip_draft_markers(draft_message),
-                    agent_id="main_tutor",
+                    agent_id=main_agent_id,
                     message_type="main_tutor",
                     created_at=main_timestamp,
                 )
             )
 
-        sess = db.query(SessionModel).filter(SessionModel.id == session_id).first()
-        if not sess:
-            raise LookupError("Session not found")
         output = (
             db.query(StageOutputModel)
             .filter(
@@ -296,7 +298,7 @@ def apply_stage_action(
         db.commit()
         return {
             "completed": False,
-            "message": PromptService.opening_message(sess.topic, flow["display_name"], stage),
+            "message": PromptService.opening_message(sess.topic, flow["display_name"], stage, sess.role_category),
             "stage": stage,
             "flow": flow,
             "topic": sess.topic,
@@ -343,9 +345,9 @@ async def chat(
                         "delta",
                         {
                             "text": text,
-                            "agent_id": "main_tutor",
-                            "agent_name": "主导师 Agent",
-                            "agent_role": "探究教学主导师",
+                            "agent_id": get_agent_registry().main_tutor(sess.role_category).id,
+                            "agent_name": get_agent_registry().main_tutor(sess.role_category).name,
+                            "agent_role": get_agent_registry().main_tutor(sess.role_category).role,
                             "message_type": "main_tutor",
                         },
                     )
@@ -355,9 +357,9 @@ async def chat(
                         "message_id": None,
                         "completed": action_result["completed"],
                         "degraded": False,
-                        "agent_id": "main_tutor",
-                        "agent_name": "主导师 Agent",
-                        "agent_role": "探究教学主导师",
+                        "agent_id": get_agent_registry().main_tutor(sess.role_category).id,
+                        "agent_name": get_agent_registry().main_tutor(sess.role_category).name,
+                        "agent_role": get_agent_registry().main_tutor(sess.role_category).role,
                         "message_type": "main_tutor",
                         "request_id": request_id,
                     },
@@ -367,9 +369,9 @@ async def chat(
                     "interrupted",
                     {
                         "request_id": request_id,
-                        "agent_id": "main_tutor",
-                        "agent_name": "主导师 Agent",
-                        "agent_role": "探究教学主导师",
+                        "agent_id": get_agent_registry().main_tutor(sess.role_category).id,
+                        "agent_name": get_agent_registry().main_tutor(sess.role_category).name,
+                        "agent_role": get_agent_registry().main_tutor(sess.role_category).role,
                         "message_type": "main_tutor",
                     },
                 )
@@ -407,17 +409,24 @@ async def chat(
     graph_warning = ""
     graph_payload: dict | None = None
     allowed_sources: list[str] = []
-    if selected_expert is not None:
-        allowed_sources = CurriculumPermissionService.allowed_sources(db, selected_expert.id)
-        if allowed_sources and payload.graph_selection is None:
-            curriculum_context, curriculum_source = RagService.retrieve_curriculum_context(
-                db,
-                topic=sess.topic,
-                stage=stage,
-                user_message=payload.message,
-                expert_id=selected_expert.id,
-                allowed_sources=allowed_sources,
-            )
+    if sess.role_category == "parent":
+        # Search only the central study-base knowledge library. Session files and
+        # private base-staff conversations are not part of this source catalog.
+        allowed_sources = CurriculumPermissionService.allowed_sources_for_role(db, "study_travel")
+    elif selected_expert is not None:
+        allowed_sources = CurriculumPermissionService.allowed_sources(
+            db, selected_expert.id, role_category=sess.role_category
+        )
+    if allowed_sources and (sess.role_category == "parent" or payload.graph_selection is None):
+        curriculum_context, curriculum_source = RagService.retrieve_curriculum_context(
+            db,
+            topic=sess.topic,
+            stage=stage,
+            user_message=(f"{dialog_history[-2500:]}\n{payload.message}" if sess.role_category == "parent" else payload.message),
+            expert_id=(selected_expert.id if selected_expert else get_agent_registry().main_tutor(sess.role_category).id),
+            allowed_sources=allowed_sources,
+            role_category=sess.role_category,
+        )
     graph_service = KnowledgeGraphService(db)
     runtime_service = GlobiRuntimeService(db)
     is_runtime_graph_expert = bool(
@@ -541,6 +550,15 @@ async def chat(
         RagService.merge_context(base_doc_input, curriculum_context),
         graph_context,
     )
+    if sess.role_category == "parent":
+        home_context = json.loads(sess.home_context_json or "{}")
+        home_lines = [f"- {label}：{home_context.get(key, '')}" for key, label in (
+            ("child_age_grade", "孩子年龄/年级"), ("available_time", "可用时长"),
+            ("activity_space", "家庭空间"), ("available_materials", "现有材料"),
+            ("adult_accompaniment", "成人陪伴情况"),
+        ) if home_context.get(key)]
+        household = "【家庭情况】\n" + ("\n".join(home_lines) if home_lines else "家长尚未填写家庭情况；必要时通过对话了解年龄、时长、空间、材料和成人陪伴。")
+        doc_input = RagService.merge_context(doc_input, household)
     curriculum_sources = RagService.curriculum_sources(curriculum_source)
     if graph_source.get("hit_sources"):
         curriculum_sources = list(dict.fromkeys([*curriculum_sources, *graph_source["hit_sources"]]))
@@ -594,10 +612,11 @@ async def chat(
         draft_request_kind = payload.draft_request_kind or (
             "generate" if not session_snapshot["current_draft"].strip() else "edit"
         )
+        main_tutor = get_agent_registry().main_tutor(sess.role_category)
         agent_identity = {
-            "agent_id": selected_expert.id if selected_expert else "main_tutor",
-            "agent_name": selected_expert.name if selected_expert else "主导师 Agent",
-            "agent_role": selected_expert.role if selected_expert else "探究教学主导师",
+            "agent_id": selected_expert.id if selected_expert else main_tutor.id,
+            "agent_name": selected_expert.name if selected_expert else main_tutor.name,
+            "agent_role": selected_expert.role if selected_expert else main_tutor.role,
             "message_type": "expert_advice" if selected_expert else "main_tutor",
         }
 
@@ -705,6 +724,7 @@ async def chat(
                 current_draft=session_snapshot["current_draft"],
                 user_message=payload.message,
                 selection_text=session_snapshot["selection_text"],
+                role_category=sess.role_category,
             )
             async for text in ExpertAgentService.chat_stream(
                 agent=selected_expert,
@@ -728,9 +748,9 @@ async def chat(
             yield format_sse(
                 "agent",
                 {
-                    "agent_id": "main_tutor",
-                    "agent_name": "主导师 Agent",
-                    "agent_role": "探究教学主导师",
+                    "agent_id": main_tutor.id,
+                    "agent_name": main_tutor.name,
+                    "agent_role": main_tutor.role,
                     "message_type": "main_tutor",
                 },
             )
@@ -770,9 +790,9 @@ async def chat(
                                 **agent_identity,
                                 "text": chunk,
                                 "content": draft_text,
-                                "agent_id": "main_tutor",
-                                "agent_name": "主导师 Agent",
-                                "agent_role": "探究教学主导师",
+                                "agent_id": main_tutor.id,
+                                "agent_name": main_tutor.name,
+                                "agent_role": main_tutor.role,
                                 "message_type": "main_tutor",
                             },
                         )
@@ -806,7 +826,7 @@ async def chat(
                                 proposal_kind = "generate"
                                 final_draft = draft_text
                                 draft_updated = True
-                                draft_status_text = f"右侧草案已经整理好了，{'基地老师' if sess.role_category == 'study_travel' else '老师'}可以直接审阅或继续修改。"
+                                draft_status_text = f"右侧草案已经整理好了，{'基地老师' if sess.role_category == 'study_travel' else '家长' if sess.role_category == 'parent' else '老师'}可以直接审阅或继续修改。"
                                 yield format_sse("proposal", {"proposal": proposal_payload})
                             else:
                                 proposal_kind = "generate"
@@ -832,9 +852,9 @@ async def chat(
                             "warning",
                             {
                                 **agent_identity,
-                                "agent_id": "main_tutor",
-                                "agent_name": "主导师 Agent",
-                                "agent_role": "探究教学主导师",
+                                "agent_id": main_tutor.id,
+                                "agent_name": main_tutor.name,
+                                "agent_role": main_tutor.role,
                                 "message": draft_status_text,
                             },
                         )
@@ -874,6 +894,7 @@ async def chat(
                             user_message=payload.message,
                             llm_history=session_snapshot["llm_history"],
                             target=target,
+                            role_category=sess.role_category,
                         ):
                             await ensure_chat_active()
                             draft_text = candidate_content
@@ -883,9 +904,9 @@ async def chat(
                                     **agent_identity,
                                     "text": chunk,
                                     "content": draft_text,
-                                    "agent_id": "main_tutor",
-                                    "agent_name": "主导师 Agent",
-                                    "agent_role": "探究教学主导师",
+                                    "agent_id": main_tutor.id,
+                                    "agent_name": main_tutor.name,
+                                    "agent_role": main_tutor.role,
                                     "message_type": "main_tutor",
                                 },
                             )
@@ -911,7 +932,7 @@ async def chat(
                             proposal_kind = "edit"
                             final_draft = draft_text
                             draft_updated = True
-                            draft_status_text = f"右侧草案已经整理好了，{'基地老师' if sess.role_category == 'study_travel' else '老师'}可以直接审阅或继续修改。"
+                            draft_status_text = f"右侧草案已经整理好了，{'基地老师' if sess.role_category == 'study_travel' else '家长' if sess.role_category == 'parent' else '老师'}可以直接审阅或继续修改。"
                             yield format_sse("proposal", {"proposal": proposal_payload})
                         else:
                             proposal_kind = "edit"
@@ -942,9 +963,9 @@ async def chat(
             yield format_sse(
                 "agent",
                 {
-                    "agent_id": "main_tutor",
-                    "agent_name": "主导师 Agent",
-                    "agent_role": "探究教学主导师",
+                    "agent_id": main_tutor.id,
+                    "agent_name": main_tutor.name,
+                    "agent_role": main_tutor.role,
                     "message_type": "main_tutor",
                 },
             )
@@ -979,9 +1000,9 @@ async def chat(
                     "delta",
                     {
                         "text": text,
-                        "agent_id": "main_tutor",
-                        "agent_name": "主导师 Agent",
-                        "agent_role": "探究教学主导师",
+                        "agent_id": main_tutor.id,
+                        "agent_name": main_tutor.name,
+                        "agent_role": main_tutor.role,
                         "message_type": "main_tutor",
                     },
                 )
@@ -996,17 +1017,20 @@ async def chat(
             )
 
         await ensure_chat_active()
-        source_note = RagService.source_note(session_snapshot["rag_sources"])
-        if source_note and selected_expert is not None:
-            expert_text += source_note
+        source_note = RagService.source_note(session_snapshot["rag_sources"], sess.role_category)
+        if source_note:
+            if selected_expert is not None:
+                expert_text += source_note
+            else:
+                main_text += source_note
             yield format_sse(
                 "delta",
                 {
                     "text": source_note,
-                    "agent_id": selected_expert.id,
-                    "agent_name": selected_expert.name,
-                    "agent_role": selected_expert.role,
-                    "message_type": "expert_advice",
+                    "agent_id": selected_expert.id if selected_expert else main_tutor.id,
+                    "agent_name": selected_expert.name if selected_expert else main_tutor.name,
+                    "agent_role": selected_expert.role if selected_expert else main_tutor.role,
+                    "message_type": "expert_advice" if selected_expert else "main_tutor",
                 },
             )
 
@@ -1042,9 +1066,9 @@ async def chat(
                 "warning": None,
                 "draft_mode_enabled": session_snapshot["draft_mode_enabled"],
                 "rag_sources": session_snapshot["rag_sources"],
-                "agent_id": selected_expert.id if selected_expert else "main_tutor",
-                "agent_name": selected_expert.name if selected_expert else "主导师 Agent",
-                "agent_role": selected_expert.role if selected_expert else "探究教学主导师",
+                "agent_id": selected_expert.id if selected_expert else main_tutor.id,
+                "agent_name": selected_expert.name if selected_expert else main_tutor.name,
+                "agent_role": selected_expert.role if selected_expert else main_tutor.role,
                 "message_type": "expert_advice" if selected_expert else "main_tutor",
                 "request_id": request_id,
             },

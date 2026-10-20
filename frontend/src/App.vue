@@ -51,6 +51,7 @@
     <section class="chat-column">
       <ConversationPanel
         :session="currentSession"
+        :role-category="currentRole"
         :stage="currentStage"
         :messages="messages"
         :stage-names="stageNameMap"
@@ -573,11 +574,20 @@
     <!-- New Session Modal -->
     <div v-if="showNewSessionModal" class="modal-overlay" @click.self="showNewSessionModal = false">
       <div class="modal-content glass">
-        <h3>新建会话</h3>
+        <h3>{{ currentRole === 'parent' ? '新建家庭探究活动' : '新建会话' }}</h3>
         <label class="field">
-          <span>课题名称</span>
+          <span>{{ currentRole === 'parent' ? '探究主题' : '课题名称' }}</span>
           <input v-model="topicInput" class="input" placeholder="例如：光的反射" />
         </label>
+        <section v-if="currentRole === 'parent'" class="home-context-card">
+          <strong>家庭情况（可选）</strong>
+          <p>帮助导师匹配孩子和家庭条件，不填写也可以开始。</p>
+          <label class="field"><span>孩子年龄/年级</span><input v-model="homeContext.child_age_grade" class="input" placeholder="例如：8岁 / 二年级" /></label>
+          <label class="field"><span>活动时长</span><input v-model="homeContext.available_time" class="input" placeholder="例如：20–30分钟" /></label>
+          <label class="field"><span>家庭空间</span><input v-model="homeContext.activity_space" class="input" placeholder="例如：客厅、阳台" /></label>
+          <label class="field"><span>现有材料</span><input v-model="homeContext.available_materials" class="input" placeholder="例如：纸、透明杯、手电筒" /></label>
+          <label class="field"><span>成人陪伴情况</span><input v-model="homeContext.adult_accompaniment" class="input" placeholder="例如：全程陪伴 / 部分时间陪伴" /></label>
+        </section>
         <label class="field">
           <span>选择流程</span>
           <select v-model="newSessionFlowName" class="input">
@@ -660,6 +670,7 @@ import type {
   ExpertAgentItem,
   FlowInfo,
   FlowStage,
+  HomeContext,
   GraphSelectionPayload,
   GraphProgressState,
   KnowledgeGraphPayload,
@@ -701,9 +712,10 @@ const activeStreamRequestId = ref<string | null>(null);
 const activeStreamAbortController = ref<AbortController | null>(null);
 const interruptRequested = ref(false);
 const themeMode = ref<"dark" | "light">("light");
-const currentRole = ref<"teacher" | "study_travel">(
-  (localStorage.getItem("user_role") as "teacher" | "study_travel") || "teacher"
+const currentRole = ref<"teacher" | "study_travel" | "parent">(
+  (localStorage.getItem("user_role") as "teacher" | "study_travel" | "parent") || "teacher"
 );
+const homeContext = ref<HomeContext>({ child_age_grade: "", available_time: "", activity_space: "", available_materials: "", adult_accompaniment: "" });
 const saveSuccessVisible = ref(false);
 const workflowPhase = ref<"idle" | "guide" | "draft" | "expert">("idle");
 const workflowStatusText = ref("准备就绪");
@@ -835,13 +847,18 @@ async function loadSessions() {
   }
 }
 
-async function handleRoleSwitch(role: "teacher" | "study_travel") {
+async function handleRoleSwitch(role: "teacher" | "study_travel" | "parent") {
   currentRole.value = role;
   localStorage.setItem("user_role", role);
   selectedExpertId.value = "";
-  // 切换角色时清空当前会话和草案状态，确保教师工作台和研学基地工作台的草案隔离
+  // 切换工作台时清空会话、消息、文件和草案状态，避免跨角色内容混用。
   currentSession.value = null;
   selectedSessionId.value = "";
+  messages.value = [];
+  sessionFiles.value = [];
+  selectedStageId.value = "";
+  resetKnowledgeGraphState();
+  showGraphInRightPanel.value = false;
   draftContent.value = "";
   draftProposal.value = null;
   draftStreamingContent.value = "";
@@ -1383,9 +1400,9 @@ async function refreshWorkspace() {
 
 async function handleAuthenticated(user: AuthUser) {
   currentUser.value = user;
-  const savedRole = localStorage.getItem("user_role") as "teacher" | "study_travel" | null;
-  currentRole.value = user.workspace_roles.includes(savedRole as "teacher" | "study_travel")
-    ? savedRole as "teacher" | "study_travel"
+  const savedRole = localStorage.getItem("user_role") as "teacher" | "study_travel" | "parent" | null;
+  currentRole.value = user.workspace_roles.includes(savedRole as "teacher" | "study_travel" | "parent")
+    ? savedRole as "teacher" | "study_travel" | "parent"
     : user.workspace_roles[0] || user.user_role;
   localStorage.setItem("user_role", currentRole.value);
   await Promise.all([refreshWorkspace(), refreshCurriculumFiles()]);
@@ -1448,8 +1465,8 @@ async function loadSession(
   const keepGraphContext = graphContextSessionId.value === sessionId
     && (preserveGraphContext || !loadMessages);
   const [session, files] = await Promise.all([
-    getSession(sessionId, roleCategory as "teacher" | "study_travel"),
-    getSessionFiles(sessionId, roleCategory as "teacher" | "study_travel"),
+    getSession(sessionId, roleCategory as "teacher" | "study_travel" | "parent"),
+    getSessionFiles(sessionId, roleCategory as "teacher" | "study_travel" | "parent"),
   ]);
   if (!preserveWarning) {
     streamWarning.value = "";
@@ -1462,7 +1479,7 @@ async function loadSession(
   selectedStageId.value = pickStageIdFromSession(session);
   if (!keepGraphContext) resetKnowledgeGraphState();
   if (loadMessages) {
-    messages.value = await getMessages(sessionId, roleCategory as "teacher" | "study_travel");
+    messages.value = await getMessages(sessionId, roleCategory as "teacher" | "study_travel" | "parent");
   }
   const restoredGraphContext = !keepGraphContext
     && loadMessages
@@ -1940,7 +1957,8 @@ async function createWorkspaceSession() {
     statusText.value = "请先输入课题名称";
     return;
   }
-  const created = await createSession(topic, newSessionFlowName.value, currentRole.value);
+  const home = Object.fromEntries(Object.entries(homeContext.value).filter(([, value]) => value?.trim()));
+  const created = await createSession(topic, newSessionFlowName.value, currentRole.value, currentRole.value === "parent" && Object.keys(home).length ? home : undefined);
   sessions.value = [created, ...sessions.value.filter((item) => item.id !== created.id)];
   await loadSession(created.id, true, false, false, currentRole.value);
   statusText.value = `已创建会话：${topic}`;
@@ -1972,7 +1990,7 @@ function inspectStage(stageId: string) {
 
 function messageRoleLabel(message: MessageItem) {
   if (message.role === "user") {
-    return "教师";
+    return currentRole.value === "parent" ? "家长" : currentRole.value === "study_travel" ? "基地人员" : "教师";
   }
   if (message.message_type === "expert_advice") {
     return message.agent_name || expertName(message.agent_id || "") || "领域专家";
@@ -2672,12 +2690,12 @@ async function exportCurrentPlan() {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${currentSession.value.topic}-${currentRole.value === "study_travel" ? "研学方案" : "探究式教案"}.md`;
+  anchor.download = `${currentSession.value.topic}-${currentRole.value === "study_travel" ? "研学方案" : currentRole.value === "parent" ? "家庭探究活动方案" : "探究式教案"}.md`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
-  statusText.value = "教案已导出";
+  statusText.value = currentRole.value === "parent" ? "家庭探究活动方案已导出" : currentRole.value === "study_travel" ? "研学方案已导出" : "教案已导出";
 }
 
 function scrollFeedToBottom() {
