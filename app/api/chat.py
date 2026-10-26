@@ -401,6 +401,10 @@ async def chat(
     base_doc_input = ContextService.build_doc_input(
         db, session_id, stage["id"], sess.role_category
     )
+    base_doc_input = RagService.merge_context(
+        base_doc_input,
+        ContextService.build_study_task_context(db, session_id),
+    )
     curriculum_context = ""
     curriculum_source: dict = {}
     local_graph_context = ""
@@ -568,6 +572,7 @@ async def chat(
 
     session_snapshot = {
         "session_id": sess.id,
+        "role_category": sess.role_category,
         "topic": sess.topic,
         "flow_name": sess.flow_name,
         "flow_display_name": flow["display_name"],
@@ -987,6 +992,7 @@ async def chat(
                 current_draft=session_snapshot["current_draft"],
                 user_message=payload.message,
                 selection_text=session_snapshot["selection_text"],
+                role_category=session_snapshot["role_category"],
             )
             async for text in LLMService.chat_stream(
                 guide_prompt,

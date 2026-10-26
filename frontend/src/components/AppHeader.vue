@@ -39,6 +39,9 @@
           家长工作台
         </button>
       </div>
+      <button v-if="workspaceRoles.includes(currentRole)" class="header-admin-button task-center-trigger" type="button" @click="$emit('open-task-center')">
+        {{ currentRole === 'study_travel' ? '项目协同' : '任务大厅' }}
+      </button>
       <ExpertSelector v-model="expertId" :experts="experts" :role-category="currentRole" :disabled="streaming || !session" />
       <button v-if="user?.is_admin" class="header-admin-button" type="button" @click="$emit('open-graph-admin')">图谱管理</button>
       <span class="connection-status" :class="{ streaming }"><i></i>{{ streaming ? '正在生成' : '已连接' }}</span>
@@ -79,6 +82,7 @@ const emit = defineEmits<{
   'toggle-sidebar': [];
   'toggle-theme': [];
   'open-graph-admin': [];
+  'open-task-center': [];
   logout: [];
   'switch-role': [role: UserRole];
 }>();
@@ -118,6 +122,10 @@ const expertId = computed({
   border: 1px solid var(--border-default);
   border-radius: 8px;
   background: var(--surface-subtle);
+}
+
+.task-center-trigger {
+  white-space: nowrap;
 }
 
 .role-switcher button {

@@ -49,6 +49,67 @@ class UserWorkspaceRoleModel(Base):
     __table_args__ = (Index("ix_user_workspace_roles_user_id", "user_id"),)
 
 
+class StudyProjectModel(Base):
+    __tablename__ = "study_projects"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    location = Column(String, nullable=False, default="")
+    scene_description = Column(Text, nullable=False, default="")
+    materials_json = Column(Text, nullable=False, default="[]")
+    status = Column(String, nullable=False, default="draft", index=True)
+    summary_markdown = Column(Text, nullable=False, default="")
+    created_by_user_id = Column(String, nullable=False, index=True)
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+
+class StudyProjectFileModel(Base):
+    __tablename__ = "study_project_files"
+
+    id = Column(String, primary_key=True)
+    project_id = Column(String, ForeignKey("study_projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    extension = Column(String, nullable=False)
+    mime_type = Column(String, nullable=False, default="")
+    size_bytes = Column(Integer, nullable=False, default=0)
+    extracted_text = Column(Text, nullable=False, default="")
+    status = Column(String, nullable=False, default="processing")
+    error_message = Column(Text, nullable=False, default="")
+    stored_path = Column(Text, nullable=False)
+    uploaded_by_user_id = Column(String, nullable=False)
+    created_at = Column(String, nullable=False)
+
+
+class StudyTaskModel(Base):
+    __tablename__ = "study_tasks"
+
+    id = Column(String, primary_key=True)
+    project_id = Column(String, ForeignKey("study_projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False, default="")
+    target_role = Column(String, nullable=False, index=True)
+    flow_name = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="draft", index=True)
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+
+class StudyTaskSubmissionModel(Base):
+    __tablename__ = "study_task_submissions"
+
+    id = Column(String, primary_key=True)
+    task_id = Column(String, ForeignKey("study_tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String, nullable=False, index=True)
+    session_id = Column(String, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    status = Column(String, nullable=False, default="claimed", index=True)
+    report_markdown = Column(Text, nullable=False, default="")
+    claimed_at = Column(String, nullable=False)
+    submitted_at = Column(String, nullable=False, default="")
+
+    __table_args__ = (UniqueConstraint("task_id", "user_id", name="uq_study_task_submission_user"),)
+
+
 class AuthSessionModel(Base):
     __tablename__ = "auth_sessions"
 

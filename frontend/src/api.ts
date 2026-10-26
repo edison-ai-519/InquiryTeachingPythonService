@@ -26,6 +26,13 @@ import type {
   SessionDetail,
   SessionFileItem,
   SessionListItem,
+  AvailableStudyTask,
+  MyStudyTask,
+  StudyProject,
+  StudyProjectFile,
+  StudyTask,
+  StudyTaskSubmission,
+  UserRole,
 } from "@/types";
 
 const API_BASE =
@@ -37,6 +44,13 @@ type ApiEnvelope<T> = {
   message?: string;
   data: T;
 };
+
+export class ApiRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
 
 async function readJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
@@ -52,7 +66,7 @@ async function readJson<T>(input: RequestInfo | URL, init?: RequestInit): Promis
     } catch {
       // Keep the original response body when it is not JSON.
     }
-    throw new Error(detail);
+    throw new ApiRequestError(detail, response.status);
   }
   return response.json() as Promise<T>;
 }
@@ -62,6 +76,124 @@ export async function getFlows(roleCategory: RoleCategory = "teacher"): Promise<
     `${API_BASE}/api/flows?role_category=${roleCategory}`
   );
   return payload.data || [];
+}
+
+export async function getStudyProjects(): Promise<StudyProject[]> {
+  const payload = await readJson<ApiEnvelope<StudyProject[]>>(`${API_BASE}/api/study-projects`);
+  return payload.data || [];
+}
+
+export async function createStudyProject(input: {
+  name: string;
+  location: string;
+  scene_description: string;
+  materials: string[];
+}): Promise<StudyProject> {
+  const payload = await readJson<ApiEnvelope<StudyProject>>(`${API_BASE}/api/study-projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return payload.data;
+}
+
+export async function getStudyProject(projectId: string): Promise<StudyProject> {
+  const payload = await readJson<ApiEnvelope<StudyProject>>(`${API_BASE}/api/study-projects/${projectId}`);
+  return payload.data;
+}
+
+export async function updateStudyProject(
+  projectId: string,
+  input: Partial<Pick<StudyProject, "name" | "location" | "scene_description" | "materials" | "summary_markdown">>,
+): Promise<StudyProject> {
+  const payload = await readJson<ApiEnvelope<StudyProject>>(`${API_BASE}/api/study-projects/${projectId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return payload.data;
+}
+
+export async function publishStudyProject(projectId: string): Promise<StudyProject> {
+  const payload = await readJson<ApiEnvelope<StudyProject>>(`${API_BASE}/api/study-projects/${projectId}/publish`, { method: "POST" });
+  return payload.data;
+}
+
+export async function closeStudyProject(projectId: string): Promise<StudyProject> {
+  const payload = await readJson<ApiEnvelope<StudyProject>>(`${API_BASE}/api/study-projects/${projectId}/close`, { method: "POST" });
+  return payload.data;
+}
+
+export async function uploadStudyProjectFile(projectId: string, file: File): Promise<StudyProjectFile> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const payload = await readJson<ApiEnvelope<StudyProjectFile>>(`${API_BASE}/api/study-projects/${projectId}/files`, {
+    method: "POST",
+    body: formData,
+  });
+  return payload.data;
+}
+
+export async function deleteStudyProjectFile(projectId: string, fileId: string): Promise<void> {
+  await readJson<ApiEnvelope<null>>(`${API_BASE}/api/study-projects/${projectId}/files/${fileId}`, { method: "DELETE" });
+}
+
+export async function downloadStudyProjectFile(projectId: string, fileId: string, role: UserRole): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/study-projects/${projectId}/files/${fileId}/download?role_category=${role}`, { credentials: "include" });
+  if (!response.ok) throw new Error("无法下载场景附件");
+  const blobUrl = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement("a");
+  anchor.href = blobUrl;
+  anchor.download = decodeURIComponent(response.headers.get("content-disposition")?.split("filename=").pop()?.replaceAll('"', "") || "场景附件");
+  anchor.click();
+  URL.revokeObjectURL(blobUrl);
+}
+
+export async function createStudyTask(projectId: string, input: {
+  title: string;
+  description: string;
+  target_role: UserRole;
+  flow_name: string;
+}): Promise<StudyTask> {
+  const payload = await readJson<ApiEnvelope<StudyTask>>(`${API_BASE}/api/study-projects/${projectId}/tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return payload.data;
+}
+
+export async function updateStudyTask(projectId: string, taskId: string, input: Partial<Pick<StudyTask, "title" | "description" | "target_role" | "flow_name">>): Promise<StudyTask> {
+  const payload = await readJson<ApiEnvelope<StudyTask>>(`${API_BASE}/api/study-projects/${projectId}/tasks/${taskId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return payload.data;
+}
+
+export async function closeStudyTask(projectId: string, taskId: string): Promise<StudyProject> {
+  const payload = await readJson<ApiEnvelope<StudyProject>>(`${API_BASE}/api/study-projects/${projectId}/tasks/${taskId}/close`, { method: "POST" });
+  return payload.data;
+}
+
+export async function getAvailableStudyTasks(role: UserRole): Promise<AvailableStudyTask[]> {
+  const payload = await readJson<ApiEnvelope<AvailableStudyTask[]>>(`${API_BASE}/api/study-tasks/available?role_category=${role}`);
+  return payload.data || [];
+}
+
+export async function getMyStudyTasks(role: UserRole): Promise<MyStudyTask[]> {
+  const payload = await readJson<ApiEnvelope<MyStudyTask[]>>(`${API_BASE}/api/study-tasks/mine?role_category=${role}`);
+  return payload.data || [];
+}
+
+export async function claimStudyTask(taskId: string, role: UserRole): Promise<{ submission: StudyTaskSubmission; session: { id: string; status: string } }> {
+  const payload = await readJson<ApiEnvelope<{ submission: StudyTaskSubmission; session: { id: string; status: string } }>>(`${API_BASE}/api/study-tasks/${taskId}/claim`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role_category: role }),
+  });
+  return payload.data;
 }
 
 export async function getSessions(roleCategory: RoleCategory = "teacher"): Promise<SessionListItem[]> {

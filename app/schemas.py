@@ -34,6 +34,39 @@ class WorkspaceRolesRequest(BaseModel):
     workspace_roles: list[Literal["teacher", "study_travel", "parent"]] = Field(min_length=1, max_length=3)
 
 
+class StudyProjectCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    location: str = Field(default="", max_length=500)
+    scene_description: str = Field(default="", max_length=10000)
+    materials: list[str] = Field(default_factory=list, max_length=100)
+
+
+class StudyProjectUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    location: str | None = Field(default=None, max_length=500)
+    scene_description: str | None = Field(default=None, max_length=10000)
+    materials: list[str] | None = Field(default=None, max_length=100)
+    summary_markdown: str | None = Field(default=None, max_length=200000)
+
+
+class StudyTaskCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=10000)
+    target_role: Literal["teacher", "parent", "study_travel"]
+    flow_name: str = Field(min_length=1, max_length=128)
+
+
+class StudyTaskUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=10000)
+    target_role: Literal["teacher", "parent", "study_travel"] | None = None
+    flow_name: str | None = Field(default=None, min_length=1, max_length=128)
+
+
+class StudyTaskClaimRequest(BaseModel):
+    role_category: Literal["teacher", "parent", "study_travel"]
+
+
 class SelectFlowRequest(BaseModel):
     flow_name: str
     clear_messages: bool = True

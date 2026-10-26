@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import agents, auth, chat, curriculum, export, flows, health, knowledge, knowledge_sources, session_files, sessions
+from app.api import agents, auth, chat, curriculum, export, flows, health, knowledge, knowledge_sources, session_files, sessions, study_projects
 from app.core.config import get_settings
 from app.db.database import Base, engine
 from app.db.migrations import ensure_schema_compatibility
@@ -55,6 +55,7 @@ app.include_router(health.router)
 app.include_router(flows.router)
 app.include_router(agents.router)
 app.include_router(sessions.router)
+app.include_router(study_projects.router)
 app.include_router(session_files.router)
 app.include_router(curriculum.router)
 app.include_router(knowledge.router)
