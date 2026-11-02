@@ -374,6 +374,7 @@ export type FlowInfo = {
   name: string;
   display_name: string;
   description: string;
+  category?: string;
   stage_count: number;
   stages: FlowStage[];
 };
@@ -389,6 +390,7 @@ export type SessionListItem = {
   draft_mode_enabled: boolean;
   updated_at: string;
   created_at: string;
+  task_session?: boolean;
 };
 
 export type StageOutput = {
@@ -404,7 +406,72 @@ export type SessionDetail = SessionListItem & {
   current_stage: FlowStage | null;
   outputs: StageOutput[];
   role_category: UserRole;
+  task_submission_status?: string;
   home_context?: HomeContext;
+};
+
+export type StudyProjectFile = {
+  id: string;
+  name: string;
+  extension: string;
+  mime_type: string;
+  size_bytes: number;
+  status: string;
+  error_message: string;
+  created_at: string;
+};
+
+export type StudyTaskSubmission = {
+  id: string;
+  task_id: string;
+  session_id: string;
+  user_id?: string;
+  username?: string;
+  status: "claimed" | "submitted" | string;
+  report_markdown: string;
+  claimed_at: string;
+  submitted_at: string;
+};
+
+export type StudyTask = {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string;
+  target_role: UserRole;
+  target_role_label?: string;
+  flow_name: string;
+  flow_display_name: string;
+  status: "draft" | "open" | "closed" | string;
+  submission_count?: number;
+  submitted_count?: number;
+  submissions?: StudyTaskSubmission[];
+  my_submission?: StudyTaskSubmission | null;
+};
+
+export type StudyProject = {
+  id: string;
+  name: string;
+  location: string;
+  scene_description: string;
+  materials: string[];
+  status: "draft" | "active" | "closed" | string;
+  summary_markdown: string;
+  files: StudyProjectFile[];
+  tasks: StudyTask[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type AvailableStudyTask = StudyTask & {
+  project: Pick<StudyProject, "id" | "name" | "location" | "scene_description" | "materials" | "files">;
+};
+
+export type MyStudyTask = StudyTaskSubmission & {
+  task_title: string;
+  project_id: string;
+  project_name: string;
+  target_role: UserRole;
 };
 
 export type SessionFileItem = {

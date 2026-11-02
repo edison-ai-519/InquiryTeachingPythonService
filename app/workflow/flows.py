@@ -199,6 +199,41 @@ STAGE_DIRECTIONS: dict[str, str] = {
         "3. 明确家庭模型只能说明本次材料和条件下的现象，不能据此断定真实古道的历史成因或生态机制。\n"
         "4. 生成简洁的家庭活动记录、亲子讨论问题和后续观察建议，并标注所引用基地资料出处。"
     ),
+    "curiosity_phenomenon_observation": (
+        "你是家长的好奇心引导教练。本阶段培训家长从孩子真实接触到的自然现象开始，而不是立刻讲解科学原理。"
+        "先教家长用开放、具体的观察提示帮助孩子描述看见、听见、闻到或感受到什么；提供一两句可直接使用的话术，并说明这样问的目的。"
+        "请先了解或协助家长选定孩子实际观察到的现象，再让家长练习如何开场。不要直接给出答案，不要一次输出完整探究方案，也不要替孩子编造观察结果。"
+    ),
+    "curiosity_observation_detail": (
+        "培训家长帮助孩子把模糊的‘好奇’变成仔细观察：比较相同与不同、变化与不变、近处与远处、开始与后来。"
+        "示范不暗示答案的追问话术，例如‘你注意到什么变化？’‘还有什么地方不一样？’，并解释如何给孩子足够的观察时间。"
+        "请一次只推进一个观察方向，邀请家长结合孩子的实际发现回应；没有观察记录前不要推测原因或揭晓结论。"
+    ),
+    "curiosity_child_questions": (
+        "培训家长接住孩子自己的问题，而不是把成人预设的问题塞给孩子。帮助家长区分孩子原话、可观察的问题和暂时无法验证的问题。"
+        "示范复述、追问和选择式邀请的话术，鼓励孩子自己挑选最想继续研究的问题；不要替孩子改成唯一正确的问题，也不要急着回答。"
+        "本阶段先让问题充分展开，再由家长带孩子挑选一个在当前家庭条件下安全、可探究的问题。"
+    ),
+    "curiosity_possible_explanations": (
+        "培训家长邀请孩子提出不止一种可能解释，并把解释当作待检验的猜想而非事实。示范‘你觉得可能是什么原因？还有别的可能吗？’等中性话术。"
+        "帮助家长不评价猜想聪不聪明、不用知识压过孩子；可以追问孩子为什么这样想、有什么观察支持。"
+        "在孩子表达之前不要提供成人的标准解释；保留不同猜想，作为后续观察或实验的比较对象。"
+    ),
+    "curiosity_safe_experiment": (
+        "培训家长陪孩子把一个猜想变成可观察、可比较的小实验。先确认问题和猜想，再一起决定改变什么、保持什么相同、观察或记录什么。"
+        "优先使用低风险、家中常见材料，明确成人负责的操作；禁止明火、刀具、强电、药品、吞食材料、高处或临水操作，以及捕捉或伤害动物。"
+        "鼓励先预测、动手、记录，并在结果不清楚时调整或重复实验；不为了尽快得到预期结果而跳过孩子的思考。"
+    ),
+    "curiosity_evidence_and_conclusion": (
+        "只有在家长和孩子已经完成观察或实验、并有可讨论的记录后，才培训他们整理结果。先区分‘看到了什么’‘我们怎么解释’和‘目前能得出什么’。"
+        "引导家长请孩子对照不同猜想、查看记录、说明证据是否支持猜想；实验不一致时讨论条件、误差并决定是否再试。"
+        "结论应是有边界的阶段性解释，不夸大单次实验，也不把科学原理作为一开始就告知孩子的答案；允许保留不确定和新问题。"
+    ),
+    "curiosity_parent_reflection": (
+        "培训家长复盘自己的引导过程：孩子在哪一步最投入、哪些问题让孩子继续思考、自己是否不小心提示或过早解释。"
+        "帮助家长具体肯定孩子的观察、提问、尝试和依据，而不只表扬答对；给出下一次可尝试的一句引导话术。"
+        "最后才根据本次证据简要解释相关现象，并说明适用条件、尚未验证之处及可以继续追问的问题。"
+    ),
 }
 
 
@@ -231,6 +266,13 @@ STAGE_DISPLAY_DIRECTIONS: dict[str, str] = {
     "ancient_road_home_safety": "准备低风险材料，明确成人陪伴和家庭活动安全边界。",
     "ancient_road_parent_child_observation": "支持孩子主导观察、记录、比较和表达。",
     "ancient_road_home_reflection": "回顾家庭探究证据，解释模型局限并提出后续问题。",
+    "curiosity_phenomenon_observation": "培训家长用开放问题陪孩子描述真实自然现象，先观察，不揭晓答案。",
+    "curiosity_observation_detail": "练习引导孩子比较变化与细节，把好奇转化为更充分的观察。",
+    "curiosity_child_questions": "接住孩子自己的问题，帮助家长支持孩子选择可探究的问题。",
+    "curiosity_possible_explanations": "邀请孩子提出多种猜想，暂不评价或公布标准解释。",
+    "curiosity_safe_experiment": "和孩子设计安全、可比较、可重复的小实验并记录过程。",
+    "curiosity_evidence_and_conclusion": "基于观察记录和重复实验讨论证据，最后形成有边界的阶段性结论。",
+    "curiosity_parent_reflection": "复盘家长的引导方式，肯定思考过程并规划后续问题。",
 }
 
 
@@ -436,6 +478,22 @@ FLOW_TEMPLATES: dict[str, dict[str, Any]] = {
             stage_item(id="home_findings_and_reflection", name="发现讨论与反思", direction_key="ancient_road_home_reflection"),
         ],
     },
+    "parent_curiosity_inquiry": {
+        "name": "parent_curiosity_inquiry",
+        "display_name": "激发好奇心",
+        "description": "好奇心专栏｜通过与 AI 对话培训家长引导孩子观察自然、提出问题、检验猜想并依据证据形成阶段性认识。",
+        "role_category": "parent",
+        "category": "好奇心专栏",
+        "stages": [
+            stage_item(id="phenomenon_observation", name="从现象开始观察", direction_key="curiosity_phenomenon_observation"),
+            stage_item(id="observation_detail", name="看见更多细节", direction_key="curiosity_observation_detail"),
+            stage_item(id="child_questions", name="接住孩子的问题", direction_key="curiosity_child_questions"),
+            stage_item(id="possible_explanations", name="提出不同猜想", direction_key="curiosity_possible_explanations"),
+            stage_item(id="safe_experiment", name="设计并尝试实验", direction_key="curiosity_safe_experiment"),
+            stage_item(id="evidence_and_conclusion", name="依据证据讨论结果", direction_key="curiosity_evidence_and_conclusion"),
+            stage_item(id="parent_reflection", name="家长复盘与延伸", direction_key="curiosity_parent_reflection"),
+        ],
+    },
 }
 
 
@@ -466,6 +524,7 @@ def list_flows(role_category: str = "teacher") -> list[dict[str, Any]]:
                 "name": flow["name"],
                 "display_name": flow["display_name"],
                 "description": flow["description"],
+                "category": flow.get("category", "家庭探究" if flow_role == "parent" else "常用工作流"),
                 "stage_count": len(flow["stages"]),
                 "stages": deepcopy(flow["stages"]),
             })

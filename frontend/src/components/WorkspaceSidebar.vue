@@ -10,7 +10,7 @@
 
     <template v-if="!collapsed">
       <section class="sidebar-session-section">
-        <div class="sidebar-section-head"><span>{{ labels.mySessions }}</span><button type="button" title="删除当前会话" :disabled="!session" @click="$emit('delete-session')"><Trash2 :size="15" /></button></div>
+        <div class="sidebar-section-head"><span>{{ labels.mySessions }}</span><button v-if="!session?.task_session" type="button" title="删除当前会话" :disabled="!session" @click="$emit('delete-session')"><Trash2 :size="15" /></button></div>
         <select :value="selectedSessionId" :disabled="uploading || !sessions.length" @change="$emit('select-session', ($event.target as HTMLSelectElement).value)">
           <option v-if="!sessions.length" value="">暂无会话</option>
           <option v-for="item in filteredSessions" :key="item.id" :value="item.id">{{ item.topic }} · {{ item.flow_display_name }}</option>

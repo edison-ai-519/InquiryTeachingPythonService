@@ -19,6 +19,66 @@ CREATE TABLE IF NOT EXISTS sessions (
     updated_at          TEXT NOT NULL
 );
 
+-- A study-trip project is the shared scene and material context for three workbenches.
+CREATE TABLE IF NOT EXISTS study_projects (
+    id                  TEXT PRIMARY KEY,
+    name                TEXT NOT NULL,
+    location            TEXT NOT NULL DEFAULT '',
+    scene_description   TEXT NOT NULL DEFAULT '',
+    materials_json      TEXT NOT NULL DEFAULT '[]',
+    status              TEXT NOT NULL DEFAULT 'draft',
+    summary_markdown    TEXT NOT NULL DEFAULT '',
+    created_by_user_id  TEXT NOT NULL,
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL
+);
+
+-- Files and extracted text are stored with the existing upload service.
+CREATE TABLE IF NOT EXISTS study_project_files (
+    id                  TEXT PRIMARY KEY,
+    project_id          TEXT NOT NULL,
+    name                TEXT NOT NULL,
+    extension           TEXT NOT NULL,
+    mime_type           TEXT NOT NULL DEFAULT '',
+    size_bytes          INTEGER NOT NULL DEFAULT 0,
+    extracted_text      TEXT NOT NULL DEFAULT '',
+    status              TEXT NOT NULL DEFAULT 'processing',
+    error_message       TEXT NOT NULL DEFAULT '',
+    stored_path         TEXT NOT NULL,
+    uploaded_by_user_id TEXT NOT NULL,
+    created_at          TEXT NOT NULL,
+    FOREIGN KEY (project_id) REFERENCES study_projects (id) ON DELETE CASCADE
+);
+
+-- Each task targets one workspace and uses a flow already registered for that role.
+CREATE TABLE IF NOT EXISTS study_tasks (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    target_role TEXT NOT NULL,
+    flow_name   TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'draft',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    FOREIGN KEY (project_id) REFERENCES study_projects (id) ON DELETE CASCADE
+);
+
+-- One independent session and report per task participant.
+CREATE TABLE IF NOT EXISTS study_task_submissions (
+    id            TEXT PRIMARY KEY,
+    task_id       TEXT NOT NULL,
+    user_id       TEXT NOT NULL,
+    session_id    TEXT NOT NULL UNIQUE,
+    status        TEXT NOT NULL DEFAULT 'claimed',
+    report_markdown TEXT NOT NULL DEFAULT '',
+    claimed_at    TEXT NOT NULL,
+    submitted_at  TEXT NOT NULL DEFAULT '',
+    CONSTRAINT uq_study_task_submission_user UNIQUE (task_id, user_id),
+    FOREIGN KEY (task_id) REFERENCES study_tasks (id) ON DELETE CASCADE,
+    FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
+);
+
 -- Draft and confirmed output for every stage in a session.
 CREATE TABLE IF NOT EXISTS stage_outputs (
     id            TEXT PRIMARY KEY,
@@ -456,6 +516,24 @@ CREATE TABLE IF NOT EXISTS chat_turns (
 -- Session timeline and stage lookup indexes.
 CREATE INDEX IF NOT EXISTS ix_sessions_updated_at
     ON sessions (updated_at);
+CREATE INDEX IF NOT EXISTS ix_study_projects_status
+    ON study_projects (status);
+CREATE INDEX IF NOT EXISTS ix_study_projects_created_by_user_id
+    ON study_projects (created_by_user_id);
+CREATE INDEX IF NOT EXISTS ix_study_project_files_project_id
+    ON study_project_files (project_id);
+CREATE INDEX IF NOT EXISTS ix_study_tasks_project_id
+    ON study_tasks (project_id);
+CREATE INDEX IF NOT EXISTS ix_study_tasks_target_role
+    ON study_tasks (target_role);
+CREATE INDEX IF NOT EXISTS ix_study_tasks_status
+    ON study_tasks (status);
+CREATE INDEX IF NOT EXISTS ix_study_task_submissions_task_id
+    ON study_task_submissions (task_id);
+CREATE INDEX IF NOT EXISTS ix_study_task_submissions_user_id
+    ON study_task_submissions (user_id);
+CREATE INDEX IF NOT EXISTS ix_study_task_submissions_status
+    ON study_task_submissions (status);
 
 CREATE INDEX IF NOT EXISTS ix_stage_outputs_session_id
     ON stage_outputs (session_id);

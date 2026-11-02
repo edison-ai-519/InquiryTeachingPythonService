@@ -13,6 +13,9 @@ from app.db.models import (
     DraftProposalModel,
     MessageModel,
     SessionModel,
+    StudyProjectModel,
+    StudyTaskModel,
+    StudyTaskSubmissionModel,
     StageOutputModel,
     RagRecordModel,
     UserModel,
@@ -68,6 +71,12 @@ def create_stage_outputs(db: Session, session_id: str, flow_name: str, role_cate
         )
 
 
+def task_submission_for_session(db: Session, session_id: str) -> StudyTaskSubmissionModel | None:
+    return db.query(StudyTaskSubmissionModel).filter(
+        StudyTaskSubmissionModel.session_id == session_id
+    ).first()
+
+
 def serialize_session(sess: SessionModel, db: Session) -> dict:
     flow = get_flow(sess.flow_name)
     current_stage = None
@@ -81,6 +90,7 @@ def serialize_session(sess: SessionModel, db: Session) -> dict:
         .order_by(StageOutputModel.order_index.asc())
         .all()
     )
+    task_submission = task_submission_for_session(db, sess.id)
     return {
         "id": sess.id,
         "title": sess.title,
@@ -92,6 +102,8 @@ def serialize_session(sess: SessionModel, db: Session) -> dict:
         "status": sess.status,
         "draft_mode_enabled": bool(sess.draft_mode_enabled),
         "role_category": sess.role_category,
+        "task_session": task_submission is not None,
+        "task_submission_status": task_submission.status if task_submission else "",
         "home_context": json.loads(sess.home_context_json or "{}"),
         "outputs": [
             {
@@ -191,6 +203,7 @@ def list_sessions(
                 "draft_mode_enabled": bool(sess.draft_mode_enabled),
                 "updated_at": sess.updated_at,
                 "created_at": sess.created_at,
+                "task_session": task_submission_for_session(db, sess.id) is not None,
             }
         )
     return {"code": 0, "message": "success", "data": data}
@@ -215,6 +228,11 @@ def delete_session(
     user: UserModel = Depends(get_current_user),
 ):
     sess = get_owned_workspace_session(db, session_id, user, role_category)
+    task_submission = db.query(StudyTaskSubmissionModel).filter(
+        StudyTaskSubmissionModel.session_id == session_id
+    ).first()
+    if task_submission:
+        raise HTTPException(status_code=409, detail="任务执行会话不能删除")
 
     # Cascade delete all related data to keep DB clean
     db.query(StageOutputModel).filter(
@@ -326,6 +344,34 @@ def confirm_stage(
     sess.current_stage_index += 1
     if sess.current_stage_index >= len(flow["stages"]):
         sess.status = "completed"
+        submission = db.query(StudyTaskSubmissionModel).filter(
+            StudyTaskSubmissionModel.session_id == session_id,
+            StudyTaskSubmissionModel.status == "claimed",
+        ).first()
+        if submission:
+            task = db.query(StudyTaskModel).filter(StudyTaskModel.id == submission.task_id).first()
+            outputs = (
+                db.query(StageOutputModel)
+                .filter(
+                    StageOutputModel.session_id == session_id,
+                    StageOutputModel.role_category == sess.role_category,
+                )
+                .order_by(StageOutputModel.order_index.asc())
+                .all()
+            )
+            report_label = {"teacher": "教师报告", "parent": "家长报告", "study_travel": "研学基地报告"}.get(sess.role_category, "任务报告")
+            report_parts = [f"# {report_label}：{task.title if task else sess.topic}"]
+            for item in outputs:
+                content = (item.final_content or item.draft_content or "").strip()
+                if content:
+                    report_parts.extend([f"## {item.stage_name}", content])
+            submission.report_markdown = "\n\n".join(report_parts)
+            submission.status = "submitted"
+            submission.submitted_at = now_iso()
+            if task:
+                project = db.query(StudyProjectModel).filter(StudyProjectModel.id == task.project_id).first()
+                if project:
+                    project.updated_at = submission.submitted_at
     sess.updated_at = now_iso()
     db.commit()
     db.refresh(sess)
@@ -428,6 +474,23 @@ def rollback(
     if payload.stage_back:
         sess.current_stage_index = max(0, sess.current_stage_index - 1)
         sess.status = "active"
+        submission = db.query(StudyTaskSubmissionModel).filter(
+            StudyTaskSubmissionModel.session_id == session_id,
+            StudyTaskSubmissionModel.status == "submitted",
+        ).first()
+        if submission:
+            submission.status = "claimed"
+            submission.report_markdown = ""
+            submission.submitted_at = ""
+            task = db.query(StudyTaskModel).filter(
+                StudyTaskModel.id == submission.task_id
+            ).first()
+            if task:
+                project = db.query(StudyProjectModel).filter(
+                    StudyProjectModel.id == task.project_id
+                ).first()
+                if project:
+                    project.updated_at = now_iso()
         stage = get_stage(sess.flow_name, sess.current_stage_index)
         output = (
             db.query(StageOutputModel)

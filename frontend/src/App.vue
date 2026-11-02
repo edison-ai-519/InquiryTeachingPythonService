@@ -1,7 +1,15 @@
 <template>
-  <AuthPanel v-if="!authLoading && !currentUser" @authenticated="handleAuthenticated" />
+  <AuthPanel v-if="!authLoading && !currentUser && !authRestoreError" @authenticated="handleAuthenticated" />
   <div v-else-if="authLoading" class="auth-loading">正在验证登录状态…</div>
+  <div v-else-if="authRestoreError" class="auth-loading">
+    <p>暂时无法验证登录状态：{{ authRestoreError }}</p>
+    <button class="primary-button" type="button" @click="restoreLoginState">重试</button>
+  </div>
   <div v-else class="workspace-page">
+  <div v-if="workspaceLoadError" class="workspace-load-error" role="alert">
+    {{ workspaceLoadError }}
+    <button type="button" @click="retryWorkspaceLoad">重试加载</button>
+  </div>
   <AppHeader
     v-model="selectedExpertId"
     :experts="experts"
@@ -18,7 +26,14 @@
     @toggle-theme="toggleTheme"
     @logout="logout"
     @open-graph-admin="openGraphAdmin"
+    @open-task-center="showStudyTaskCenter = true"
     @switch-role="handleRoleSwitch"
+  />
+  <StudyTaskCenter
+    v-if="showStudyTaskCenter"
+    :role="currentRole"
+    @close="showStudyTaskCenter = false"
+    @open-session="openTaskSession"
   />
   <div
     class="workspace-grid"
@@ -591,9 +606,11 @@
         <label class="field">
           <span>选择流程</span>
           <select v-model="newSessionFlowName" class="input">
-            <option v-for="flow in flows" :key="flow.name" :value="flow.name">
-              {{ flow.display_name }} ({{ flow.stage_count }}阶段)
-            </option>
+            <optgroup v-for="group in flowGroups" :key="group.category" :label="group.category">
+              <option v-for="flow in group.flows" :key="flow.name" :value="flow.name">
+                {{ flow.display_name }} ({{ flow.stage_count }}阶段)
+              </option>
+            </optgroup>
           </select>
         </label>
         <div class="modal-actions">
@@ -623,6 +640,7 @@ import DraftReviewOverlay from "@/components/DraftReviewOverlay.vue";
 import KnowledgeGraphPanel from "@/components/KnowledgeGraphPanel.vue";
 import KnowledgeGraphAdminModal from "@/components/KnowledgeGraphAdminModal.vue";
 import WorkspaceSidebar from "@/components/WorkspaceSidebar.vue";
+import StudyTaskCenter from "@/components/StudyTaskCenter.vue";
 import { BookOpen, Database, Download, FileText, History, LoaderCircle, RefreshCw, Upload, X } from "lucide-vue-next";
 import {
   createSession,
@@ -680,10 +698,22 @@ import type {
   SessionListItem,
 } from "@/types";
 import { renderMarkdown } from "@/utils/markdown";
+import { restoreAuthentication } from "@/authBootstrap";
+import { ApiRequestError } from "@/api";
 
 const flows = ref<FlowInfo[]>([]);
+const flowGroups = computed(() => {
+  const grouped = new Map<string, FlowInfo[]>();
+  for (const flow of flows.value) {
+    const category = flow.category || "常用工作流";
+    grouped.set(category, [...(grouped.get(category) || []), flow]);
+  }
+  return Array.from(grouped, ([category, items]) => ({ category, flows: items }));
+});
 const currentUser = ref<AuthUser | null>(null);
 const authLoading = ref(true);
+const authRestoreError = ref("");
+const workspaceLoadError = ref("");
 const sessions = ref<SessionListItem[]>([]);
 const currentSession = ref<SessionDetail | null>(null);
 const messages = ref<MessageItem[]>([]);
@@ -794,6 +824,7 @@ let draftMeasureCanvas: HTMLCanvasElement | null = null;
 
 // New ref for modal
 const showNewSessionModal = ref(false);
+const showStudyTaskCenter = ref(false);
 
 function isKnowledgeGraphExpert(expertId: string): boolean {
   return expertId === "insect_agent" || expertId === "nature_agent";
@@ -840,10 +871,24 @@ function toggleRightSidebar() {
 }
 
 async function loadSessions() {
+  sessions.value = [];
   try {
     sessions.value = await getSessions(currentRole.value);
+    workspaceLoadError.value = "";
   } catch (error: any) {
-    // 错误处理
+    workspaceLoadError.value = `历史会话加载失败：${error.message || String(error)}`;
+  }
+}
+
+async function retryWorkspaceLoad() {
+  workspaceLoadError.value = "";
+  try {
+    await refreshWorkspace();
+    if (sessions.value[0]) {
+      await loadSession(sessions.value[0].id, true, false, false, currentRole.value);
+    }
+  } catch (error: any) {
+    workspaceLoadError.value = `工作台加载失败：${error.message || String(error)}`;
   }
 }
 
@@ -866,19 +911,25 @@ async function handleRoleSwitch(role: "teacher" | "study_travel" | "parent") {
   lastDraftSelection.value = null;
   attachedChatSelection.value = null;
   attachedChatSelectionLabel.value = "";
+  sessions.value = [];
 
-  const [flowList, expertList] = await Promise.all([
-    getFlows(role),
-    getExperts(role),
-  ]);
-  flows.value = flowList;
-  experts.value = expertList;
-  newSessionFlowName.value = flowList[0]?.name ?? "";
+  workspaceLoadError.value = "";
+  try {
+    const [flowList, expertList] = await Promise.all([
+      getFlows(role),
+      getExperts(role),
+    ]);
+    flows.value = flowList;
+    experts.value = expertList;
+    newSessionFlowName.value = flowList[0]?.name ?? "";
 
-  // 重新加载该角色下的会话列表，并自动打开最新会话
-  await loadSessions();
-  if (sessions.value[0]) {
-    await loadSession(sessions.value[0].id, true, false, false, currentRole.value);
+    // 重新加载该角色下的会话列表，并自动打开最新会话
+    await loadSessions();
+    if (sessions.value[0]) {
+      await loadSession(sessions.value[0].id, true, false, false, currentRole.value);
+    }
+  } catch (error: any) {
+    workspaceLoadError.value = `工作台加载失败：${error.message || String(error)}`;
   }
 }
 
@@ -1378,37 +1429,90 @@ function onDraftEditorInput() {
 }
 
 async function refreshWorkspace() {
+  workspaceLoadError.value = "";
   statusText.value = "刷新流程与会话中...";
-  const [flowList, sessionList, expertList] = await Promise.all([
+  const [flowResult, sessionResult, expertResult] = await Promise.allSettled([
     getFlows(currentRole.value),
     getSessions(currentRole.value),
     getExperts(currentRole.value),
   ]);
-  flows.value = flowList;
-  sessions.value = sessionList;
-  experts.value = expertList;
+  const errors: string[] = [];
+  if (flowResult.status === "fulfilled") {
+    flows.value = flowResult.value;
+  } else {
+    flows.value = [];
+    errors.push(`工作流：${flowResult.reason?.message || String(flowResult.reason)}`);
+  }
+  if (sessionResult.status === "fulfilled") {
+    sessions.value = sessionResult.value;
+  } else {
+    sessions.value = [];
+    errors.push(`历史会话：${sessionResult.reason?.message || String(sessionResult.reason)}`);
+  }
+  if (expertResult.status === "fulfilled") {
+    experts.value = expertResult.value;
+  } else {
+    experts.value = [];
+    errors.push(`专家列表：${expertResult.reason?.message || String(expertResult.reason)}`);
+  }
+  if (errors.length) {
+    workspaceLoadError.value = `工作台部分数据加载失败（${errors.join("；")}）`;
+  }
+  const flowList = flows.value;
   if (!flowList.length) {
     newSessionFlowName.value = "";
-    statusText.value = "工作区已刷新";
+    statusText.value = errors.length ? "工作区部分数据加载失败" : "工作区已刷新";
     return;
   }
   if (!flowList.some((flow) => flow.name === newSessionFlowName.value)) {
     newSessionFlowName.value = flowList[0].name;
   }
-  statusText.value = "工作区已刷新";
+  statusText.value = errors.length ? "工作区部分数据加载失败" : "工作区已刷新";
 }
 
 async function handleAuthenticated(user: AuthUser) {
   currentUser.value = user;
+  workspaceLoadError.value = "";
   const savedRole = localStorage.getItem("user_role") as "teacher" | "study_travel" | "parent" | null;
   currentRole.value = user.workspace_roles.includes(savedRole as "teacher" | "study_travel" | "parent")
     ? savedRole as "teacher" | "study_travel" | "parent"
     : user.workspace_roles[0] || user.user_role;
   localStorage.setItem("user_role", currentRole.value);
-  await Promise.all([refreshWorkspace(), refreshCurriculumFiles()]);
-  if (sessions.value[0]) {
-    await loadSession(sessions.value[0].id, true);
+  try {
+    await Promise.all([refreshWorkspace(), refreshCurriculumFiles()]);
+    if (sessions.value[0]) {
+      await loadSession(sessions.value[0].id, true, false, false, currentRole.value);
+    }
+  } catch (error: any) {
+    workspaceLoadError.value = `登录成功，但工作台加载失败：${error.message || String(error)}`;
   }
+}
+
+async function restoreLoginState() {
+  authLoading.value = true;
+  authRestoreError.value = "";
+  const result = await restoreAuthentication(
+    getCurrentUser,
+    async (user) => {
+      await handleAuthenticated(user);
+    },
+    (error) => error instanceof ApiRequestError && error.status === 401,
+  );
+  if (result.status === "unauthenticated") {
+    currentUser.value = null;
+    authRestoreError.value = "";
+  } else if (result.status === "unavailable") {
+    currentUser.value = null;
+    authRestoreError.value = result.error instanceof Error
+      ? result.error.message
+      : String(result.error);
+  } else {
+    currentUser.value = result.user;
+    if (result.workspaceError) {
+      workspaceLoadError.value = `已恢复登录，但工作台加载失败：${String(result.workspaceError)}`;
+    }
+  }
+  authLoading.value = false;
 }
 
 async function logout() {
@@ -1435,6 +1539,7 @@ async function logout() {
     draftProposal.value = null;
     draftStreamingContent.value = "";
     statusText.value = "已退出登录";
+    workspaceLoadError.value = "";
   }
 }
 
@@ -1498,6 +1603,12 @@ async function loadSession(
 }
 
 async function selectSession(sessionId: string) {
+  await loadSession(sessionId, true, false, false, currentRole.value);
+}
+
+async function openTaskSession(sessionId: string) {
+  showStudyTaskCenter.value = false;
+  sessions.value = await getSessions(currentRole.value);
   await loadSession(sessionId, true, false, false, currentRole.value);
 }
 
@@ -2357,7 +2468,7 @@ async function sendChat(options: SendChatOptions = {}) {
       : requestMode === "expert"
         ? selectionPayload
           ? "正在请领域专家围绕您选中的内容提供建议..."
-          : "正在等待领域专家分析..."
+          : "正在等待回答..."
         : selectionPayload
           ? "正在请主导师围绕您选中的内容做引导..."
           : "正在等待主导师分析...";
@@ -2772,14 +2883,7 @@ onMounted(async () => {
   }
   applyTheme(themeMode.value);
   updateWorkflowStatus("idle", "准备就绪", "done");
-  try {
-    const user = await getCurrentUser();
-    await handleAuthenticated(user);
-  } catch {
-    currentUser.value = null;
-  } finally {
-    authLoading.value = false;
-  }
+  await restoreLoginState();
   syncDraftEditor();
   updateDraftCursorLine();
   nextTick(() => {

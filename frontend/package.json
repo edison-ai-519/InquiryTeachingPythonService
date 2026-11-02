@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit -p tsconfig.app.json && vite build",
+    "test:auth": "node --experimental-strip-types --test tests/authBootstrap.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

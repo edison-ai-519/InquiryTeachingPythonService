@@ -162,7 +162,7 @@ agents:
     role: 家庭昆虫观察与生态专家
     description: 指导家庭环境下的昆虫观察、识别推理和非侵扰活动。
     capabilities: [insect_observation, identification_reasoning, non_intrusive_guidance, family_activity]
-    prompt_file: prompts/parent_expert.md
+    prompt_file: prompts/parent_insect.md
     selectable: true
     role_category: parent
 
@@ -172,7 +172,7 @@ agents:
     role: 家庭自然观察专家
     description: 指导家庭周边植物、土壤、天气与生态关系观察。
     capabilities: [ecosystem_relationships, seasonal_change, family_activity]
-    prompt_file: prompts/parent_expert.md
+    prompt_file: prompts/parent_nature.md
     selectable: true
     role_category: parent
 
@@ -182,7 +182,7 @@ agents:
     role: 家庭数学与数据分析专家
     description: 指导使用常见家庭工具开展测量、计数、比较和数据表达。
     capabilities: [measurement, sampling, statistics, family_activity]
-    prompt_file: prompts/parent_expert.md
+    prompt_file: prompts/parent_mathematics.md
     selectable: true
     role_category: parent
 
@@ -192,7 +192,7 @@ agents:
     role: 家庭探究安全专家
     description: 评估家庭空间、材料和工具风险，提供适龄安全边界。
     capabilities: [risk_assessment, tool_safety, biological_ethics, family_activity]
-    prompt_file: prompts/parent_expert.md
+    prompt_file: prompts/parent_safety.md
     selectable: true
     role_category: parent
 
@@ -202,6 +202,16 @@ agents:
     role: 家庭科学探究专家
     description: 指导低成本家庭实验、变量控制、观察记录和解释。
     capabilities: [inquiry_question, variable_control, experiment_design, family_activity]
-    prompt_file: prompts/parent_expert.md
+    prompt_file: prompts/parent_physics.md
+    selectable: true
+    role_category: parent
+
+  - id: parent_child_agent
+    kind: expert
+    name: 好奇的小朋友
+    role: 小学三年级小朋友
+    description: 以充满好奇、爱思考、热爱大自然的小学生视角回应，供家长练习倾听和引导。
+    capabilities: [child_perspective, curiosity_roleplay, nature_observation, parent_guidance_practice]
+    prompt_file: prompts/parent_child_agent.md
     selectable: true
     role_category: parent
