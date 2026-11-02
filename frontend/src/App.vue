@@ -27,6 +27,7 @@
     @logout="logout"
     @open-graph-admin="openGraphAdmin"
     @open-task-center="showStudyTaskCenter = true"
+    @open-user-guide="showUserGuide = true"
     @switch-role="handleRoleSwitch"
   />
   <StudyTaskCenter
@@ -35,6 +36,7 @@
     @close="showStudyTaskCenter = false"
     @open-session="openTaskSession"
   />
+  <UserGuideModal v-if="showUserGuide" :role="currentRole" @close="showUserGuide = false" />
   <div
     class="workspace-grid"
     :class="{
@@ -641,6 +643,7 @@ import KnowledgeGraphPanel from "@/components/KnowledgeGraphPanel.vue";
 import KnowledgeGraphAdminModal from "@/components/KnowledgeGraphAdminModal.vue";
 import WorkspaceSidebar from "@/components/WorkspaceSidebar.vue";
 import StudyTaskCenter from "@/components/StudyTaskCenter.vue";
+import UserGuideModal from "@/components/UserGuideModal.vue";
 import { BookOpen, Database, Download, FileText, History, LoaderCircle, RefreshCw, Upload, X } from "lucide-vue-next";
 import {
   createSession,
@@ -825,6 +828,7 @@ let draftMeasureCanvas: HTMLCanvasElement | null = null;
 // New ref for modal
 const showNewSessionModal = ref(false);
 const showStudyTaskCenter = ref(false);
+const showUserGuide = ref(false);
 
 function isKnowledgeGraphExpert(expertId: string): boolean {
   return expertId === "insect_agent" || expertId === "nature_agent";

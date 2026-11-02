@@ -42,6 +42,7 @@
       <button v-if="workspaceRoles.includes(currentRole)" class="header-admin-button task-center-trigger" type="button" @click="$emit('open-task-center')">
         {{ currentRole === 'study_travel' ? '项目协同' : '任务大厅' }}
       </button>
+      <button class="header-admin-button user-guide-trigger" type="button" @click="$emit('open-user-guide')"><BookOpen :size="15" /><span>使用手册</span></button>
       <ExpertSelector v-model="expertId" :experts="experts" :role-category="currentRole" :disabled="streaming || !session" />
       <button v-if="user?.is_admin" class="header-admin-button" type="button" @click="$emit('open-graph-admin')">图谱管理</button>
       <span class="connection-status" :class="{ streaming }"><i></i>{{ streaming ? '正在生成' : '已连接' }}</span>
@@ -59,7 +60,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { ChevronDown, GraduationCap, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Sun } from "lucide-vue-next";
+import { BookOpen, ChevronDown, GraduationCap, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Sun } from "lucide-vue-next";
 import ExpertSelector from "@/components/ExpertSelector.vue";
 import type { AuthUser, ExpertAgentItem, FlowStage, SessionDetail, UserRole } from "@/types";
 
@@ -83,6 +84,7 @@ const emit = defineEmits<{
   'toggle-theme': [];
   'open-graph-admin': [];
   'open-task-center': [];
+  'open-user-guide': [];
   logout: [];
   'switch-role': [role: UserRole];
 }>();

@@ -2885,6 +2885,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .graph-admin-source-option input { accent-color:var(--brand); }
 .header-admin-button { min-height:30px; padding:5px 9px; border:1px solid var(--border-default); border-radius:7px; color:var(--text-secondary); background:var(--surface-subtle); font-size:12px; cursor:pointer; }
 .header-admin-button:hover { color:var(--brand); border-color:var(--brand); background:var(--brand-soft); }
+.user-guide-trigger { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
 
 @media (max-width: 680px) {
   .knowledge-graph-svg { min-height:220px; }
@@ -3050,3 +3051,4 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .admin-list { max-height:170px; border-right:0; border-bottom:1px solid var(--border-default); }
   .admin-form > label:has(textarea),.admin-form fieldset,.admin-form .form-actions { grid-column:1; }
 }
+@media(max-width:980px){.user-guide-trigger span{display:none}}
