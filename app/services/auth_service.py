@@ -131,13 +131,15 @@ def register_user(
     )
     db.add(user)
     db.flush()
-    db.add(
-        UserWorkspaceRoleModel(
-            user_id=user.id,
-            role_category="teacher",
-            created_at=now_iso(),
+    created_at = now_iso()
+    for role_category in ("teacher", "study_travel", "parent"):
+        db.add(
+            UserWorkspaceRoleModel(
+                user_id=user.id,
+                role_category=role_category,
+                created_at=created_at,
+            )
         )
-    )
 
     if is_first_user:
         (

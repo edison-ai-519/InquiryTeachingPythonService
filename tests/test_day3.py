@@ -64,6 +64,7 @@ from app.db.models import (
     RagRecordModel,
     SessionFileModel,
     SessionModel,
+    UserWorkspaceRoleModel,
 )
 from app.main import app
 from app.services.auth_service import register_user
@@ -255,6 +256,14 @@ class AgentArchitectureApiTests(unittest.TestCase):
         )
         if response.status_code != 200:
             raise AssertionError(response.text)
+        # Most tests in this class exercise the teacher-only workspace path.
+        # Dedicated registration tests below cover the three-workspace default.
+        with SessionLocal() as db:
+            db.query(UserWorkspaceRoleModel).filter(
+                UserWorkspaceRoleModel.user_id == response.json()["data"]["id"],
+                UserWorkspaceRoleModel.role_category.in_(("study_travel", "parent")),
+            ).delete(synchronize_session=False)
+            db.commit()
 
     @classmethod
     def tearDownClass(cls):
@@ -607,6 +616,15 @@ class AgentArchitectureApiTests(unittest.TestCase):
             self.assertEqual(registered.status_code, 200)
             self.assertEqual(registered.json()["data"]["username"], username)
             self.assertFalse(registered.json()["data"]["is_admin"])
+            self.assertEqual(
+                registered.json()["data"]["workspace_roles"],
+                ["parent", "study_travel", "teacher"],
+            )
+            for role_category in ("teacher", "study_travel", "parent"):
+                self.assertEqual(
+                    client.get("/api/sessions", params={"role_category": role_category}).status_code,
+                    200,
+                )
             self.assertEqual(client.get("/api/auth/me").status_code, 200)
 
             duplicate = client.post(
@@ -674,6 +692,10 @@ class AgentArchitectureApiTests(unittest.TestCase):
             )
             self.assertEqual(ordinary_registered.status_code, 200)
             self.assertFalse(ordinary_registered.json()["data"]["is_admin"])
+            self.assertEqual(
+                ordinary_registered.json()["data"]["workspace_roles"],
+                ["parent", "study_travel", "teacher"],
+            )
 
             admin_registered = admin_client.post(
                 "/api/auth/admin/register",
@@ -681,6 +703,15 @@ class AgentArchitectureApiTests(unittest.TestCase):
             )
             self.assertEqual(admin_registered.status_code, 200)
             self.assertTrue(admin_registered.json()["data"]["is_admin"])
+            self.assertEqual(
+                admin_registered.json()["data"]["workspace_roles"],
+                ["parent", "study_travel", "teacher"],
+            )
+            for role_category in ("teacher", "study_travel", "parent"):
+                self.assertEqual(
+                    admin_client.get("/api/sessions", params={"role_category": role_category}).status_code,
+                    200,
+                )
 
             admin_client.post("/api/auth/logout")
             self.assertEqual(
@@ -859,35 +890,65 @@ class AgentArchitectureApiTests(unittest.TestCase):
 
             alice_session = alice.post(
                 "/api/sessions",
-                json={"topic": "Alice 的课题", "flow_name": "inquiry_7_stage"},
+                json={
+                    "topic": "Alice 的课题",
+                    "flow_name": "inquiry_7_stage",
+                    "role_category": "teacher",
+                },
             ).json()["data"]["id"]
             bob_session = bob.post(
                 "/api/sessions",
-                json={"topic": "Bob 的课题", "flow_name": "inquiry_7_stage"},
+                json={
+                    "topic": "Bob 的课题",
+                    "flow_name": "inquiry_7_stage",
+                    "role_category": "teacher",
+                },
             ).json()["data"]["id"]
 
             self.assertNotEqual(alice_session, bob_session)
             self.assertEqual(
-                [item["id"] for item in alice.get("/api/sessions").json()["data"]],
+                [
+                    item["id"]
+                    for item in alice.get(
+                        "/api/sessions", params={"role_category": "teacher"}
+                    ).json()["data"]
+                ],
                 [alice_session],
             )
             self.assertEqual(
-                [item["id"] for item in bob.get("/api/sessions").json()["data"]],
+                [
+                    item["id"]
+                    for item in bob.get(
+                        "/api/sessions", params={"role_category": "teacher"}
+                    ).json()["data"]
+                ],
                 [bob_session],
             )
-            self.assertEqual(alice.get(f"/api/sessions/{bob_session}").status_code, 404)
-            self.assertEqual(bob.delete(f"/api/sessions/{alice_session}").status_code, 404)
+            self.assertEqual(
+                alice.get(
+                    f"/api/sessions/{bob_session}",
+                    params={"role_category": "teacher"},
+                ).status_code,
+                404,
+            )
+            self.assertEqual(
+                bob.delete(
+                    f"/api/sessions/{alice_session}",
+                    params={"role_category": "teacher"},
+                ).status_code,
+                404,
+            )
 
             self.assertEqual(alice.get("/api/settings/chat-mode").status_code, 404)
             alice_events = parse_sse(
                 alice.post(
-                    f"/api/sessions/{alice_session}/chat",
+                    f"/api/sessions/{alice_session}/chat?role_category=teacher",
                     json={"type": "chat", "message": "Alice 的第一轮提问"},
                 ).text
             )
             bob_events = parse_sse(
                 bob.post(
-                    f"/api/sessions/{bob_session}/chat",
+                    f"/api/sessions/{bob_session}/chat?role_category=teacher",
                     json={"type": "chat", "message": "Bob 的第一轮提问"},
                 ).text
             )
