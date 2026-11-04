@@ -60,6 +60,22 @@ class Settings:
         1.0,
         max(0.0, float(os.getenv("CURRICULUM_VECTOR_MIN_SIMILARITY", "0.5"))),
     )
+    curriculum_embedding_provider: str = os.getenv(
+        "CURRICULUM_EMBEDDING_PROVIDER", "remote"
+    ).strip().lower()
+    curriculum_embedding_api_base: str = os.getenv("CURRICULUM_EMBEDDING_API_BASE", "").strip().rstrip("/")
+    curriculum_embedding_api_key: str = os.getenv("CURRICULUM_EMBEDDING_API_KEY", "").strip()
+    curriculum_embedding_api_model: str = os.getenv("CURRICULUM_EMBEDDING_API_MODEL", "").strip()
+    curriculum_embedding_api_timeout_seconds: float = float(
+        os.getenv("CURRICULUM_EMBEDDING_API_TIMEOUT_SECONDS", "60")
+    )
+
+    @property
+    def curriculum_effective_embedding_model(self) -> str:
+        if self.curriculum_embedding_provider == "remote":
+            return self.curriculum_embedding_api_model
+        return self.curriculum_embedding_model
+
     curriculum_embedding_model: str = os.getenv(
         "CURRICULUM_EMBEDDING_MODEL",
         "BAAI/bge-small-zh-v1.5",

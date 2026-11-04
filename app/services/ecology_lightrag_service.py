@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import re
 import shutil
 from dataclasses import dataclass
@@ -9,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.config import Settings, get_settings
-from app.services.curriculum_vector_service import get_local_embedding_model
+from app.services.curriculum_vector_service import get_embedding_model, embedding_identity
 
 
 LIGHTRAG_EXTRACTOR_VERSION = "ecology-v1"
@@ -84,14 +85,14 @@ class EcologyLightRagExtractor:
         doc_id = self.document_id(source, checksum)
         work_dir = self._working_dir(source, checksum)
         work_dir.mkdir(parents=True, exist_ok=True)
-        embedding_model = get_local_embedding_model(self.settings)
+        embedding_model = get_embedding_model(self.settings)
         try:
-            embedding_model.load()
+            await asyncio.to_thread(embedding_model.load)
         except Exception as exc:
             raise EcologyLightRagError(str(exc)) from exc
         dimension = int(embedding_model.dimension or 0)
         if not dimension:
-            raise EcologyLightRagError("本地 Embedding 模型未提供向量维度")
+            raise EcologyLightRagError("Embedding 模型未提供向量维度")
 
         settings = self.settings
 
@@ -126,7 +127,7 @@ class EcologyLightRagExtractor:
         @wrap_embedding_func_with_attrs(
             embedding_dim=dimension,
             max_token_size=8192,
-            model_name=settings.curriculum_embedding_model,
+            model_name=settings.curriculum_effective_embedding_model,
         )
         async def embedding_func(texts: list[str]):
             values = await asyncio.to_thread(embedding_model.encode, texts)
@@ -184,9 +185,8 @@ class EcologyLightRagExtractor:
         return f"ecology-{digest}-{checksum[:16]}"
 
     def _working_dir(self, source: str, checksum: str) -> Path:
-        digest = hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
         safe_checksum = re.sub(r"[^a-zA-Z0-9_-]", "", checksum)[:16] or "unknown"
-        return self.settings.ecology_lightrag_dir / digest / safe_checksum
+        return self._source_dir(source) / safe_checksum
 
     def prune_source_versions(self, source: str, *, keep_checksum: str = "") -> None:
         source_dir = self._source_dir(source)
@@ -210,7 +210,12 @@ class EcologyLightRagExtractor:
 
     def _source_dir(self, source: str) -> Path:
         digest = hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
-        return self.settings.ecology_lightrag_dir / digest
+        root = self.settings.ecology_lightrag_dir
+        if self.settings.curriculum_embedding_provider != "local":
+            identity = json.dumps(embedding_identity(self.settings), sort_keys=True)
+            fingerprint = hashlib.sha256(identity.encode()).hexdigest()[:16]
+            root = root / f"remote-{fingerprint}"
+        return root / digest
 
     @classmethod
     def parse_graph(

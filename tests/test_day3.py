@@ -249,6 +249,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = TestClient(app)
+        cls.client.params = {"role_category": "teacher"}
         cls.username = f"test_{uuid.uuid4().hex[:10]}"
         response = cls.client.post(
             "/api/auth/register",
@@ -878,6 +879,8 @@ class AgentArchitectureApiTests(unittest.TestCase):
     def test_users_have_isolated_sessions_and_main_tutor_chat(self):
         alice = TestClient(app)
         bob = TestClient(app)
+        alice.params = {"role_category": "teacher"}
+        bob.params = {"role_category": "teacher"}
         try:
             for client, username in (
                 (alice, f"alice_{uuid.uuid4().hex[:10]}"),
@@ -1715,6 +1718,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
 
         try:
             for role, flow_name in workspaces.items():
+                self.client.params = {"role_category": role}
                 create_response = self.client.post(
                     "/api/sessions",
                     json={
@@ -1745,11 +1749,17 @@ class AgentArchitectureApiTests(unittest.TestCase):
                 self.assertEqual(saved_output["draft_content"], content)
 
                 other_role = next(candidate for candidate in workspaces if candidate != role)
+                self.client.params = {"role_category": other_role}
                 wrong_role_response = self.client.get(
                     f"/api/sessions/{session_id}?role_category={other_role}"
                 )
-                self.assertEqual(wrong_role_response.status_code, 404)
+                self.assertEqual(
+                    wrong_role_response.status_code,
+                    404,
+                    f"session_role={role}, requested_role={other_role}, response={wrong_role_response.text}",
+                )
         finally:
+            self.client.params = {"role_category": "teacher"}
             for session_id, role in session_roles:
                 self.client.delete(f"/api/sessions/{session_id}?role_category={role}")
             with SessionLocal() as db:
@@ -2389,6 +2399,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     "session_id": session_id,
                     "message": "月季旁边为什么经常看到蚜虫和七星瓢虫？",
                     "expert_id": "insect_agent",
+                    "role_category": "teacher",
                 },
             )
             self.assertEqual(candidate_response.status_code, 200)
@@ -3517,6 +3528,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     "session_id": session_id,
                     "message": "",
                     "expert_id": "insect_agent",
+                    "role_category": "teacher",
                 },
             )
             self.assertEqual(response.status_code, 200)
@@ -3531,6 +3543,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     "session_id": session_id,
                     "message": "银河系边缘的量子卫星",
                     "expert_id": "insect_agent",
+                    "role_category": "teacher",
                 },
             )
             self.assertEqual(unmatched.status_code, 200)

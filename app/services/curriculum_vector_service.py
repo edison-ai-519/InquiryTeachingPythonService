@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import hashlib
+import math
 import importlib.util
 import shutil
 import threading
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Protocol
+from urllib.parse import urlsplit
+
+import httpx
 
 from app.core.config import Settings
 from app.db.models import CurriculumChunkModel
@@ -22,7 +27,7 @@ class CurriculumVectorHit:
     score: float
 
 
-_MODEL_CACHE: dict[tuple[str, str], "LocalEmbeddingModel"] = {}
+_MODEL_CACHE: dict[tuple[str, str, int], "LocalEmbeddingModel"] = {}
 _MODEL_CACHE_LOCK = threading.Lock()
 _VECTOR_LOCKS: dict[str, threading.RLock] = {}
 _VECTOR_LOCKS_GUARD = threading.Lock()
@@ -32,6 +37,7 @@ def get_local_embedding_model(settings: Settings) -> "LocalEmbeddingModel":
     key = (
         str(settings.curriculum_embedding_model_dir),
         settings.curriculum_embedding_device,
+        settings.curriculum_embedding_batch_size,
     )
     with _MODEL_CACHE_LOCK:
         model = _MODEL_CACHE.get(key)
@@ -39,6 +45,139 @@ def get_local_embedding_model(settings: Settings) -> "LocalEmbeddingModel":
             model = LocalEmbeddingModel(settings)
             _MODEL_CACHE[key] = model
         return model
+
+
+class EmbeddingModel(Protocol):
+    model_name: str
+    dimension: int | None
+
+    def availability_error(self) -> str: ...
+    def load(self): ...
+    def encode(self, texts: Iterable[str]) -> list[list[float]]: ...
+
+
+def embedding_identity(settings: Settings) -> dict[str, str]:
+    provider = settings.curriculum_embedding_provider
+    endpoint = settings.curriculum_embedding_api_base.rstrip("/") if provider == "remote" else ""
+    return {
+        "embedding_provider": provider,
+        "embedding_model": settings.curriculum_effective_embedding_model,
+        "embedding_endpoint": hashlib.sha256(endpoint.encode()).hexdigest() if endpoint else "",
+    }
+
+
+_REMOTE_MODEL_CACHE: dict[tuple, "RemoteEmbeddingModel"] = {}
+
+
+def get_embedding_model(settings: Settings) -> EmbeddingModel:
+    if settings.curriculum_embedding_provider == "local":
+        return get_local_embedding_model(settings)
+    key = (
+        settings.curriculum_embedding_provider,
+        settings.curriculum_embedding_api_base,
+        settings.curriculum_embedding_api_model,
+        settings.curriculum_embedding_api_key,
+        settings.curriculum_embedding_api_timeout_seconds,
+        settings.curriculum_embedding_batch_size,
+    )
+    with _MODEL_CACHE_LOCK:
+        if key not in _REMOTE_MODEL_CACHE:
+            _REMOTE_MODEL_CACHE[key] = RemoteEmbeddingModel(settings)
+        return _REMOTE_MODEL_CACHE[key]
+
+
+class RemoteEmbeddingModel:
+    def __init__(self, settings: Settings):
+        self.provider = settings.curriculum_embedding_provider
+        self.model_name = settings.curriculum_embedding_api_model
+        self.api_base = settings.curriculum_embedding_api_base.rstrip("/")
+        self.api_key = settings.curriculum_embedding_api_key
+        self.timeout = settings.curriculum_embedding_api_timeout_seconds
+        self.batch_size = settings.curriculum_embedding_batch_size
+        self.dimension: int | None = None
+        self._encode_lock = threading.Lock()
+
+    def availability_error(self) -> str:
+        if self.provider != "remote":
+            return "CURRICULUM_EMBEDDING_PROVIDER 必须为 local 或 remote"
+        try:
+            url = urlsplit(self.api_base)
+            _ = url.port  # Validate malformed or out-of-range ports as configuration errors.
+            valid = url.scheme in {"http", "https"} and url.hostname and not (
+                url.username or url.password or url.query or url.fragment
+            )
+        except ValueError:
+            valid = False
+        if not valid:
+            return "请配置有效的 CURRICULUM_EMBEDDING_API_BASE（HTTP(S) 服务根路径）"
+        if not self.model_name:
+            return "请配置 CURRICULUM_EMBEDDING_API_MODEL"
+        if not math.isfinite(self.timeout) or self.timeout <= 0:
+            return "CURRICULUM_EMBEDDING_API_TIMEOUT_SECONDS 必须为正数"
+        if self.batch_size < 1:
+            return "CURRICULUM_EMBEDDING_BATCH_SIZE 必须为正整数"
+        return ""
+
+    def load(self):
+        if self.dimension is None:
+            self.encode(["embedding dimension probe"])
+        return self
+
+    def encode(self, texts: Iterable[str]) -> list[list[float]]:
+        error = self.availability_error()
+        if error:
+            raise CurriculumVectorUnavailable(error)
+        values = [text if text.strip() else " " for text in texts]
+        if not values:
+            return []
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        vectors: list[list[float]] = []
+        with self._encode_lock:
+            dimension = self.dimension
+            try:
+                with httpx.Client(timeout=self.timeout) as client:
+                    for start in range(0, len(values), self.batch_size):
+                        batch = values[start:start + self.batch_size]
+                        response = client.post(
+                            f"{self.api_base}/embeddings",
+                            headers=headers,
+                            json={"model": self.model_name, "input": batch, "encoding_format": "float"},
+                        )
+                        response.raise_for_status()
+                        data = response.json()["data"]
+                        if not isinstance(data, list) or len(data) != len(batch):
+                            raise ValueError("invalid count")
+                        ordered: dict[int, list[float]] = {}
+                        for item in data:
+                            index = item["index"]
+                            if type(index) is not int or not 0 <= index < len(batch) or index in ordered:
+                                raise ValueError("invalid index")
+                            raw = item["embedding"]
+                            if not isinstance(raw, list) or not raw or any(
+                                type(v) not in (float, int) or not math.isfinite(v) for v in raw
+                            ):
+                                raise ValueError("invalid vector")
+                            vector = [float(v) for v in raw]
+                            dimension = dimension or len(vector)
+                            if len(vector) != dimension:
+                                raise ValueError("inconsistent dimension")
+                            norm = math.hypot(*vector)
+                            if not norm or not math.isfinite(norm):
+                                raise ValueError("invalid norm")
+                            ordered[index] = [v / norm for v in vector]
+                        vectors.extend(ordered[i] for i in range(len(batch)))
+            except httpx.HTTPStatusError as exc:
+                raise CurriculumVectorUnavailable(
+                    f"远程 Embedding 请求失败：HTTP {exc.response.status_code}"
+                ) from None
+            except httpx.TimeoutException:
+                raise CurriculumVectorUnavailable("远程 Embedding 请求超时") from None
+            except httpx.RequestError:
+                raise CurriculumVectorUnavailable("远程 Embedding 网络请求失败") from None
+            except (ValueError, KeyError, TypeError, OverflowError):
+                raise CurriculumVectorUnavailable("远程 Embedding 响应无效（数量、顺序、数值或维度错误）") from None
+            self.dimension = dimension
+        return vectors
 
 
 def vector_directory_lock(path: Path) -> threading.RLock:
@@ -127,10 +266,10 @@ class CurriculumVectorStore:
     def __init__(
         self,
         settings: Settings,
-        embedding_model: LocalEmbeddingModel | None = None,
+        embedding_model: EmbeddingModel | None = None,
     ):
         self.settings = settings
-        self.embedding_model = embedding_model or get_local_embedding_model(settings)
+        self.embedding_model = embedding_model or get_embedding_model(settings)
         self.persist_dir = settings.curriculum_vector_dir
         self.collection_name = settings.curriculum_vector_collection
         self.error = ""
@@ -169,17 +308,19 @@ class CurriculumVectorStore:
                 embedding_function=None,
                 metadata={
                     "hnsw:space": "cosine",
-                    "embedding_model": self.settings.curriculum_embedding_model,
+                    **embedding_identity(self.settings),
                 },
             )
             metadata = self.collection.metadata or {}
-            indexed_model = str(metadata.get("embedding_model") or "")
-            if self.collection.count() and indexed_model != self.settings.curriculum_embedding_model:
+            expected = embedding_identity(self.settings)
+            actual = {
+                "embedding_provider": str(metadata.get("embedding_provider") or "local"),
+                "embedding_model": str(metadata.get("embedding_model") or ""),
+                "embedding_endpoint": str(metadata.get("embedding_endpoint") or ""),
+            }
+            if self.collection.count() and actual != expected:
                 self.rebuild_required = True
-                self.error = (
-                    f"向量索引模型为 {indexed_model or '未知'}，当前模型为 "
-                    f"{self.settings.curriculum_embedding_model}，需要重建索引"
-                )
+                self.error = "向量索引的 Embedding 服务或模型已变化，需要重建索引"
         except Exception as exc:
             self.client = None
             self.collection = None
@@ -188,12 +329,16 @@ class CurriculumVectorStore:
     def embed_texts(self, texts: Iterable[str]) -> list[list[float]]:
         if self.collection is None:
             raise CurriculumVectorUnavailable(self.error or "Chroma 不可用")
+        if self.rebuild_required:
+            raise CurriculumVectorUnavailable(self.error)
         vectors = self.embedding_model.encode(texts)
         if vectors:
             self._validate_dimension(len(vectors[0]))
         return vectors
 
     def _validate_dimension(self, dimension: int) -> None:
+        if self.rebuild_required:
+            raise CurriculumVectorUnavailable(self.error)
         if self.collection is None:
             raise CurriculumVectorUnavailable(self.error or "Chroma 不可用")
         metadata = dict(self.collection.metadata or {})
@@ -207,7 +352,8 @@ class CurriculumVectorStore:
         if indexed_dimension != dimension:
             self.collection.modify(
                 metadata={
-                    "embedding_model": self.settings.curriculum_embedding_model,
+                    **metadata,
+                    **embedding_identity(self.settings),
                     "embedding_dimension": dimension,
                 }
             )
@@ -330,7 +476,7 @@ class CurriculumVectorStore:
                 embedding_function=None,
                 metadata={
                     "hnsw:space": "cosine",
-                    "embedding_model": self.settings.curriculum_embedding_model,
+                    **embedding_identity(self.settings),
                 },
             )
             self.error = ""
@@ -368,7 +514,8 @@ class CurriculumVectorStore:
             "required": self.settings.curriculum_vector_required,
             "available": self.available,
             "dependency_ready": dependency_ready,
-            "model": self.settings.curriculum_embedding_model,
+            "provider": self.settings.curriculum_embedding_provider,
+            "model": self.settings.curriculum_effective_embedding_model,
             "model_dir": str(self.settings.curriculum_embedding_model_dir),
             "device": self.settings.curriculum_embedding_device,
             "vector_dir": str(self.persist_dir),

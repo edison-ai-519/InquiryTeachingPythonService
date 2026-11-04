@@ -13,6 +13,7 @@ from app.db.models import AuthSessionModel, SessionModel, UserModel, UserWorkspa
 
 
 AUTH_COOKIE_NAME = "inquiry_auth"
+DEFAULT_WORKSPACE_ROLES = ("teacher", "study_travel", "parent")
 
 
 def now_utc() -> dt.datetime:
@@ -76,11 +77,11 @@ def workspace_roles_for_user(db: Session, user: UserModel) -> list[str]:
         .order_by(UserWorkspaceRoleModel.role_category.asc())
         .all()
     ]
-    return roles or [user.user_role if user.user_role in {"teacher", "study_travel", "parent"} else "teacher"]
+    return roles or (["parent"] if user.user_role == "parent" else list(DEFAULT_WORKSPACE_ROLES))
 
 
 def serialize_user(user: UserModel, workspace_roles: list[str] | None = None) -> dict:
-    roles = workspace_roles or [user.user_role if user.user_role in {"teacher", "study_travel", "parent"} else "teacher"]
+    roles = workspace_roles or (["parent"] if user.user_role == "parent" else list(DEFAULT_WORKSPACE_ROLES))
     return {
         "id": user.id,
         "username": user.username,
@@ -132,7 +133,7 @@ def register_user(
     db.add(user)
     db.flush()
     created_at = now_iso()
-    for role_category in ("teacher", "study_travel", "parent"):
+    for role_category in DEFAULT_WORKSPACE_ROLES:
         db.add(
             UserWorkspaceRoleModel(
                 user_id=user.id,

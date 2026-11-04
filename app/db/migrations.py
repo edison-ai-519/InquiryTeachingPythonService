@@ -53,6 +53,8 @@ def ensure_schema_compatibility() -> None:
 
         if "users" in table_names:
             user_columns = {column["name"] for column in inspector.get_columns("users")}
+            if "chat_mode" in user_columns:
+                connection.execute(text("ALTER TABLE users DROP COLUMN chat_mode"))
             if "is_admin" not in user_columns:
                 connection.execute(
                     text("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
@@ -85,10 +87,27 @@ def ensure_schema_compatibility() -> None:
                 text(
                     """
                     INSERT OR IGNORE INTO user_workspace_roles (user_id, role_category, created_at)
-                    SELECT id,
-                        CASE WHEN user_role IN ('teacher', 'study_travel', 'parent') THEN user_role ELSE 'teacher' END,
-                        datetime('now')
+                    SELECT id, 'teacher', datetime('now')
                     FROM users
+                    """
+                )
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT OR IGNORE INTO user_workspace_roles (user_id, role_category, created_at)
+                    SELECT id, 'study_travel', datetime('now')
+                    FROM users
+                    """
+                )
+            )
+        if "users" in table_names:
+            connection.execute(
+                text(
+                    """
+                    INSERT OR IGNORE INTO user_workspace_roles (user_id, role_category, created_at)
+                    SELECT id, 'parent', datetime('now')
+                    FROM users WHERE user_role = 'parent'
                     """
                 )
             )

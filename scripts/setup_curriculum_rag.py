@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="下载本地 Embedding 模型并重建课标 Chroma 索引。",
+        description="准备 Embedding 服务并重建课标 Chroma 索引。",
     )
     parser.add_argument(
         "--skip-download",
@@ -57,13 +57,17 @@ def main() -> int:
     Base.metadata.create_all(bind=engine)
     ensure_schema_compatibility()
 
-    if not args.skip_download:
-        download_model(
-            settings.curriculum_embedding_model,
-            settings.curriculum_embedding_model_dir,
-        )
-    elif not settings.curriculum_embedding_model_dir.is_dir():
-        print(f"模型目录不存在：{settings.curriculum_embedding_model_dir}")
+    from app.services.curriculum_vector_service import get_embedding_model
+
+    if settings.curriculum_embedding_provider == "local":
+        if not args.skip_download:
+            download_model(
+                settings.curriculum_embedding_model,
+                settings.curriculum_embedding_model_dir,
+            )
+    model_error = get_embedding_model(settings).availability_error()
+    if model_error:
+        print(model_error)
         return 1
 
     with SessionLocal() as db:

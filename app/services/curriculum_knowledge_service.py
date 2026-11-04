@@ -287,7 +287,7 @@ class CurriculumKnowledgeService:
         source_state.vector_chunk_count = vector_count
         source_state.vector_status = vector_status
         source_state.embedding_model = (
-            self.settings.curriculum_embedding_model
+            self.settings.curriculum_effective_embedding_model
             if self.settings.curriculum_vector_enabled
             else ""
         )
@@ -349,7 +349,7 @@ class CurriculumKnowledgeService:
             if not state.checksum:
                 state.checksum = checksum_chunks([row.content for row in rows])
             if not state.embedding_model and self.settings.curriculum_vector_enabled:
-                state.embedding_model = self.settings.curriculum_embedding_model
+                state.embedding_model = self.settings.curriculum_effective_embedding_model
             state.updated_at = state.updated_at or timestamp
         stale_sources = (
             self.db.query(CurriculumSourceModel)
@@ -411,7 +411,7 @@ class CurriculumKnowledgeService:
             for state in self.db.query(CurriculumSourceModel).all():
                 state.vector_status = "error"
                 state.vector_chunk_count = 0
-                state.embedding_model = self.settings.curriculum_embedding_model
+                state.embedding_model = self.settings.curriculum_effective_embedding_model
                 state.last_error = error
                 state.updated_at = timestamp
             self.db.flush()
@@ -422,7 +422,7 @@ class CurriculumKnowledgeService:
         for state in self.db.query(CurriculumSourceModel).all():
             state.vector_status = "ready"
             state.vector_chunk_count = grouped_counts.get(state.source, 0)
-            state.embedding_model = self.settings.curriculum_embedding_model
+            state.embedding_model = self.settings.curriculum_effective_embedding_model
             state.last_error = ""
             state.updated_at = timestamp
         self.db.flush()
