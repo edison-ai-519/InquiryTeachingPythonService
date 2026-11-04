@@ -408,6 +408,7 @@ export type StreamChatPayload = {
   final_content?: string;
   expert_id?: string;
   draft_request_kind?: "generate" | "edit";
+  target_stage_id?: string;
   selection?: DraftSelection | null;
   graph_selection?: GraphSelectionPayload | null;
 };

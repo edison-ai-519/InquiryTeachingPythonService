@@ -22,30 +22,33 @@
       <div v-if="workspaceRoles.length > 1" class="role-switcher">
         <button v-if="workspaceRoles.includes('teacher')"
           :class="{ active: currentRole === 'teacher' }"
+          :disabled="streaming || saving"
           @click="switchRole('teacher')"
         >
           教师工作台
         </button>
         <button v-if="workspaceRoles.includes('study_travel')"
           :class="{ active: currentRole === 'study_travel' }"
+          :disabled="streaming || saving"
           @click="switchRole('study_travel')"
         >
           研学基地工作台
         </button>
         <button v-if="workspaceRoles.includes('parent')"
           :class="{ active: currentRole === 'parent' }"
+          :disabled="streaming || saving"
           @click="switchRole('parent')"
         >
           家长工作台
         </button>
       </div>
-      <button v-if="workspaceRoles.includes(currentRole)" class="header-admin-button task-center-trigger" type="button" @click="$emit('open-task-center')">
+      <button v-if="workspaceRoles.includes(currentRole)" class="header-admin-button task-center-trigger" type="button" :disabled="streaming || saving" @click="$emit('open-task-center')">
         {{ currentRole === 'study_travel' ? '项目协同' : '任务大厅' }}
       </button>
       <button class="header-admin-button user-guide-trigger" type="button" @click="$emit('open-user-guide')"><BookOpen :size="15" /><span>使用手册</span></button>
-      <ExpertSelector v-model="expertId" :experts="experts" :role-category="currentRole" :disabled="streaming || !session" />
+      <ExpertSelector v-model="expertId" :experts="experts" :role-category="currentRole" :disabled="streaming || saving || !session" />
       <button v-if="user?.is_admin" class="header-admin-button" type="button" @click="$emit('open-graph-admin')">图谱管理</button>
-      <span class="connection-status" :class="{ streaming }"><i></i>{{ streaming ? '正在生成' : '已连接' }}</span>
+      <span class="connection-status" :class="{ streaming }" :title="streaming ? '当前操作正在处理' : saving ? '正在保存当前阶段内容' : '工作台已就绪；发送、保存或推进阶段时会显示对应状态。'"><i></i>{{ streaming ? '正在处理' : saving ? '正在保存' : '工作台就绪' }}</span>
       <button class="header-icon-button" type="button" :title="themeMode === 'light' ? '切换深色模式' : '切换浅色模式'" @click="$emit('toggle-theme')">
         <Moon v-if="themeMode === 'light'" :size="17" />
         <Sun v-else :size="17" />
@@ -72,6 +75,7 @@ const props = defineProps<{
   stage: FlowStage | null;
   stageProgress: string;
   streaming: boolean;
+  saving: boolean;
   sidebarCollapsed: boolean;
   themeMode: 'light' | 'dark';
   currentRole: UserRole;

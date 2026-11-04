@@ -318,6 +318,8 @@ async def chat(
     sess, flow, stage, stage_output = get_current_context(
         db, session_id, user, role_category
     )
+    if payload.type != "chat" and payload.target_stage_id is not None:
+        raise HTTPException(status_code=400, detail="目标阶段仅可用于草案聊天操作")
     request_id = payload.request_id or new_id("chat")
 
     if payload.type == "sys_action":
@@ -391,6 +393,34 @@ async def chat(
         selected_expert = registry.selectable_expert(payload.expert_id, sess.role_category)
         if selected_expert is None:
             raise HTTPException(status_code=400, detail="未知或不可选择的专家 Agent")
+
+    if payload.target_stage_id is not None:
+        if not sess.draft_mode_enabled or selected_expert is not None:
+            raise HTTPException(status_code=400, detail="目标阶段仅可用于主导师草案操作")
+        target_stage = next(
+            (item for item in flow["stages"] if item["id"] == payload.target_stage_id),
+            None,
+        )
+        if target_stage is None:
+            raise HTTPException(status_code=404, detail="Stage not found in this workflow")
+        if (
+            payload.draft_request_kind == "edit"
+            and payload.selection is not None
+            and payload.selection.stage_id != payload.target_stage_id
+        ):
+            raise HTTPException(status_code=400, detail="选中的草案内容与目标阶段不一致")
+        stage = target_stage
+        stage_output = (
+            db.query(StageOutputModel)
+            .filter(
+                StageOutputModel.session_id == session_id,
+                StageOutputModel.stage_id == payload.target_stage_id,
+                StageOutputModel.role_category == sess.role_category,
+            )
+            .first()
+        )
+        if stage_output is None:
+            raise HTTPException(status_code=404, detail="Stage output not found")
 
     all_messages = ContextService.load_messages(db, session_id)
     dialog_history = ContextService.format_dialog_history(

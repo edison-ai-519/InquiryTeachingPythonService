@@ -25,7 +25,7 @@
               <div><strong>{{ step.title }}</strong><p>{{ step.description }}</p></div>
             </li>
           </ol>
-          <aside class="user-guide-note"><BookOpen :size="17" /><span><strong>页面怎么读</strong>左侧是草案和阶段，中间是对话，右侧是方案编辑、保存与导出。</span></aside>
+          <aside class="user-guide-note"><BookOpen :size="17" /><span><strong>页面怎么读</strong>宽屏左侧是草案和阶段，中间是对话，右侧是方案编辑、保存与导出；窄屏可在顶部切换“对话”和“方案编辑”。</span></aside>
         </template>
         <template v-else-if="activeTab === 'help'">
           <p class="user-guide-intro">遇到具体操作问题时，可以先查看这里：</p>
