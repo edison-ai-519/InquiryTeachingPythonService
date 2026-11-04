@@ -6,6 +6,7 @@
       :aria-expanded="open"
       aria-haspopup="listbox"
       :disabled="disabled"
+      title="主导师负责推进阶段；领域专家只回答当前这一轮咨询。"
       @click="toggle"
     >
       <Bot :size="16" />

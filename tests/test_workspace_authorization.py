@@ -28,12 +28,12 @@ def make_user(role: str = "teacher") -> UserModel:
     )
 
 
-def test_serialized_user_exposes_both_default_workspace_authorizations():
-    assert serialize_user(make_user())["workspace_roles"] == ["study_travel", "teacher"]
+def test_serialized_user_exposes_all_default_workspace_authorizations():
+    assert serialize_user(make_user())["workspace_roles"] == ["parent", "study_travel", "teacher"]
 
 
 def test_serialized_user_exposes_study_travel_workspace_authorization():
-    assert serialize_user(make_user("study_travel"))["workspace_roles"] == ["study_travel", "teacher"]
+    assert serialize_user(make_user("study_travel"))["workspace_roles"] == ["parent", "study_travel", "teacher"]
 
 
 @pytest.fixture
@@ -47,10 +47,10 @@ def db():
         session.close()
 
 
-def test_registration_grants_both_workspaces_by_default(db):
+def test_registration_grants_all_workspaces_by_default(db):
     user, _ = register_user(db, "dual_workspace_user", "valid-password-123")
 
-    assert workspace_roles_for_user(db, user) == ["study_travel", "teacher"]
+    assert workspace_roles_for_user(db, user) == ["parent", "study_travel", "teacher"]
 
 
 def test_legacy_user_migration_removes_chat_mode_and_grants_both_workspaces():

@@ -13,7 +13,7 @@ from app.db.models import AuthSessionModel, SessionModel, UserModel, UserWorkspa
 
 
 AUTH_COOKIE_NAME = "inquiry_auth"
-DEFAULT_WORKSPACE_ROLES = ("teacher", "study_travel")
+DEFAULT_WORKSPACE_ROLES = ("teacher", "study_travel", "parent")
 
 
 def now_utc() -> dt.datetime:

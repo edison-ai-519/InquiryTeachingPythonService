@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { commonHelpItems, userGuideByRole } from "../src/userGuide.ts";
+import { commonGuideSteps, commonHelpItems, userGuideByRole } from "../src/userGuide.ts";
 
 test("user guide provides a practical workflow for every workspace role", () => {
   for (const role of ["teacher", "parent", "study_travel"] as const) {
@@ -30,4 +30,11 @@ test("common help covers expert consultation, draft edits and save actions", () 
   assert.match(text, /草案/);
   assert.match(text, /保存/);
   assert.match(text, /参考资料/);
+});
+
+test("guides explain visible save states, recovery, and the study travel project entry", () => {
+  const guideText = [...commonGuideSteps, ...commonHelpItems].map((item) => `${item.title} ${item.description}`).join(" ");
+  assert.match(guideText, /未保存|保存中|已保存/);
+  assert.match(guideText, /重新发送|重试/);
+  assert.match(userGuideByRole.study_travel.steps.map((step) => step.description).join(" "), /项目协同/);
 });
