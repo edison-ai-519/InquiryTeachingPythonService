@@ -318,7 +318,7 @@ def export_curriculum_bundle(
     payload = {
         "version": EXPORT_VERSION,
         "exported_at": now_iso(),
-        "embedding_model": get_settings().curriculum_embedding_model,
+        "embedding_model": get_settings().curriculum_effective_embedding_model,
         "category_filter": normalized_category or "all",
         "sources": sources,
     }

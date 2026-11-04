@@ -123,9 +123,9 @@ cd E:\InquiryTeachingPythonService
 .\.venv\Scripts\python.exe scripts\ingest_curriculum.py data\curriculum
 ```
 
-导入命令会递归读取目录、切分正文并写入本地 `curriculum_chunks` 表。同一路径的文件重复导入时会替换旧片段。只有教师显式选择的专家会查询课程知识库：系统先读取 `curriculum_source_agent_permissions`，然后在获权文件范围内执行 BM25 和本地 BGE Embedding 召回。主导师、草案能力和未被选择的专家不会查询课程库。完整命中、专家 ID、授权来源及各路分数保存在 `rag_records` 中。
+导入命令会递归读取目录、切分正文并写入本地 `curriculum_chunks` 表。同一路径的文件重复导入时会替换旧片段。只有教师显式选择的专家会查询课程知识库：系统先读取 `curriculum_source_agent_permissions`，然后在获权文件范围内执行 BM25 和所选 Embedding 服务召回。主导师、草案能力和未被选择的专家不会查询课程库。完整命中、专家 ID、授权来源及各路分数保存在 `rag_records` 中。
 
-首次部署或模型缺失时执行一次初始化脚本。脚本会下载或验证模型，并根据 `curriculum_chunks` 重建 Chroma 索引：
+首次部署或模型缺失时执行一次初始化脚本。本地模式下脚本会下载或验证模型，远程模式下跳过本地模型准备，再根据 `curriculum_chunks` 重建 Chroma 索引：
 
 ```powershell
 cd E:\InquiryTeachingPythonService
@@ -134,7 +134,28 @@ cd E:\InquiryTeachingPythonService
 
 离线服务器可先把模型放入 `data/models/bge-small-zh-v1.5/`，再添加 `--skip-download`。所有网页用户共用后端模型，无需在个人电脑下载。
 
-默认配置如下，可在 `.env` 中覆盖：
+项目代码和 `.env.example` 默认使用远程 Embedding；本机 `.env` 显式设置
+`CURRICULUM_EMBEDDING_PROVIDER=local`，继续使用已有 BGE 模型、CPU 和本地索引。
+本地模式不需要远程参数。修改配置后需要重启后端。
+
+远程模式支持 OpenAI 兼容的 `/embeddings` 接口，配置独立于对话 LLM：
+
+```dotenv
+CURRICULUM_EMBEDDING_PROVIDER=remote
+CURRICULUM_EMBEDDING_API_BASE=https://your-provider.example/v1
+CURRICULUM_EMBEDDING_API_KEY=
+CURRICULUM_EMBEDDING_API_MODEL=your-embedding-model
+CURRICULUM_EMBEDDING_API_TIMEOUT_SECONDS=60
+```
+
+Base 填到服务根路径（按服务要求包含 `/v1`），不要包含 `/embeddings`。
+Key 允许留空以支持无需鉴权的自建服务。远程配置缺失或请求失败时按现有规则退回 BM25，
+不会自动切换本地模型；LightRAG 建图任务会报告失败并沿用队列重试规则。
+切换 provider、模型或远程地址后，运行上述初始化脚本重建 Chroma 索引。
+旧本地索引兼容，无需因本次配置功能改造重建。LightRAG 本地目录保持原样，
+远程目录按服务与模型身份隔离，生态资料后续重新抽取时使用新目录。
+
+本地模式配置示例，可在 `.env` 中覆盖：
 
 ```text
 CURRICULUM_DIR=./data/curriculum
@@ -147,6 +168,7 @@ CURRICULUM_RERANK_ENABLED=true
 CURRICULUM_VECTOR_ENABLED=true
 CURRICULUM_VECTOR_REQUIRED=false
 CURRICULUM_VECTOR_MIN_SIMILARITY=0.5
+CURRICULUM_EMBEDDING_PROVIDER=local
 CURRICULUM_EMBEDDING_MODEL=BAAI/bge-small-zh-v1.5
 CURRICULUM_EMBEDDING_MODEL_DIR=./data/models/bge-small-zh-v1.5
 CURRICULUM_EMBEDDING_DEVICE=cpu
