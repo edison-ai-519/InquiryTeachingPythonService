@@ -1,13 +1,16 @@
+from unittest.mock import patch
+
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 from app.db.database import Base
+from app.db.migrations import ensure_schema_compatibility
 from app.db.models import SessionModel, UserModel, UserWorkspaceRoleModel
 from app.api.auth import update_workspace_roles
 from app.schemas import WorkspaceRolesRequest
-from app.services.auth_service import serialize_user
+from app.services.auth_service import register_user, serialize_user, workspace_roles_for_user
 from app.services.session_access_service import (
     get_owned_workspace_session,
     resolve_workspace_role,
@@ -25,12 +28,12 @@ def make_user(role: str = "teacher") -> UserModel:
     )
 
 
-def test_serialized_user_exposes_default_teacher_workspace_authorization():
-    assert serialize_user(make_user())["workspace_roles"] == ["teacher"]
+def test_serialized_user_exposes_both_default_workspace_authorizations():
+    assert serialize_user(make_user())["workspace_roles"] == ["study_travel", "teacher"]
 
 
 def test_serialized_user_exposes_study_travel_workspace_authorization():
-    assert serialize_user(make_user("study_travel"))["workspace_roles"] == ["study_travel"]
+    assert serialize_user(make_user("study_travel"))["workspace_roles"] == ["study_travel", "teacher"]
 
 
 @pytest.fixture
@@ -42,6 +45,57 @@ def db():
         yield session
     finally:
         session.close()
+
+
+def test_registration_grants_both_workspaces_by_default(db):
+    user, _ = register_user(db, "dual_workspace_user", "valid-password-123")
+
+    assert workspace_roles_for_user(db, user) == ["study_travel", "teacher"]
+
+
+def test_legacy_user_migration_removes_chat_mode_and_grants_both_workspaces():
+    legacy_engine = create_engine("sqlite:///:memory:")
+    with legacy_engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE users (
+                    id VARCHAR PRIMARY KEY,
+                    username VARCHAR NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    chat_mode VARCHAR NOT NULL,
+                    created_at VARCHAR NOT NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO users (id, username, password_hash, chat_mode, created_at)
+                VALUES ('legacy_user', 'legacy', 'hash', 'default', '2026-01-01')
+                """
+            )
+        )
+
+    with patch("app.db.migrations.engine", legacy_engine):
+        ensure_schema_compatibility()
+
+    assert "chat_mode" not in {
+        column["name"] for column in inspect(legacy_engine).get_columns("users")
+    }
+    with legacy_engine.connect() as connection:
+        roles = connection.execute(
+            text(
+                """
+                SELECT role_category
+                FROM user_workspace_roles
+                WHERE user_id = 'legacy_user'
+                ORDER BY role_category
+                """
+            )
+        ).scalars().all()
+    assert roles == ["study_travel", "teacher"]
 
 
 def test_workspace_context_rejects_ungranted_role(db):

@@ -248,6 +248,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = TestClient(app)
+        cls.client.params = {"role_category": "teacher"}
         cls.username = f"test_{uuid.uuid4().hex[:10]}"
         response = cls.client.post(
             "/api/auth/register",
@@ -846,6 +847,8 @@ class AgentArchitectureApiTests(unittest.TestCase):
     def test_users_have_isolated_sessions_and_main_tutor_chat(self):
         alice = TestClient(app)
         bob = TestClient(app)
+        alice.params = {"role_category": "teacher"}
+        bob.params = {"role_category": "teacher"}
         try:
             for client, username in (
                 (alice, f"alice_{uuid.uuid4().hex[:10]}"),
@@ -2167,6 +2170,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     "session_id": session_id,
                     "message": "月季旁边为什么经常看到蚜虫和七星瓢虫？",
                     "expert_id": "insect_agent",
+                    "role_category": "teacher",
                 },
             )
             self.assertEqual(candidate_response.status_code, 200)
@@ -3295,6 +3299,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     "session_id": session_id,
                     "message": "",
                     "expert_id": "insect_agent",
+                    "role_category": "teacher",
                 },
             )
             self.assertEqual(response.status_code, 200)
@@ -3309,6 +3314,7 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     "session_id": session_id,
                     "message": "银河系边缘的量子卫星",
                     "expert_id": "insect_agent",
+                    "role_category": "teacher",
                 },
             )
             self.assertEqual(unmatched.status_code, 200)
