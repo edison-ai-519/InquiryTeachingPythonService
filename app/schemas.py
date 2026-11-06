@@ -142,6 +142,7 @@ class ChatRequest(BaseModel):
     final_content: str | None = None
     expert_id: str | None = Field(default=None, min_length=1, max_length=128)
     draft_request_kind: Literal["generate", "edit"] | None = None
+    target_stage_id: str | None = Field(default=None, min_length=1, max_length=128)
     selection: DraftSelection | None = None
     graph_selection: GraphSelection | None = None
 

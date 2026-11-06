@@ -4,7 +4,7 @@
     <div v-if="selectionLabel" class="draft-selection-bar"><span>{{ selectionLabel }}</span><div><button v-if="attachedLabel !== selectionLabel" type="button" @click="$emit('add-selection')">添加到对话</button><button type="button" @click="$emit('clear-selection')">取消</button></div></div>
     <div class="draft-editor-pane">
       <div class="draft-line-gutter" aria-hidden="true"><div class="draft-line-gutter-inner" :style="{ transform: `translateY(-${scrollTop}px)` }"><span v-for="line in visualLines" :key="line.key" class="draft-line-number" :class="{ active: line.logicalLine === cursorLine, continuation: line.continuation }" :style="{ height: `${lineHeight}px`, lineHeight: `${lineHeight}px` }">{{ line.label }}</span></div></div>
-      <textarea ref="editor" v-model="content" class="draft-editor-textarea" spellcheck="false" placeholder="这里可以直接编辑 Markdown 草稿" @input="$emit('input')" @scroll="$emit('scroll')" @select="$emit('capture-selection')" @keyup="$emit('capture-selection')" @mouseup="$emit('capture-selection')"></textarea>
+      <textarea ref="editor" v-model="content" class="draft-editor-textarea" :disabled="disabled" spellcheck="false" placeholder="这里可以直接编辑 Markdown 草稿" @input="$emit('input')" @scroll="$emit('scroll')" @select="$emit('capture-selection')" @keyup="$emit('capture-selection')" @mouseup="$emit('capture-selection')"></textarea>
     </div>
   </section>
 </template>
@@ -21,6 +21,7 @@ const props = defineProps<{
   cursorLine: number;
   selectionLabel: string;
   attachedLabel: string;
+  disabled?: boolean;
   role_category?: "teacher" | "study_travel" | "parent";
 }>();
 const emit = defineEmits<{

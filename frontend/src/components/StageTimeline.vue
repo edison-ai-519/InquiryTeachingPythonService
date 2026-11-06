@@ -6,6 +6,7 @@
       class="timeline-stage"
       :class="{ active: stage.id === selectedStageId, current: stage.id === currentStageId, confirmed: output(stage.id)?.confirmed }"
       type="button"
+      :disabled="disabled"
       :title="`阶段 ${index + 1} · ${stage.name}`"
       @click="$emit('select-stage', stage.id)"
     >
@@ -31,6 +32,7 @@ defineProps<{
   selectedStageId: string;
   currentStageId: string;
   output: (stageId: string) => StageOutput | undefined;
+  disabled?: boolean;
 }>();
 
 defineEmits<{ 'select-stage': [stageId: string] }>();

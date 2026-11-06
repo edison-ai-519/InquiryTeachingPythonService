@@ -18,6 +18,7 @@
     :stage="currentStage"
     :stage-progress="currentSession?.status === 'completed' ? '已完成' : `阶段 ${currentStageIndex + 1} / ${activeStages.length}`"
     :streaming="isStreaming"
+    :saving="savingDraft"
     :sidebar-collapsed="!leftSidebarVisible"
     :theme-mode="themeMode"
     :current-role="currentRole"
@@ -42,8 +43,17 @@
     :class="{
       'left-sidebar-collapsed': !leftSidebarVisible,
       'right-sidebar-collapsed': !rightSidebarVisible,
+      'mobile-draft-view': mobileWorkspaceView === 'draft',
     }"
   >
+    <nav class="mobile-workspace-switch" aria-label="工作区">
+      <button type="button" :class="{ active: mobileWorkspaceView === 'chat' }" :aria-pressed="mobileWorkspaceView === 'chat'" @click="mobileWorkspaceView = 'chat'">对话</button>
+      <button type="button" :class="{ active: mobileWorkspaceView === 'draft' }" :aria-pressed="mobileWorkspaceView === 'draft'" @click="mobileWorkspaceView = 'draft'">方案编辑</button>
+      <button type="button" :disabled="savingDraft || isStreaming" @click="openNewSessionModal">新建</button>
+      <select v-if="sessions.length" :value="selectedSessionId" aria-label="切换草案" :disabled="isUploadingFile || savingDraft || isStreaming" @change="selectSession(($event.target as HTMLSelectElement).value)">
+        <option v-for="item in sessions" :key="item.id" :value="item.id">{{ item.topic }} · {{ item.flow_display_name }}</option>
+      </select>
+    </nav>
     <WorkspaceSidebar
       :collapsed="!leftSidebarVisible"
       :session="currentSession"
@@ -53,12 +63,14 @@
       :selected-stage-id="selectedStageId"
       :current-stage-id="currentStageId"
       :progress="currentSession?.status === 'completed' ? '已完成' : `${currentStageIndex + 1}/${activeStages.length}`"
-      :uploading="isUploadingFile"
+      :uploading="isUploadingFile || savingDraft || isStreaming"
       :search="sessionSearchQuery"
       :output="activeStageOutput"
       :role-category="currentRole"
+      :flow-stage-counts="flowStageCounts"
+      :operation-error="sessionOperationError"
       @update:search="sessionSearchQuery = $event"
-      @new-session="showNewSessionModal = true"
+      @new-session="openNewSessionModal"
       @delete-session="handleDeleteSession"
       @select-session="selectSession"
       @select-stage="inspectStage"
@@ -73,10 +85,14 @@
         :messages="messages"
         :stage-names="stageNameMap"
         :warning="streamWarning"
-        :streaming="isStreaming"
+        :workflow-status="workflowPhase !== 'idle' ? workflowStatusText : ''"
+        :streaming="isStreaming || savingDraft"
         :render="renderMarkdown"
         :message-role-label="messageRoleLabel"
         @rollback="rollbackRecent"
+        @create-session="openNewSessionModal"
+        @open-tasks="showStudyTaskCenter = true"
+        @use-example="useWelcomeExample"
         @feed-ready="feedRef = $event"
       >
         <ChatComposer
@@ -91,7 +107,9 @@
           :draft-mode="isDraftMode"
           :request-id="activeStreamRequestId"
           :file-error="fileOperationError"
-          :send-disabled="isStreaming ? !activeStreamRequestId : (!selectedExpertId && isDraftMode && !!draftContent.trim() && !attachedChatSelection?.selected_text?.trim())"
+          :send-disabled="sendDisabled"
+          :disabled-reason="sendDisabledReason"
+          :busy="savingDraft || advanceCommitPending"
           :file-status-label="fileStatusLabel"
           @input-ready="chatInputRef = $event"
           @resize="resizeChatInput"
@@ -138,7 +156,8 @@
         :selected-stage-id="selectedStageId"
         :current-stage-id="currentStageId"
         :stage-index="currentStageIndex"
-        :streaming="isStreaming"
+        :stage-count="activeStages.length"
+        :streaming="isStreaming || savingDraft"
         :drafting="workflowPhase === 'draft'"
         :proposal="draftProposal"
         :proposal-label="draftProposal ? proposalStatusLabel(draftProposal.status) : draftWorkbenchEmptyText"
@@ -149,6 +168,9 @@
         :selection-label="currentSelectionReferenceLabel"
         :attached-label="attachedChatSelectionLabel"
         :role-category="currentRole"
+        :save-state="draftSaveState"
+        :saving="savingDraft"
+        :advance-disabled-reason="advanceDisabledReason"
         @previous="goPreviousStage"
         @next="goNextStage"
         @save="saveDraftToServer"
@@ -591,10 +613,11 @@
     <!-- New Session Modal -->
     <div v-if="showNewSessionModal" class="modal-overlay" @click.self="showNewSessionModal = false">
       <div class="modal-content glass">
-        <h3>{{ currentRole === 'parent' ? '新建家庭探究活动' : '新建会话' }}</h3>
+        <h3>{{ currentRole === 'parent' ? '新建家庭探究活动' : currentRole === 'study_travel' ? '新建研学方案' : '新建教学课题' }}</h3>
+        <p class="create-session-intro">{{ currentRole === 'parent' ? '先填写探究主题；家庭情况可以稍后补充。' : currentRole === 'study_travel' ? '基地任务请在“项目协同”中创建项目和任务；也可以创建独立研学方案。' : '先填写课题名称并选择流程，之后可以逐阶段与主导师协作。' }}</p>
         <label class="field">
-          <span>{{ currentRole === 'parent' ? '探究主题' : '课题名称' }}</span>
-          <input v-model="topicInput" class="input" placeholder="例如：光的反射" />
+          <span>{{ currentRole === 'parent' ? '探究主题' : currentRole === 'study_travel' ? '研学主题' : '课题名称' }}</span>
+          <input v-model="topicInput" class="input" :placeholder="currentRole === 'parent' ? '例如：雨后叶片上的水珠' : currentRole === 'study_travel' ? '例如：古道自然观察研学' : '例如：光的反射'" required />
         </label>
         <section v-if="currentRole === 'parent'" class="home-context-card">
           <strong>家庭情况（可选）</strong>
@@ -617,8 +640,9 @@
         </label>
         <div class="modal-actions">
           <button class="ghost-button" @click="showNewSessionModal = false">取消</button>
-          <button class="primary-button" @click="handleCreateSession">创建</button>
+          <button class="primary-button" :disabled="isCreatingSession || !topicInput.trim()" @click="handleCreateSession">{{ isCreatingSession ? '创建中…' : currentRole === 'parent' ? '创建活动' : currentRole === 'study_travel' ? '创建方案' : '创建课题' }}</button>
         </div>
+        <p v-if="sessionCreateError" class="form-error" role="alert">{{ sessionCreateError }}</p>
       </div>
     </div>
 
@@ -701,6 +725,7 @@ import type {
   SessionListItem,
 } from "@/types";
 import { renderMarkdown } from "@/utils/markdown";
+import { getAdvanceDisabledReason, getDraftSaveState, getSendDisabledReason, getStageAdvanceFailureNotice, resolveStageSelectionAfterRefresh, saveDraftBeforeAction, updateStageDraftOutput } from "@/utils/workspaceUx";
 import { restoreAuthentication } from "@/authBootstrap";
 import { ApiRequestError } from "@/api";
 
@@ -713,6 +738,7 @@ const flowGroups = computed(() => {
   }
   return Array.from(grouped, ([category, items]) => ({ category, flows: items }));
 });
+const flowStageCounts = computed<Record<string, number>>(() => Object.fromEntries(flows.value.map((flow) => [flow.name, flow.stage_count])));
 const currentUser = ref<AuthUser | null>(null);
 const authLoading = ref(true);
 const authRestoreError = ref("");
@@ -734,8 +760,15 @@ const selectedSessionId = ref("");
 const sessionSearchQuery = ref("");
 const selectedStageId = ref("");
 const topicInput = ref("光的反射");
+const isCreatingSession = ref(false);
+const sessionCreateError = ref("");
 const chatInput = ref("");
 const draftContent = ref("");
+const savedDraftContent = ref("");
+const savingDraft = ref(false);
+const draftSaveError = ref("");
+const sessionOperationError = ref("");
+const advanceCommitPendingSessionId = ref("");
 const draftProposal = ref<DraftProposal | null>(null);
 const draftStreamingContent = ref("");
 const statusText = ref("准备就绪");
@@ -754,6 +787,7 @@ const workflowPhase = ref<"idle" | "guide" | "draft" | "expert">("idle");
 const workflowStatusText = ref("准备就绪");
 const leftSidebarVisible = ref(true);
 const rightSidebarVisible = ref(true);
+const mobileWorkspaceView = ref<"chat" | "draft">("chat");
 const feedRef = ref<HTMLElement | null>(null);
 const chatInputRef = ref<HTMLTextAreaElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -885,11 +919,19 @@ async function loadSessions() {
 }
 
 async function retryWorkspaceLoad() {
+  if (!(await saveDraftBeforeWorkspaceAction())) {
+    return;
+  }
+  const preferredSessionId = selectedSessionId.value;
+  const preferredStageId = selectedStageId.value;
   workspaceLoadError.value = "";
   try {
     await refreshWorkspace();
-    if (sessions.value[0]) {
-      await loadSession(sessions.value[0].id, true, false, false, currentRole.value);
+    const sessionId = sessions.value.some((item) => item.id === preferredSessionId)
+      ? preferredSessionId
+      : sessions.value[0]?.id;
+    if (sessionId) {
+      await loadSession(sessionId, true, false, false, currentRole.value, preferredStageId);
     }
   } catch (error: any) {
     workspaceLoadError.value = `工作台加载失败：${error.message || String(error)}`;
@@ -897,6 +939,9 @@ async function retryWorkspaceLoad() {
 }
 
 async function handleRoleSwitch(role: "teacher" | "study_travel" | "parent") {
+  if (!(await saveDraftBeforeWorkspaceAction())) {
+    return;
+  }
   currentRole.value = role;
   localStorage.setItem("user_role", role);
   selectedExpertId.value = "";
@@ -909,6 +954,10 @@ async function handleRoleSwitch(role: "teacher" | "study_travel" | "parent") {
   resetKnowledgeGraphState();
   showGraphInRightPanel.value = false;
   draftContent.value = "";
+  savedDraftContent.value = "";
+  draftSaveError.value = "";
+  sessionOperationError.value = "";
+  advanceCommitPendingSessionId.value = "";
   draftProposal.value = null;
   draftStreamingContent.value = "";
   draftWorkbenchState.value = "idle";
@@ -957,7 +1006,7 @@ function updateWorkflowStatus(
     workflowPhase.value = "idle";
     workflowStatusText.value = "准备就绪";
     workflowStatusTimer = undefined;
-  }, 900);
+  }, 4500);
 }
 
 const stageNameMap = computed<Record<string, string>>(() => {
@@ -994,6 +1043,37 @@ const progressPercentage = computed(() => {
 });
 
 const isDraftMode = computed(() => Boolean(currentSession.value?.draft_mode_enabled));
+const draftSaveDirty = computed(() => draftContent.value !== savedDraftContent.value);
+const draftSaveState = computed(() => getDraftSaveState({
+  hasSession: Boolean(currentSession.value && selectedStageId.value),
+  hasContent: Boolean(draftContent.value.trim()),
+  dirty: draftSaveDirty.value,
+  saving: savingDraft.value,
+  error: draftSaveError.value,
+}));
+const advanceCommitPending = computed(() => Boolean(currentSession.value && currentSession.value.id === advanceCommitPendingSessionId.value));
+const sendDisabled = computed(() => isStreaming.value
+  ? !activeStreamRequestId.value
+  : savingDraft.value || advanceCommitPending.value || !currentSession.value || (!selectedExpertId.value && isDraftMode.value && Boolean(draftContent.value.trim()) && !attachedChatSelection.value?.selected_text?.trim()));
+const sendDisabledReason = computed(() => getSendDisabledReason({
+  hasSession: Boolean(currentSession.value),
+  saving: savingDraft.value,
+  committedPendingRefresh: advanceCommitPending.value,
+  streaming: isStreaming.value,
+  hasRequestId: Boolean(activeStreamRequestId.value),
+  draftMode: isDraftMode.value,
+  hasDraft: Boolean(draftContent.value.trim()),
+  hasSelection: Boolean(attachedChatSelection.value?.selected_text?.trim()),
+  expertSelected: Boolean(selectedExpertId.value),
+}));
+const advanceDisabledReason = computed(() => getAdvanceDisabledReason({
+  hasSession: Boolean(currentSession.value),
+  completed: currentSession.value?.status === "completed",
+  streaming: isStreaming.value,
+  selectedCurrent: selectedStageId.value === currentStageId.value,
+  saving: savingDraft.value,
+  committedPendingRefresh: advanceCommitPending.value,
+}));
 const selectedExpert = computed(() =>
   experts.value.find((expert) => expert.id === selectedExpertId.value) || null,
 );
@@ -1215,10 +1295,14 @@ function syncDraftFromSelection() {
   const stageId = selectedStageId.value || currentStageId.value;
   if (!stageId) {
     draftContent.value = "";
+    savedDraftContent.value = "";
+    draftSaveError.value = "";
     return;
   }
   const output = activeStageOutput(stageId);
   draftContent.value = output?.draft_content || output?.final_content || "";
+  savedDraftContent.value = draftContent.value;
+  draftSaveError.value = "";
 }
 
 function syncDraftEditor() {
@@ -1427,6 +1511,7 @@ function handleGlobalKeydown(event: KeyboardEvent) {
 
 function onDraftEditorInput() {
   draftContent.value = draftEditorRef.value?.value ?? draftContent.value;
+  draftSaveError.value = "";
   draftWorkbenchState.value = draftContent.value.trim() ? "save_ready" : "idle";
   updateDraftCursorLine();
   syncDraftEditorMetrics();
@@ -1570,6 +1655,7 @@ async function loadSession(
   preserveWarning = false,
   preserveGraphContext = false,
   roleCategory: string = "teacher",
+  preferredStageId?: string,
 ) {
   const keepGraphContext = graphContextSessionId.value === sessionId
     && (preserveGraphContext || !loadMessages);
@@ -1585,7 +1671,11 @@ async function loadSession(
   fileOperationError.value = "";
   selectedSessionId.value = session.id;
   selectedExpertId.value = "";
-  selectedStageId.value = pickStageIdFromSession(session);
+  selectedStageId.value = resolveStageSelectionAfterRefresh(
+    preferredStageId,
+    session.outputs.map((output) => output.stage_id),
+    pickStageIdFromSession(session),
+  );
   if (!keepGraphContext) resetKnowledgeGraphState();
   if (loadMessages) {
     messages.value = await getMessages(sessionId, roleCategory as "teacher" | "study_travel" | "parent");
@@ -1604,13 +1694,33 @@ async function loadSession(
     await refreshKnowledgeGraph(lastGraphQuery.value, lastGraphExpertId.value, sessionId);
   }
   statusText.value = `已切换到 ${session.topic}`;
+  if (advanceCommitPendingSessionId.value === session.id) {
+    advanceCommitPendingSessionId.value = "";
+    if (workspaceLoadError.value.startsWith("本阶段已经提交，但刷新状态失败：")) {
+      workspaceLoadError.value = "";
+    }
+  }
 }
 
 async function selectSession(sessionId: string) {
+  if (sessionId === currentSession.value?.id) {
+    return;
+  }
+  if (!(await saveDraftBeforeWorkspaceAction())) {
+    return;
+  }
+  sessionOperationError.value = "";
   await loadSession(sessionId, true, false, false, currentRole.value);
 }
 
 async function openTaskSession(sessionId: string) {
+  if (sessionId === currentSession.value?.id) {
+    showStudyTaskCenter.value = false;
+    return;
+  }
+  if (!(await saveDraftBeforeWorkspaceAction())) {
+    return;
+  }
   showStudyTaskCenter.value = false;
   sessions.value = await getSessions(currentRole.value);
   await loadSession(sessionId, true, false, false, currentRole.value);
@@ -2042,6 +2152,7 @@ async function handleDeleteSession() {
     return;
   }
   try {
+    sessionOperationError.value = "";
     statusText.value = `正在删除会话《${topic}》...`;
     await deleteSession(currentSession.value.id, currentRole.value);
     sessions.value = sessions.value.filter((item) => item.id !== currentSession.value!.id);
@@ -2062,7 +2173,8 @@ async function handleDeleteSession() {
       statusText.value = "所有会话已删除";
     }
   } catch (err: any) {
-    statusText.value = `删除失败: ${err.message || err}`;
+    sessionOperationError.value = `删除失败：${err.message || err}`;
+    statusText.value = sessionOperationError.value;
   }
 }
 
@@ -2071,6 +2183,9 @@ async function createWorkspaceSession() {
   if (!topic) {
     statusText.value = "请先输入课题名称";
     return;
+  }
+  if (!(await saveDraftBeforeWorkspaceAction())) {
+    throw new Error("当前草案未能保存，新会话尚未创建。请重试保存后再继续。");
   }
   const home = Object.fromEntries(Object.entries(homeContext.value).filter(([, value]) => value?.trim()));
   const created = await createSession(topic, newSessionFlowName.value, currentRole.value, currentRole.value === "parent" && Object.keys(home).length ? home : undefined);
@@ -2082,17 +2197,46 @@ async function createWorkspaceSession() {
 async function handleCreateSession() {
   const topic = topicInput.value.trim();
   if (!topic) {
-    statusText.value = "请先输入课题名称";
+    sessionCreateError.value = "请先填写课题名称。";
     return;
   }
-  await createWorkspaceSession();
-  showNewSessionModal.value = false;
+  isCreatingSession.value = true;
+  sessionCreateError.value = "";
+  try {
+    await createWorkspaceSession();
+    showNewSessionModal.value = false;
+  } catch (error: any) {
+    sessionCreateError.value = `创建失败：${error.message || String(error)}。请检查网络后重试。`;
+  } finally {
+    isCreatingSession.value = false;
+  }
 }
 
-function inspectStage(stageId: string) {
+function useWelcomeExample(text: string) {
+  chatInput.value = text;
+  nextTick(() => {
+    chatInputRef.value?.focus();
+    resizeChatInput();
+  });
+}
+
+function openNewSessionModal() {
+  sessionCreateError.value = "";
+  showNewSessionModal.value = true;
+}
+
+async function inspectStage(stageId: string) {
+  if (stageId === selectedStageId.value) {
+    return;
+  }
+  if (!(await saveDraftBeforeWorkspaceAction())) {
+    return;
+  }
   selectedStageId.value = stageId;
   const output = activeStageOutput(stageId);
   draftContent.value = output?.draft_content || output?.final_content || "";
+  savedDraftContent.value = draftContent.value;
+  draftSaveError.value = "";
   clearAttachedChatSelection(true);
   lastDraftSelection.value = null;
   void refreshDraftProposal();
@@ -2166,32 +2310,62 @@ function showWorkflowBadgeForMessage(message: MessageItem) {
   return false;
 }
 
-async function saveDraftToServer() {
-  if (!currentSession.value || !selectedStageId.value) {
-    return;
+async function saveDraftToServer(): Promise<boolean> {
+  if (!currentSession.value || !selectedStageId.value || savingDraft.value) {
+    return false;
   }
-  await saveDraft(currentSession.value.id, selectedStageId.value, draftContent.value, currentRole.value);
-  await loadSession(currentSession.value.id, false, false, false, currentRole.value);
-  draftWorkbenchState.value = draftContent.value.trim() ? "save_ready" : "idle";
-  statusText.value = "草稿已保存";
-  saveSuccessVisible.value = true;
-  if (saveSuccessTimer) {
-    window.clearTimeout(saveSuccessTimer);
+  const sessionId = currentSession.value.id;
+  const stageId = selectedStageId.value;
+  const contentToSave = draftContent.value;
+  savingDraft.value = true;
+  draftSaveError.value = "";
+  try {
+    await saveDraft(sessionId, stageId, contentToSave, currentRole.value);
+    savedDraftContent.value = contentToSave;
+    if (currentSession.value?.id === sessionId) {
+      currentSession.value = {
+        ...currentSession.value,
+        outputs: updateStageDraftOutput(currentSession.value.outputs, stageId, contentToSave),
+      };
+    }
+    draftProposal.value = null;
+    draftWorkbenchState.value = draftContent.value.trim() ? "save_ready" : "idle";
+    statusText.value = "草稿已保存";
+    saveSuccessVisible.value = true;
+    if (saveSuccessTimer) {
+      window.clearTimeout(saveSuccessTimer);
+    }
+    saveSuccessTimer = window.setTimeout(() => {
+      saveSuccessVisible.value = false;
+    }, 1800);
+    return true;
+  } catch (error: any) {
+    draftSaveError.value = error.message || String(error);
+    statusText.value = `保存失败：${draftSaveError.value}`;
+    return false;
+  } finally {
+    savingDraft.value = false;
   }
-  saveSuccessTimer = window.setTimeout(() => {
-    saveSuccessVisible.value = false;
-  }, 1800);
+}
+
+async function saveDraftBeforeWorkspaceAction(): Promise<boolean> {
+  return saveDraftBeforeAction(
+    Boolean(currentSession.value && selectedStageId.value && draftSaveDirty.value),
+    saveDraftToServer,
+  );
 }
 
 async function applyDraftProposalAction(hunkId: string, action: "accept" | "reject") {
   if (!currentSession.value || !draftProposal.value) {
     return;
   }
-  const updated = await applyDraftProposalActions(currentSession.value.id, draftProposal.value.id, [
+  const sessionId = currentSession.value.id;
+  const proposalStageId = draftProposal.value.stage_id;
+  const updated = await applyDraftProposalActions(sessionId, draftProposal.value.id, [
     { hunk_id: hunkId, action },
   ], currentRole.value);
   draftProposal.value = updated.status === "pending" ? updated : null;
-  await loadSession(currentSession.value.id, false, true);
+  await loadSession(sessionId, false, true, false, currentRole.value, proposalStageId);
   await refreshDraftProposal();
 }
 
@@ -2205,9 +2379,11 @@ async function applyAllDraftProposalActions(action: "accept" | "reject") {
   if (!actions.length) {
     return;
   }
-  const updated = await applyDraftProposalActions(currentSession.value.id, draftProposal.value.id, actions, currentRole.value);
+  const sessionId = currentSession.value.id;
+  const proposalStageId = draftProposal.value.stage_id;
+  const updated = await applyDraftProposalActions(sessionId, draftProposal.value.id, actions, currentRole.value);
   draftProposal.value = updated.status === "pending" ? updated : null;
-  await loadSession(currentSession.value.id, false, true);
+  await loadSession(sessionId, false, true, false, currentRole.value, proposalStageId);
   await refreshDraftProposal();
 }
 
@@ -2408,6 +2584,9 @@ async function sendChat(options: SendChatOptions = {}) {
   if (!currentSession.value) {
     return;
   }
+  if (!(await saveDraftBeforeWorkspaceAction())) {
+    return;
+  }
 
   const requestedExpertId = options.expertId || selectedExpertId.value;
   const requestExpert = experts.value.find((expert) => expert.id === requestedExpertId) || null;
@@ -2421,6 +2600,9 @@ async function sendChat(options: SendChatOptions = {}) {
   const draftRequestKind = requestMode === "draft" ? (draftContent.value.trim() ? "edit" : "generate") : undefined;
   const selectionPayload = attachedChatSelection.value?.selected_text?.trim() ? attachedChatSelection.value : null;
   const draftContentBeforeRequest = draftContent.value;
+  const activeStageId = currentSession.value.current_stage?.id || "";
+  const viewedStageId = selectedStageId.value || activeStageId;
+  const stageId = requestMode === "draft" ? viewedStageId : activeStageId;
   const shouldStreamDraftIntoEditor =
     requestMode === "draft" && draftRequestKind === "generate" && !draftContentBeforeRequest.trim();
 
@@ -2433,7 +2615,6 @@ async function sendChat(options: SendChatOptions = {}) {
   const requestId = createStreamRequestId();
   let graphRequestSequence = 0;
   const abortController = new AbortController();
-  const stageId = currentSession.value.current_stage?.id || "";
   const userMessage: MessageItem = {
     stage_id: stageId,
     role: "user",
@@ -2506,12 +2687,13 @@ async function sendChat(options: SendChatOptions = {}) {
         message: text,
         expert_id: requestExpertId || undefined,
         draft_request_kind: draftRequestKind,
+        target_stage_id: requestMode === "draft" ? stageId : undefined,
         selection: selectionPayload,
         graph_selection: graphSelection,
       },
       {
         stage: () => {
-          selectedStageId.value = currentSession.value?.current_stage?.id || selectedStageId.value;
+          selectedStageId.value = viewedStageId || currentSession.value?.current_stage?.id || selectedStageId.value;
         },
         graph: (data) => {
           if (
@@ -2667,7 +2849,7 @@ async function sendChat(options: SendChatOptions = {}) {
           if (graphRequestSequence === knowledgeGraphRequestSequence) {
             isLoadingKnowledgeGraph.value = false;
           }
-          await loadSession(sessionId, true, true, true);
+          await loadSession(sessionId, true, true, true, currentRole.value, viewedStageId);
           await refreshDraftProposal();
           if (requestMode === "draft") {
             if (data.draft_proposal) {
@@ -2708,6 +2890,7 @@ async function sendChat(options: SendChatOptions = {}) {
       updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "expert" ? "expert" : "guide", statusText.value, "done");
     } else {
       statusText.value = `对话失败：${err.message || err}`;
+      streamWarning.value = `这次回复没有完成：${err.message || String(err)}。您的输入仍可重新发送。`;
       updateWorkflowStatus(requestMode === "draft" ? "draft" : requestMode === "expert" ? "expert" : "guide", statusText.value, "error");
     }
   } finally {
@@ -2747,11 +2930,20 @@ async function goNextStage() {
   if (!currentSession.value) {
     return;
   }
+  const sessionId = currentSession.value.id;
+  const roleCategory = currentRole.value;
+  if (advanceCommitPendingSessionId.value === sessionId) {
+    return;
+  }
+  let actionCommitted = false;
+  let sessionRefreshed = false;
   isStreaming.value = true;
   statusText.value = "正在推进到下一阶段...";
+  updateWorkflowStatus("guide", "正在提交当前阶段并推进...", "start");
+  streamWarning.value = "";
   try {
     await streamChat(
-      currentSession.value.id,
+      sessionId,
       {
         type: "sys_action",
         action: "next_stage",
@@ -2761,12 +2953,39 @@ async function goNextStage() {
         stage: () => undefined,
         delta: () => undefined,
         done: async () => {
-          await loadSession(currentSession.value!.id, true);
-          statusText.value = "已进入下一阶段";
+          actionCommitted = true;
+          advanceCommitPendingSessionId.value = sessionId;
+          try {
+            await loadSession(sessionId, true, false, false, roleCategory);
+            sessionRefreshed = true;
+            advanceCommitPendingSessionId.value = "";
+          } catch (refreshError: any) {
+            const notice = getStageAdvanceFailureNotice(refreshError.message || String(refreshError), true);
+            workspaceLoadError.value = notice;
+            streamWarning.value = notice;
+            statusText.value = notice;
+            updateWorkflowStatus("guide", notice, "error");
+            return;
+          }
+          statusText.value = currentSession.value?.status === "completed" ? "流程已完成，方案已提交" : "已进入下一阶段";
+          updateWorkflowStatus("guide", statusText.value, "done");
         },
       },
-      currentRole.value,
+      roleCategory,
     );
+  } catch (error: any) {
+    const message = error.message || String(error);
+    if (actionCommitted && sessionRefreshed) {
+      return;
+    }
+    const notice = getStageAdvanceFailureNotice(message, actionCommitted);
+    if (actionCommitted) {
+      advanceCommitPendingSessionId.value = sessionId;
+      workspaceLoadError.value = notice;
+    }
+    streamWarning.value = notice;
+    statusText.value = notice;
+    updateWorkflowStatus("guide", statusText.value, "error");
   } finally {
     isStreaming.value = false;
   }
@@ -2776,11 +2995,16 @@ async function goPreviousStage() {
   if (!currentSession.value) {
     return;
   }
+  if (!(await saveDraftBeforeWorkspaceAction())) {
+    return;
+  }
+  const sessionId = currentSession.value.id;
+  const roleCategory = currentRole.value;
   statusText.value = "正在回退到上一阶段...";
   isStreaming.value = true;
   try {
-    await rollbackSession(currentSession.value.id, { steps: 1, stage_back: true }, currentRole.value);
-    await loadSession(currentSession.value.id, true);
+    await rollbackSession(sessionId, { steps: 1, stage_back: true }, roleCategory);
+    await loadSession(sessionId, true, false, false, roleCategory);
     statusText.value = "已回到上一阶段";
   } finally {
     isStreaming.value = false;
@@ -2791,9 +3015,11 @@ async function rollbackRecent() {
   if (!currentSession.value) {
     return;
   }
+  const sessionId = currentSession.value.id;
+  const viewedStageId = selectedStageId.value;
   statusText.value = "正在回滚最近一轮对话...";
-  await rollbackSession(currentSession.value.id, { steps: 1, stage_back: false }, currentRole.value);
-  await loadSession(currentSession.value.id, true);
+  await rollbackSession(sessionId, { steps: 1, stage_back: false }, currentRole.value);
+  await loadSession(sessionId, true, false, false, currentRole.value, viewedStageId);
   statusText.value = "最近一轮对话已回滚";
 }
 

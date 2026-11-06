@@ -64,6 +64,7 @@ from app.db.models import (
     RagRecordModel,
     SessionFileModel,
     SessionModel,
+    UserWorkspaceRoleModel,
 )
 from app.main import app
 from app.services.auth_service import register_user
@@ -256,6 +257,15 @@ class AgentArchitectureApiTests(unittest.TestCase):
         )
         if response.status_code != 200:
             raise AssertionError(response.text)
+        cls.user_id = response.json()["data"]["id"]
+        # Most tests in this class exercise the teacher-only workspace path.
+        # Dedicated registration tests below cover the three-workspace default.
+        with SessionLocal() as db:
+            db.query(UserWorkspaceRoleModel).filter(
+                UserWorkspaceRoleModel.user_id == response.json()["data"]["id"],
+                UserWorkspaceRoleModel.role_category.in_(("study_travel", "parent")),
+            ).delete(synchronize_session=False)
+            db.commit()
 
     @classmethod
     def tearDownClass(cls):
@@ -608,6 +618,15 @@ class AgentArchitectureApiTests(unittest.TestCase):
             self.assertEqual(registered.status_code, 200)
             self.assertEqual(registered.json()["data"]["username"], username)
             self.assertFalse(registered.json()["data"]["is_admin"])
+            self.assertEqual(
+                registered.json()["data"]["workspace_roles"],
+                ["parent", "study_travel", "teacher"],
+            )
+            for role_category in ("teacher", "study_travel", "parent"):
+                self.assertEqual(
+                    client.get("/api/sessions", params={"role_category": role_category}).status_code,
+                    200,
+                )
             self.assertEqual(client.get("/api/auth/me").status_code, 200)
 
             duplicate = client.post(
@@ -675,6 +694,10 @@ class AgentArchitectureApiTests(unittest.TestCase):
             )
             self.assertEqual(ordinary_registered.status_code, 200)
             self.assertFalse(ordinary_registered.json()["data"]["is_admin"])
+            self.assertEqual(
+                ordinary_registered.json()["data"]["workspace_roles"],
+                ["parent", "study_travel", "teacher"],
+            )
 
             admin_registered = admin_client.post(
                 "/api/auth/admin/register",
@@ -682,6 +705,15 @@ class AgentArchitectureApiTests(unittest.TestCase):
             )
             self.assertEqual(admin_registered.status_code, 200)
             self.assertTrue(admin_registered.json()["data"]["is_admin"])
+            self.assertEqual(
+                admin_registered.json()["data"]["workspace_roles"],
+                ["parent", "study_travel", "teacher"],
+            )
+            for role_category in ("teacher", "study_travel", "parent"):
+                self.assertEqual(
+                    admin_client.get("/api/sessions", params={"role_category": role_category}).status_code,
+                    200,
+                )
 
             admin_client.post("/api/auth/logout")
             self.assertEqual(
@@ -862,35 +894,65 @@ class AgentArchitectureApiTests(unittest.TestCase):
 
             alice_session = alice.post(
                 "/api/sessions",
-                json={"topic": "Alice 的课题", "flow_name": "inquiry_7_stage"},
+                json={
+                    "topic": "Alice 的课题",
+                    "flow_name": "inquiry_7_stage",
+                    "role_category": "teacher",
+                },
             ).json()["data"]["id"]
             bob_session = bob.post(
                 "/api/sessions",
-                json={"topic": "Bob 的课题", "flow_name": "inquiry_7_stage"},
+                json={
+                    "topic": "Bob 的课题",
+                    "flow_name": "inquiry_7_stage",
+                    "role_category": "teacher",
+                },
             ).json()["data"]["id"]
 
             self.assertNotEqual(alice_session, bob_session)
             self.assertEqual(
-                [item["id"] for item in alice.get("/api/sessions").json()["data"]],
+                [
+                    item["id"]
+                    for item in alice.get(
+                        "/api/sessions", params={"role_category": "teacher"}
+                    ).json()["data"]
+                ],
                 [alice_session],
             )
             self.assertEqual(
-                [item["id"] for item in bob.get("/api/sessions").json()["data"]],
+                [
+                    item["id"]
+                    for item in bob.get(
+                        "/api/sessions", params={"role_category": "teacher"}
+                    ).json()["data"]
+                ],
                 [bob_session],
             )
-            self.assertEqual(alice.get(f"/api/sessions/{bob_session}").status_code, 404)
-            self.assertEqual(bob.delete(f"/api/sessions/{alice_session}").status_code, 404)
+            self.assertEqual(
+                alice.get(
+                    f"/api/sessions/{bob_session}",
+                    params={"role_category": "teacher"},
+                ).status_code,
+                404,
+            )
+            self.assertEqual(
+                bob.delete(
+                    f"/api/sessions/{alice_session}",
+                    params={"role_category": "teacher"},
+                ).status_code,
+                404,
+            )
 
             self.assertEqual(alice.get("/api/settings/chat-mode").status_code, 404)
             alice_events = parse_sse(
                 alice.post(
-                    f"/api/sessions/{alice_session}/chat",
+                    f"/api/sessions/{alice_session}/chat?role_category=teacher",
                     json={"type": "chat", "message": "Alice 的第一轮提问"},
                 ).text
             )
             bob_events = parse_sse(
                 bob.post(
-                    f"/api/sessions/{bob_session}/chat",
+                    f"/api/sessions/{bob_session}/chat?role_category=teacher",
                     json={"type": "chat", "message": "Bob 的第一轮提问"},
                 ).text
             )
@@ -1638,6 +1700,75 @@ class AgentArchitectureApiTests(unittest.TestCase):
         finally:
             self.delete_session(session_id)
 
+    def test_manual_draft_save_remains_role_isolated_across_all_workspaces(self):
+        workspaces = {
+            "teacher": "inquiry_7_stage",
+            "parent": "parent_curiosity_inquiry",
+            "study_travel": "study_travel_project",
+        }
+        session_roles: list[tuple[str, str]] = []
+        with SessionLocal() as db:
+            for role in ("parent", "study_travel"):
+                db.add(UserWorkspaceRoleModel(
+                    user_id=self.user_id,
+                    role_category=role,
+                    created_at="2026-11-04T00:00:00+00:00",
+                ))
+            db.commit()
+
+        try:
+            for role, flow_name in workspaces.items():
+                self.client.params = {"role_category": role}
+                create_response = self.client.post(
+                    "/api/sessions",
+                    json={
+                        "topic": f"{role} draft isolation",
+                        "flow_name": flow_name,
+                        "role_category": role,
+                    },
+                )
+                self.assertEqual(create_response.status_code, 200, create_response.text)
+                session_id = create_response.json()["data"]["id"]
+                session_roles.append((session_id, role))
+                stage_id = create_response.json()["data"]["current_stage"]["id"]
+                content = f"只属于 {role} 工作台的草案内容"
+                save_response = self.client.put(
+                    f"/api/sessions/{session_id}/stages/{stage_id}/draft?role_category={role}",
+                    json={"draft_content": content, "role_category": role},
+                )
+                self.assertEqual(save_response.status_code, 200, save_response.text)
+
+                session_response = self.client.get(
+                    f"/api/sessions/{session_id}?role_category={role}"
+                )
+                self.assertEqual(session_response.status_code, 200)
+                saved_output = next(
+                    item for item in session_response.json()["data"]["outputs"]
+                    if item["stage_id"] == stage_id
+                )
+                self.assertEqual(saved_output["draft_content"], content)
+
+                other_role = next(candidate for candidate in workspaces if candidate != role)
+                self.client.params = {"role_category": other_role}
+                wrong_role_response = self.client.get(
+                    f"/api/sessions/{session_id}?role_category={other_role}"
+                )
+                self.assertEqual(
+                    wrong_role_response.status_code,
+                    404,
+                    f"session_role={role}, requested_role={other_role}, response={wrong_role_response.text}",
+                )
+        finally:
+            self.client.params = {"role_category": "teacher"}
+            for session_id, role in session_roles:
+                self.client.delete(f"/api/sessions/{session_id}?role_category={role}")
+            with SessionLocal() as db:
+                db.query(UserWorkspaceRoleModel).filter(
+                    UserWorkspaceRoleModel.user_id == self.user_id,
+                    UserWorkspaceRoleModel.role_category.in_(("study_travel", "parent")),
+                ).delete(synchronize_session=False)
+                db.commit()
+
     def test_first_draft_generation_writes_directly_without_pending_proposal(self):
         session_id, stage_id = self.create_session()
         try:
@@ -1736,6 +1867,104 @@ class AgentArchitectureApiTests(unittest.TestCase):
                     .count(),
                     1,
                 )
+        finally:
+            self.delete_session(session_id)
+
+    def test_draft_generation_targets_a_selected_non_current_stage(self):
+        session_id, current_stage_id = self.create_session()
+        try:
+            self.set_draft_mode(session_id, True)
+            session_before = self.get_session(session_id)
+            target_stage_id = session_before["outputs"][1]["stage_id"]
+
+            response = self.client.post(
+                f"/api/sessions/{session_id}/chat",
+                json={
+                    "type": "chat",
+                    "message": "为第二阶段生成一份观察记录草案",
+                    "draft_request_kind": "generate",
+                    "target_stage_id": target_stage_id,
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            events = parse_sse(response.text)
+            self.assertTrue(events[-1][1]["draft_updated"])
+
+            session_after = self.get_session(session_id)
+            self.assertEqual(session_after["current_stage"]["id"], current_stage_id)
+            target_output = next(
+                item for item in session_after["outputs"] if item["stage_id"] == target_stage_id
+            )
+            self.assertTrue(target_output["draft_content"])
+            current_output = next(
+                item for item in session_after["outputs"] if item["stage_id"] == current_stage_id
+            )
+            self.assertFalse(current_output["draft_content"])
+        finally:
+            self.delete_session(session_id)
+
+    def test_draft_edit_targets_selected_non_current_stage_and_keeps_proposal_there(self):
+        session_id, current_stage_id = self.create_session()
+        try:
+            self.set_draft_mode(session_id, True)
+            session_before = self.get_session(session_id)
+            target_stage_id = session_before["outputs"][1]["stage_id"]
+            base_content = "### 历史阶段\n\n第一步：观察叶片纹理。"
+            save_response = self.client.put(
+                f"/api/sessions/{session_id}/stages/{target_stage_id}/draft",
+                json={"draft_content": base_content},
+            )
+            self.assertEqual(save_response.status_code, 200)
+            selected_text = "第一步：观察叶片纹理。"
+            start_offset = base_content.index(selected_text)
+
+            response = self.client.post(
+                f"/api/sessions/{session_id}/chat",
+                json={
+                    "type": "chat",
+                    "message": "把这一步改得更具体",
+                    "draft_request_kind": "edit",
+                    "target_stage_id": target_stage_id,
+                    "selection": {
+                        "selected_text": selected_text,
+                        "start_offset": start_offset,
+                        "end_offset": start_offset + len(selected_text),
+                        "stage_id": target_stage_id,
+                    },
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            events = parse_sse(response.text)
+            event_names = [name for name, _ in events]
+            self.assertIn("proposal", event_names)
+            proposal_payload = next(payload for name, payload in events if name == "proposal")["proposal"]
+            self.assertEqual(proposal_payload["stage_id"], target_stage_id)
+
+            session_after = self.get_session(session_id)
+            self.assertEqual(session_after["current_stage"]["id"], current_stage_id)
+            proposal_response = self.client.get(
+                f"/api/sessions/{session_id}/draft-proposal",
+                params={"stage_id": target_stage_id},
+            )
+            self.assertEqual(proposal_response.status_code, 200)
+            self.assertEqual(proposal_response.json()["data"]["stage_id"], target_stage_id)
+        finally:
+            self.delete_session(session_id)
+
+    def test_draft_chat_rejects_target_stage_outside_the_session_flow(self):
+        session_id, _ = self.create_session()
+        try:
+            self.set_draft_mode(session_id, True)
+            response = self.client.post(
+                f"/api/sessions/{session_id}/chat",
+                json={
+                    "type": "chat",
+                    "message": "生成草案",
+                    "draft_request_kind": "generate",
+                    "target_stage_id": "not-a-stage-in-this-flow",
+                },
+            )
+            self.assertEqual(response.status_code, 404)
         finally:
             self.delete_session(session_id)
 

@@ -234,7 +234,106 @@ STAGE_DIRECTIONS: dict[str, str] = {
         "帮助家长具体肯定孩子的观察、提问、尝试和依据，而不只表扬答对；给出下一次可尝试的一句引导话术。"
         "最后才根据本次证据简要解释相关现象，并说明适用条件、尚未验证之处及可以继续追问的问题。"
     ),
+    "teacher_curiosity_phenomenon_observation": (
+        "帮助教师从学生真实接触到的自然或生活现象开启探究，而不是先讲科学原理。先了解学生看到、听到或感受到的现象，"
+        "提供可直接用于课堂的开放观察提示，并说明提示如何让学生描述证据。不要代替学生编造观察结果、直接公布答案或一次给出完整教案。"
+    ),
+    "teacher_curiosity_observation_detail": (
+        "帮助教师设计课堂追问，让学生比较相同与不同、变化与不变、近处与远处、开始与后来。示范不暗示答案的话术，"
+        "并建议学生如何记录观察。一次聚焦一个观察方向；在有观察记录前不推测原因或揭晓结论。"
+    ),
+    "teacher_curiosity_student_questions": (
+        "帮助教师接住学生自己的问题，而不是用预设问题取代学生好奇心。区分学生原话、可观察的问题和当前暂时无法验证的问题，"
+        "示范复述、追问和邀请选择的话术，支持学生从问题中选出适合本课时和课堂条件探究的一项。"
+    ),
+    "teacher_curiosity_possible_explanations": (
+        "帮助教师组织学生提出多种可能解释，并把解释作为待检验的猜想。示范中性追问，鼓励学生说明依据，避免评价猜想对错或过早给出标准解释。"
+        "保留不同猜想，供后续观察或实验比较。"
+    ),
+    "teacher_curiosity_safe_experiment": (
+        "帮助教师把课堂中的问题和猜想转化为安全、低成本、可比较的小实验。明确改变什么、保持什么相同、观察记录什么及学生分工，"
+        "结合学段和场地说明风险控制；鼓励预测、记录、重复或调整，不为得到预期结果而跳过学生思考。"
+    ),
+    "teacher_curiosity_evidence_and_conclusion": (
+        "基于学生实际完成的观察或实验记录，引导教师组织证据讨论。区分观察事实、解释和阶段性结论，对照不同猜想检查证据，"
+        "讨论结果不一致时的条件、误差和后续验证；结论说明适用边界，并保留不确定和新问题。"
+    ),
+    "teacher_curiosity_teacher_reflection": (
+        "帮助教师复盘课堂中学生最投入的环节、哪些提问推动了思考、是否出现提示过多或解释过早的情况。"
+        "具体肯定学生的观察、提问、尝试和证据表达，提出下一次可调整的一句引导话术，并把遗留问题转为后续探究入口。"
+    ),
+    "parent_nature_museum_discovery": (
+        "家长陪孩子在熟悉、安全的自然环境里寻找想带进‘我的自然博物馆’的植物材料。让孩子先观察颜色、形状、纹理和生长位置，"
+        "请孩子亲自挑选一个想继续了解的发现。可以问：‘哪一片最吸引你？你觉得它有什么特别？’不要急着讲名称或用途。"
+        "结束时一起约定采集边界，并把孩子选中的发现带到下一步整理。"
+    ),
+    "parent_nature_museum_collect": (
+        "优先捡拾自然掉落的叶片、细枝、果实或种子；只有家长确认是常见、不属于受保护植物且允许采集的植物后，才少量采摘叶片，不折枝、不连根、不采不认识或疑似有毒的植物。"
+        "让孩子亲手收集并按叶片、枝条等简单分类。可以问：‘哪些材料相似？你根据什么把它们放在一起？’下一步从中选一件用放大镜观察。"
+    ),
+    "parent_nature_museum_magnifier": (
+        "和孩子轮流用放大镜观察材料的叶脉、边缘、斑点、纹理或枝条截面，轻拿轻放并比较两件材料。"
+        "可以问：‘放大后你看见了什么新细节？哪两件最不一样？’鼓励孩子自己指出证据，不替孩子下结论；下一步把发现写成一句话。"
+    ),
+    "parent_nature_museum_sentence": (
+        "请孩子从自己的观察中选一个最有意思的细节，在卡纸标签上亲手写一句话或画图配一句话，例如‘这片叶子的边缘有小锯齿’。"
+        "可以问：‘别人只看这件标本，哪句话能告诉他你发现了什么？’协助孩子把标签和对应材料配好，下一步规划卡纸上的位置。"
+    ),
+    "parent_nature_museum_layout": (
+        "让孩子先在大卡纸上摆放材料和标签，亲手试出标题、分区、留白和讲解顺序，粘贴前先拍照或画个布局草图。"
+        "可以问：‘你想按颜色、形状还是发现地点来分区？参观的人从哪里开始看？’尊重孩子的分类理由，下一步固定标本和标签。"
+    ),
+    "parent_nature_museum_mount": (
+        "由孩子亲手将干燥、无虫害的材料轻放并固定在卡纸上，使用适龄、安全的胶带或胶水；家长负责剪刀等工具的安全看护。"
+        "可以问：‘怎样固定才看得清细节又不盖住它？这件材料最值得保留的部分是什么？’完成后检查材料与标签对应，下一步准备讲解。"
+    ),
+    "parent_nature_museum_share": (
+        "邀请孩子亲自带领家人参观自然博物馆，介绍一件材料、自己的观察句和分类理由。"
+        "可以问：‘哪一个发现最出乎你的意料？如果再观察一次，你还想弄清什么？’肯定孩子观察和表达的过程，把新问题记在卡纸空白处作为后续探索。"
+    ),
+    "teacher_nature_museum_discovery": (
+        "教师组织学生小组在校园或安全的活动区域观察植物，先让每位学生发现并描述一个感兴趣的对象，再由小组选出要带进‘我的自然博物馆’的材料。"
+        "可以问：‘你们看到了什么不同？为什么选它？’暂不讲解名称和原理；记录小组的发现，下一步共同约定采集规则。"
+    ),
+    "teacher_nature_museum_collect": (
+        "优先由小组捡拾自然掉落的叶片、细枝、果实或种子；只有教师确认是常见、不属于受保护植物且允许采集的植物后，才少量采摘叶片，不折枝、不连根、不采不认识或疑似有毒的植物。"
+        "安排学生分工收集、清点和分类，并共享材料。可以问：‘你们的分类依据是什么？有没有不符合这类的材料？’整理后每组选择材料用放大镜观察。"
+    ),
+    "teacher_nature_museum_magnifier": (
+        "组织组内轮流使用放大镜，观察并比较叶脉、边缘、斑点、纹理或枝条截面；学生轻拿轻放，记录每人发现的一个细节。"
+        "可以问：‘放大后多看见了什么？你们的观察有什么相同或不同？’要求用看到的细节支持表达，下一步各自写下一句观察记录。"
+    ),
+    "teacher_nature_museum_sentence": (
+        "请每位学生亲手写一条简短观察句或画图配句，例如‘这片叶子的边缘有小锯齿’，再由小组核对文字对应的是哪件标本。"
+        "可以问：‘这句话记录的是看见的事实，还是对原因的猜想？’保留学生原话，下一步汇总标签并共同规划班级卡纸版面。"
+    ),
+    "teacher_nature_museum_layout": (
+        "教师组织各小组在大卡纸上试摆材料和标签，讨论按形状、颜色、地点或季节分区，明确标题、标签位置和全班参观顺序，先画版面草图再粘贴。"
+        "可以问：‘不同小组的材料可以怎样连接成一座博物馆？参观者怎样找到证据？’让学生说明布局理由，下一步分工固定标本。"
+    ),
+    "teacher_nature_museum_mount": (
+        "安排学生分工亲手把干燥、无虫害的材料固定在卡纸上，使用适龄、安全的胶带或胶水；剪刀等工具由教师按课堂规范管理。"
+        "可以问：‘怎样固定才能展示细节又不遮挡标本？标签和实物怎样保持对应？’完成后由小组交叉检查，下一步准备班级展览讲解。"
+    ),
+    "teacher_nature_museum_share": (
+        "组织小组轮流担任讲解员，向全班介绍材料来源、观察句、分类依据和仍然不确定的问题，其他学生担任参观者并提出一个新问题。"
+        "可以问：‘哪条证据支持你们的分类？还想观察或验证什么？’总结观察、思考和制作过程，把新问题留在卡纸上用于后续课程。"
+    ),
 }
+
+_PARENT_NATURE_MUSEUM_RHYTHM = (
+    "节奏要求：每15分钟左右安排一次孩子可以参与的动手操作，不要连续讲解；"
+    "本阶段明确列出‘动手操作’、至少一个开放的‘思考问题’，以及完成后的‘下一步’。"
+)
+_TEACHER_NATURE_MUSEUM_RHYTHM = (
+    "节奏要求：每15分钟左右安排一次学生可以参与的动手操作，不要连续讲解；"
+    "本阶段明确列出‘动手操作’、至少一个开放的‘思考问题’，以及完成后的‘下一步’。"
+)
+for _direction_key in tuple(STAGE_DIRECTIONS):
+    if _direction_key.startswith("parent_nature_museum_"):
+        STAGE_DIRECTIONS[_direction_key] = _PARENT_NATURE_MUSEUM_RHYTHM + STAGE_DIRECTIONS[_direction_key]
+    elif _direction_key.startswith("teacher_nature_museum_"):
+        STAGE_DIRECTIONS[_direction_key] = _TEACHER_NATURE_MUSEUM_RHYTHM + STAGE_DIRECTIONS[_direction_key]
 
 
 STAGE_DISPLAY_DIRECTIONS: dict[str, str] = {
@@ -273,6 +372,27 @@ STAGE_DISPLAY_DIRECTIONS: dict[str, str] = {
     "curiosity_safe_experiment": "和孩子设计安全、可比较、可重复的小实验并记录过程。",
     "curiosity_evidence_and_conclusion": "基于观察记录和重复实验讨论证据，最后形成有边界的阶段性结论。",
     "curiosity_parent_reflection": "复盘家长的引导方式，肯定思考过程并规划后续问题。",
+    "teacher_curiosity_phenomenon_observation": "从学生熟悉的真实现象开始，设计课堂观察和好奇心引导。",
+    "teacher_curiosity_observation_detail": "用课堂追问和记录提示，帮助学生看见现象中的更多细节。",
+    "teacher_curiosity_student_questions": "接住学生自己的问题，并共同选出适合课堂探究的问题。",
+    "teacher_curiosity_possible_explanations": "组织学生提出多种可比较、可检验的猜想。",
+    "teacher_curiosity_safe_experiment": "把猜想转化为符合课堂条件的安全实验和记录方案。",
+    "teacher_curiosity_evidence_and_conclusion": "基于课堂证据讨论结果，形成有边界的阶段性认识。",
+    "teacher_curiosity_teacher_reflection": "复盘课堂引导并规划后续探究。",
+    "parent_nature_museum_discovery": "每15分钟左右安排孩子动手观察并选材料；思考问题：哪种最吸引你？下一步约定采集规则。",
+    "parent_nature_museum_collect": "每15分钟左右安排孩子动手收集和分类；思考问题：你根据什么分类？下一步用放大镜观察。",
+    "parent_nature_museum_magnifier": "每15分钟左右安排孩子动手放大观察；思考问题：看见了什么新细节？下一步写观察句。",
+    "parent_nature_museum_sentence": "每15分钟左右安排孩子动手写观察句；思考问题：怎样让别人看懂？下一步试摆卡纸。",
+    "parent_nature_museum_layout": "每15分钟左右安排孩子动手试摆版面；思考问题：参观者先看哪里？下一步固定标本。",
+    "parent_nature_museum_mount": "每15分钟左右安排孩子动手固定标本；思考问题：怎样不遮住细节？下一步准备讲解。",
+    "parent_nature_museum_share": "每15分钟左右安排孩子动手整理展览；思考问题：还想了解什么？下一步记录新问题。",
+    "teacher_nature_museum_discovery": "每15分钟左右安排学生动手观察选材；思考问题：小组为什么选它？下一步约定采集规则。",
+    "teacher_nature_museum_collect": "每15分钟左右安排学生分组动手收集分类；思考问题：依据是什么？下一步放大观察。",
+    "teacher_nature_museum_magnifier": "每15分钟左右安排学生动手放大观察；思考问题：发现有何异同？下一步写观察句。",
+    "teacher_nature_museum_sentence": "每15分钟左右安排学生动手写观察句；思考问题：这是真实观察还是猜想？下一步规划版面。",
+    "teacher_nature_museum_layout": "每15分钟左右安排各组动手试摆卡纸；思考问题：展览顺序如何安排？下一步固定标本。",
+    "teacher_nature_museum_mount": "每15分钟左右安排各组动手固定标本；思考问题：标签如何对应？下一步准备班级展览。",
+    "teacher_nature_museum_share": "每15分钟左右安排学生动手布置展览；思考问题：证据支持什么？下一步收集新问题。",
 }
 
 
@@ -494,6 +614,54 @@ FLOW_TEMPLATES: dict[str, dict[str, Any]] = {
             stage_item(id="parent_reflection", name="家长复盘与延伸", direction_key="curiosity_parent_reflection"),
         ],
     },
+    "teacher_curiosity_inquiry": {
+        "name": "teacher_curiosity_inquiry",
+        "display_name": "激发好奇心",
+        "description": "好奇心专栏｜从学生观察到的现象出发，逐步组织提问、猜想、课堂实验和证据讨论，形成可延伸的探究学习过程。",
+        "role_category": "teacher",
+        "category": "好奇心专栏",
+        "stages": [
+            stage_item(id="phenomenon_observation", name="从现象开始观察", direction_key="teacher_curiosity_phenomenon_observation"),
+            stage_item(id="observation_detail", name="看见更多细节", direction_key="teacher_curiosity_observation_detail"),
+            stage_item(id="child_questions", name="接住学生的问题", direction_key="teacher_curiosity_student_questions"),
+            stage_item(id="possible_explanations", name="提出不同猜想", direction_key="teacher_curiosity_possible_explanations"),
+            stage_item(id="safe_experiment", name="设计并尝试实验", direction_key="teacher_curiosity_safe_experiment"),
+            stage_item(id="evidence_and_conclusion", name="依据证据讨论结果", direction_key="teacher_curiosity_evidence_and_conclusion"),
+            stage_item(id="parent_reflection", name="教师复盘与延伸", direction_key="teacher_curiosity_teacher_reflection"),
+        ],
+    },
+    "parent_nature_museum": {
+        "name": "parent_nature_museum",
+        "display_name": "我的自然博物馆",
+        "description": "好奇心专栏｜家长陪伴孩子观察、收集和整理植物材料，在大卡纸上制作并讲解属于自己的自然博物馆。",
+        "role_category": "parent",
+        "category": "好奇心专栏",
+        "stages": [
+            stage_item(id="nature_spot_discovery", name="发现自然材料", direction_key="parent_nature_museum_discovery"),
+            stage_item(id="nature_collect_and_sort", name="采集与整理", direction_key="parent_nature_museum_collect"),
+            stage_item(id="nature_magnifier_observation", name="放大观察", direction_key="parent_nature_museum_magnifier"),
+            stage_item(id="nature_observation_sentence", name="写下观察句", direction_key="parent_nature_museum_sentence"),
+            stage_item(id="nature_card_layout", name="设计卡纸布局", direction_key="parent_nature_museum_layout"),
+            stage_item(id="nature_specimen_mounting", name="制作自然标本", direction_key="parent_nature_museum_mount"),
+            stage_item(id="nature_museum_sharing", name="讲解与回顾", direction_key="parent_nature_museum_share"),
+        ],
+    },
+    "teacher_nature_museum": {
+        "name": "teacher_nature_museum",
+        "display_name": "我的自然博物馆",
+        "description": "好奇心专栏｜教师组织学生小组观察和收集植物材料，协作制作大卡纸自然博物馆并开展班级展示。",
+        "role_category": "teacher",
+        "category": "好奇心专栏",
+        "stages": [
+            stage_item(id="nature_spot_discovery", name="发现自然材料", direction_key="teacher_nature_museum_discovery"),
+            stage_item(id="nature_collect_and_sort", name="采集与整理", direction_key="teacher_nature_museum_collect"),
+            stage_item(id="nature_magnifier_observation", name="放大观察", direction_key="teacher_nature_museum_magnifier"),
+            stage_item(id="nature_observation_sentence", name="写下观察句", direction_key="teacher_nature_museum_sentence"),
+            stage_item(id="nature_card_layout", name="设计卡纸布局", direction_key="teacher_nature_museum_layout"),
+            stage_item(id="nature_specimen_mounting", name="制作自然标本", direction_key="teacher_nature_museum_mount"),
+            stage_item(id="nature_museum_sharing", name="讲解与回顾", direction_key="teacher_nature_museum_share"),
+        ],
+    },
 }
 
 
@@ -502,7 +670,11 @@ FLOW_TEMPLATES: dict[str, dict[str, Any]] = {
 for _teacher_flow_name, _teacher_flow in list(FLOW_TEMPLATES.items()):
     if _teacher_flow.get("role_category") != "teacher":
         continue
-    if _teacher_flow_name == "stone_buddha_ancient_road_course":
+    if _teacher_flow_name in {
+        "stone_buddha_ancient_road_course",
+        "teacher_curiosity_inquiry",
+        "teacher_nature_museum",
+    }:
         continue
     _parent_flow = deepcopy(_teacher_flow)
     _parent_flow["name"] = f"parent_{_teacher_flow_name}"

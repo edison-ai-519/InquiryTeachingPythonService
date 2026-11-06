@@ -155,6 +155,71 @@ def test_parent_curiosity_column_has_a_scaffolded_curiosity_training_flow():
     assert "parent_curiosity_inquiry" not in {
         item["name"] for item in list_flows("teacher")
     }
+    assert "parent_teacher_curiosity_inquiry" not in {
+        item["name"] for item in list_flows("parent")
+    }
+
+
+def test_teacher_curiosity_column_has_the_same_scaffold_in_a_classroom_context():
+    teacher_flows = {flow["name"]: flow for flow in list_flows("teacher")}
+    flow = teacher_flows["teacher_curiosity_inquiry"]
+
+    assert flow["category"] == "好奇心专栏"
+    assert flow["display_name"] == "激发好奇心"
+    assert [stage["id"] for stage in flow["stages"]] == [
+        "phenomenon_observation",
+        "observation_detail",
+        "child_questions",
+        "possible_explanations",
+        "safe_experiment",
+        "evidence_and_conclusion",
+        "parent_reflection",
+    ]
+    assert "学生" in flow["stages"][0]["direction"]
+    assert "课堂" in flow["stages"][4]["direction"]
+    assert "教师" in flow["stages"][6]["direction"]
+    assert all("孩子" not in stage["direction"] for stage in flow["stages"])
+    assert "parent_curiosity_inquiry" not in teacher_flows
+
+
+def test_nature_museum_workflow_is_role_isolated_and_keeps_a_regular_hands_on_rhythm():
+    parent_flows = {flow["name"]: flow for flow in list_flows("parent")}
+    teacher_flows = {flow["name"]: flow for flow in list_flows("teacher")}
+    parent = parent_flows["parent_nature_museum"]
+    teacher = teacher_flows["teacher_nature_museum"]
+    expected_stages = [
+        "nature_spot_discovery",
+        "nature_collect_and_sort",
+        "nature_magnifier_observation",
+        "nature_observation_sentence",
+        "nature_card_layout",
+        "nature_specimen_mounting",
+        "nature_museum_sharing",
+    ]
+
+    for flow in (parent, teacher):
+        assert flow["category"] == "好奇心专栏"
+        assert flow["display_name"] == "我的自然博物馆"
+        assert [stage["id"] for stage in flow["stages"]] == expected_stages
+        for stage in flow["stages"]:
+            direction = stage["direction"]
+            assert "15分钟" in direction
+            assert "动手" in direction
+            assert "问题" in direction
+            assert "下一步" in direction
+            display_direction = stage["display_direction"]
+            assert "15分钟" in display_direction
+            assert "动手" in display_direction
+            assert "问题" in display_direction
+            assert "下一步" in display_direction
+
+    assert "家长" in parent["stages"][0]["direction"]
+    assert "小组" in teacher["stages"][0]["direction"]
+    assert "受保护植物" in parent["stages"][1]["direction"]
+    assert "受保护植物" in teacher["stages"][1]["direction"]
+    assert "teacher_nature_museum" not in parent_flows
+    assert "parent_teacher_nature_museum" not in parent_flows
+    assert "parent_nature_museum" not in teacher_flows
 
 
 def test_parent_household_context_is_optional_and_does_not_collect_identity():

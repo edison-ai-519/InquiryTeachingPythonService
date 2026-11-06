@@ -34,7 +34,11 @@ def register(payload: RegisterRequest, response: Response, db: Session = Depends
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="用户名已存在") from exc
 
     set_auth_cookie(response, token)
-    return {"code": 0, "message": "registered", "data": serialize_user(user)}
+    return {
+        "code": 0,
+        "message": "registered",
+        "data": serialize_user(user, workspace_roles_for_user(db, user)),
+    }
 
 
 @router.post("/login")
@@ -77,7 +81,11 @@ def register_admin(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="用户名已存在") from exc
 
     set_auth_cookie(response, token)
-    return {"code": 0, "message": "admin registered", "data": serialize_user(user)}
+    return {
+        "code": 0,
+        "message": "admin registered",
+        "data": serialize_user(user, workspace_roles_for_user(db, user)),
+    }
 
 
 @router.post("/admin/login")
