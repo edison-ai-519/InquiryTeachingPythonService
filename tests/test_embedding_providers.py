@@ -173,12 +173,60 @@ def store_with_metadata(monkeypatch, tmp_path, s, metadata):
 def test_old_local_index_is_compatible(monkeypatch, tmp_path):
     s = settings("local")
     store, collection = store_with_metadata(monkeypatch, tmp_path, s, {
-        "embedding_model": s.curriculum_embedding_model, "hnsw:space": "cosine"
+        "embedding_model": s.curriculum_embedding_model,
+        "hnsw:space": "cosine",
+        "hnsw:search_ef": 100,
+        "custom_note": "preserve",
     })
     assert store.available
     assert not store.rebuild_required
     store._validate_dimension(512)
-    assert collection.modify.call_args.kwargs["metadata"]["hnsw:space"] == "cosine"
+    metadata = collection.modify.call_args.kwargs["metadata"]
+    assert not any(key.startswith("hnsw:") for key in metadata)
+    assert metadata["custom_note"] == "preserve"
+    assert metadata["embedding_dimension"] == 512
+    assert all(metadata[key] == value for key, value in vectors.embedding_identity(s).items())
+
+
+@pytest.mark.parametrize("provider", ["local", "remote"])
+def test_chroma_fresh_index_append_and_rebuild(tmp_path, provider):
+    pytest.importorskip("chromadb")
+    s = settings(provider, curriculum_vector_dir=tmp_path, curriculum_vector_enabled=True)
+    model = Mock()
+    model.availability_error.return_value = ""
+    model.encode.return_value = [[1.0, 0.0]]
+    first = vectors.CurriculumChunkModel(
+        id=1, source="first.txt", source_index=0, content="first chunk"
+    )
+    second = vectors.CurriculumChunkModel(
+        id=2, source="second.txt", source_index=0, content="second chunk"
+    )
+
+    store = vectors.CurriculumVectorStore(s, model)
+    assert store.available
+    assert store.count() == 0
+    assert store.index_chunks([first]) == 1
+    assert store.collection.metadata["embedding_dimension"] == 2
+    assert store.collection.configuration["hnsw"]["space"] == "cosine"
+    assert all(
+        store.collection.metadata[key] == value
+        for key, value in vectors.embedding_identity(s).items()
+    )
+
+    # Reopen the existing index and append without changing its configuration.
+    store = vectors.CurriculumVectorStore(s, model)
+    assert store.available
+    assert store.index_chunks([second]) == 1
+    assert store.count() == 2
+    assert store.collection.configuration["hnsw"]["space"] == "cosine"
+    assert store.query("first chunk", 1, allowed_sources=["first.txt"])[0].chunk_id == 1
+
+    # Rebuilding creates a fresh collection and must also record its dimension.
+    assert store.rebuild([first]) == 1
+    assert store.count() == 1
+    assert store.collection.metadata["embedding_dimension"] == 2
+    assert store.collection.configuration["hnsw"]["space"] == "cosine"
+    assert store.query("first chunk", 1)[0].chunk_id == 1
 
 
 @pytest.mark.parametrize("change", ["provider", "model", "endpoint", "dimension"])

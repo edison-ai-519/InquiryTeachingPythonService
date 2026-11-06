@@ -43,7 +43,7 @@
         {{ currentRole === 'study_travel' ? '项目协同' : '任务大厅' }}
       </button>
       <button class="header-admin-button user-guide-trigger" type="button" @click="$emit('open-user-guide')"><BookOpen :size="15" /><span>使用手册</span></button>
-      <ExpertSelector v-model="expertId" :experts="experts" :role-category="currentRole" :disabled="streaming || !session" />
+      <ExpertSelector v-model="expertId" :experts="experts" :role-category="currentRole" :disabled="streaming" />
       <button v-if="user?.is_admin" class="header-admin-button" type="button" @click="$emit('open-graph-admin')">图谱管理</button>
       <span class="connection-status" :class="{ streaming }"><i></i>{{ streaming ? '正在生成' : '已连接' }}</span>
       <button class="header-icon-button" type="button" :title="themeMode === 'light' ? '切换深色模式' : '切换浅色模式'" @click="$emit('toggle-theme')">

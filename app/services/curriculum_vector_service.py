@@ -350,6 +350,12 @@ class CurriculumVectorStore:
             )
             raise CurriculumVectorUnavailable(self.error)
         if indexed_dimension != dimension:
+            # Index settings belong to collection creation/configuration, not metadata updates.
+            metadata = {
+                key: value
+                for key, value in metadata.items()
+                if not key.startswith("hnsw:")
+            }
             self.collection.modify(
                 metadata={
                     **metadata,
